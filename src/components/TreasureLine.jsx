@@ -1,18 +1,18 @@
+import { ItemSearch } from '@521studios/pfsrd2-display'
 import { SALE_CLASSES, TREASURE_STATES } from '../model.js'
+import { pfsrd2 } from '../api/pfsrd2.js'
+import ItemView from './ItemView.jsx'
 
-// One treasure row. ref is a pfsrd2 game_id for now; qty, a mask (with the label
-// players see + an identify DC), sale class, and post-encounter state.
+// One treasure row. Before an item is chosen, the library ItemSearch picks it by
+// name (no more typing raw game_ids). Once chosen: the ItemCard preview (masked-
+// aware) plus qty, a mask (label players see + identify DC), sale class, and
+// post-encounter state.
 export default function TreasureLine({ treasure, disabled, onChange, onRemove }) {
   const set = (fields) => onChange({ ...treasure, ...fields })
-  return (
-    <div className="line treasure-line">
-      <input
-        className="grow"
-        placeholder="item game_id"
-        value={treasure.ref?.game_id || ''}
-        disabled={disabled}
-        onChange={(e) => set({ ref: { game_id: e.target.value } })}
-      />
+  const gameId = treasure.ref?.game_id || ''
+
+  const controls = (
+    <div className="line treasure-controls">
       <input
         type="number"
         min="1"
@@ -72,6 +72,40 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
       {!disabled && (
         <button type="button" className="link danger" onClick={onRemove}>Remove</button>
       )}
+    </div>
+  )
+
+  if (!gameId) {
+    return (
+      <div className="line treasure-line">
+        {disabled ? (
+          <span className="picked grow muted">— no item</span>
+        ) : (
+          <div className="item-search grow">
+            <ItemSearch
+              search={pfsrd2.suggestItems}
+              onSelect={(it) => set({ ref: { game_id: it.game_id } })}
+              placeholder="search an item…"
+            />
+          </div>
+        )}
+        {!disabled && (
+          <button type="button" className="link danger" onClick={onRemove}>Remove</button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="treasure-line-wrap">
+      <ItemView gameId={gameId} />
+      {treasure.masked && (
+        <p className="muted mask-note">Players see: {treasure.mask_label || 'Unidentified Item'}</p>
+      )}
+      {!disabled && (
+        <button type="button" className="link" onClick={() => set({ ref: { game_id: '' } })}>change item</button>
+      )}
+      {controls}
     </div>
   )
 }
