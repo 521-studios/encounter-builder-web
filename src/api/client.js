@@ -23,6 +23,15 @@ export function buildHeaders(token, { json = false } = {}) {
   return headers
 }
 
+// Hex SHA-256 of the request body. CloudFront OAC signs the Lambda Function URL
+// request with SigV4; a bodied request MUST carry the payload hash in
+// x-amz-content-sha256 or the OAC signature (which omits the body) mismatches
+// and the Function URL rejects it with 403 before it reaches the app.
+export async function bodyHash(bodyStr) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(bodyStr))
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 async function parseBody(res) {
   const text = await res.text()
   if (!text) return null
@@ -36,11 +45,12 @@ async function parseBody(res) {
 // tokenProvider is injectable for testing; defaults to the wired OIDC session.
 export async function request(method, path, { body, tokenProvider = getToken, fetchImpl = fetch } = {}) {
   const token = await tokenProvider()
-  const res = await fetchImpl(config.apiBase + path, {
-    method,
-    headers: buildHeaders(token, { json: body !== undefined }),
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  const bodyStr = body !== undefined ? JSON.stringify(body) : undefined
+  const headers = buildHeaders(token, { json: bodyStr !== undefined })
+  if (bodyStr !== undefined) {
+    headers['x-amz-content-sha256'] = await bodyHash(bodyStr) // required for OAC SigV4 on bodied requests
+  }
+  const res = await fetchImpl(config.apiBase + path, { method, headers, body: bodyStr })
   if (!res.ok) throw new ApiError(res.status, await parseBody(res))
   return res.status === 204 ? null : parseBody(res)
 }

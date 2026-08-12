@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildHeaders, request, ApiError } from './client.js'
+import { buildHeaders, request, ApiError, bodyHash } from './client.js'
+
+test('bodyHash returns the hex SHA-256 (known vector for empty string)', async () => {
+  assert.equal(await bodyHash(''), 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+})
 
 test('buildHeaders attaches the bearer as X-Access-Token', () => {
   const h = buildHeaders('tok-abc')
@@ -49,6 +53,14 @@ test('request serializes a JSON body and sets Content-Type', async () => {
   const opts = fetchImpl.calls[0].opts
   assert.equal(opts.body, JSON.stringify({ name: 'Goblins' }))
   assert.equal(opts.headers['Content-Type'], 'application/json')
+  // OAC SigV4 needs the body hash on bodied requests, or the Function URL 403s.
+  assert.equal(opts.headers['x-amz-content-sha256'], await bodyHash(JSON.stringify({ name: 'Goblins' })))
+})
+
+test('request omits x-amz-content-sha256 on bodiless requests (GET)', async () => {
+  const fetchImpl = fakeFetch({ ok: true, status: 200, text: async () => '[]' })
+  await request('GET', '/api/app/campaigns/g1/encounters', { tokenProvider: async () => 't', fetchImpl })
+  assert.equal(fetchImpl.calls[0].opts.headers['x-amz-content-sha256'], undefined)
 })
 
 test('request throws ApiError with status + body on non-ok', async () => {
