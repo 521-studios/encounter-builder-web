@@ -3,6 +3,7 @@ import { errorMessage } from '../api/errors.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { groupEncountersByChapter, nextChapterOrder, UNSORTED } from '../chapters.js'
+import { toEncounterInput } from '../model.js'
 
 // The sidebar chapter tree: chapters (in order) each expand to their encounters
 // (natural-sorted), with a "+ encounter" per chapter and chapter add/rename/delete.
@@ -50,6 +51,17 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
   async function removeEncounter(id) {
     try {
       await encountersApi.remove(campaignId, id)
+      await load()
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+
+  // Move an encounter to another chapter (or Unsorted, chapterId=''). PUT replaces
+  // the resource, so send the whole encounter with the new chapter_id.
+  async function moveEncounter(enc, chapterId) {
+    try {
+      await encountersApi.update(campaignId, enc.id, { ...toEncounterInput(enc), chapter_id: chapterId })
       await load()
     } catch (e) {
       setError(errorMessage(e))
@@ -141,6 +153,18 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
                       >
                         {e.name} <span className="status">{e.status}</span>
                       </button>
+                      <select
+                        className="move-encounter"
+                        aria-label={`Move ${e.name} to chapter`}
+                        value={g.chapter ? g.chapter.id : ''}
+                        disabled={e.status === 'released'}
+                        onChange={(ev) => moveEncounter(e, ev.target.value)}
+                      >
+                        <option value="">Unsorted</option>
+                        {chapters.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
                       <button
                         className="link danger"
                         aria-label={`Delete ${e.name}`}
