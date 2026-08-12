@@ -147,3 +147,58 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
   border-radius: 0.5rem; padding: 1rem; overflow-x: auto;
 }
 
+
+/* Two-pane layout: sidebar (campaign switcher + encounter list) | main (editor).
+   Widen the app shell only when the two-pane is present; the campaign picker
+   stays in the narrow single column. */
+.app:has(.two-pane) { max-width: 72rem; }
+
+.two-pane {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  align-items: flex-start;
+}
+
+.sidebar {
+  flex: 0 0 18rem;
+  display: grid;
+  gap: 1rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.main { flex: 1; min-width: 0; }
+
+.campaign-switcher {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  text-align: left;
+  padding: 0.6rem 0.85rem;
+  background: var(--panel);
+  border-color: var(--panel);
+}
+.campaign-switcher-name { font-weight: 600; }
+.campaign-switcher-hint { opacity: 0.6; font-size: 0.85rem; }
+
+button.encounter.selected {
+  border-color: var(--accent);
+  background: var(--panel);
+}
+
+.empty-main {
+  opacity: 0.6;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--panel);
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+/* Sidebar responsiveness: stack on narrow viewports. */
+@media (max-width: 40rem) {
+  .two-pane { flex-direction: column; }
+  .sidebar { flex-basis: auto; position: static; width: 100%; }
+}
