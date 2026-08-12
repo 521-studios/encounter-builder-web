@@ -22,6 +22,13 @@ export const pfsrd2 = {
     params.append('type', 'npcs')
     return request('GET', `/api/pfsrd2/search/suggest/unified?${params.toString()}`, opts)
   },
+  // Autocomplete over items (equipment/weapons/armor/shields). Same result shape
+  // as suggestMonsters, so the library ItemSearch consumes it directly.
+  suggestItems: (q, opts = {}) => {
+    const params = new URLSearchParams({ q })
+    for (const t of ['equipment', 'weapons', 'armor', 'shields']) params.append('type', t)
+    return request('GET', `/api/pfsrd2/search/suggest/unified?${params.toString()}`, opts)
+  },
   // Full creature entry (with schema_version) for CreatureStatBlock.
   entryFull: (gameId, opts = {}) =>
     request('GET', `/api/pfsrd2/entries/${gameIdPath(gameId)}/full`, opts),

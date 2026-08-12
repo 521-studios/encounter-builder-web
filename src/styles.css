@@ -238,3 +238,7 @@ button.encounter.selected {
   padding: 0.25rem 0.75rem;
   font-size: 0.95rem;
 }
+
+/* Treasure line: library ItemSearch to pick, ItemCard to preview (masked-aware). */
+.treasure-line-wrap { display: grid; gap: 0.5rem; border-top: 1px solid var(--panel); padding-top: 0.5rem; }
+.treasure-controls { flex-wrap: wrap; }
