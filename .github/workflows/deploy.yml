@@ -38,6 +38,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Build SPA
+        env:
+          VITE_OIDC_AUTHORITY: https://lets-roll.staging.521studios.com
+        run: |
+          npm ci
+          npm run build
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -93,6 +105,18 @@ jobs:
         run: |
           echo "❌ Production deploys must be triggered from main (got: ${{ github.ref }})"
           exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Build SPA
+        env:
+          VITE_OIDC_AUTHORITY: https://lets-roll.521studios.com
+        run: |
+          npm ci
+          npm run build
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4

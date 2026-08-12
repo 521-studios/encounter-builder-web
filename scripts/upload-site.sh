@@ -6,7 +6,7 @@ set -euo pipefail
 
 BUCKET="${1:?usage: upload-site.sh <bucket> <sha>}"
 SHA="${2:?usage: upload-site.sh <bucket> <sha>}"
-SRC="site"
+SRC="dist"
 
 for prefix in "$SHA" current; do
   extra=()
