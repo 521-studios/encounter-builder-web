@@ -2,14 +2,15 @@ import { useState } from 'react'
 import { CreatureSearch } from '@521studios/pfsrd2-display'
 import { ADJUSTMENTS } from '../model.js'
 import { pfsrd2 } from '../api/pfsrd2.js'
-import CreatureView from './CreatureView.jsx'
+import MonsterView from './MonsterView.jsx'
 
 // One monster row. Before a monster is chosen, a pfsrd2 search picker fills the
 // ref (and seeds the nickname with the monster's name). Once chosen: count,
 // elite/weak, an editable nickname, and a toggleable stat-block preview.
 export default function MonsterLine({ monster, disabled, onChange, onRemove }) {
   const set = (fields) => onChange({ ...monster, ...fields })
-  const gameId = monster.ref?.game_id || ''
+  // Pristine refs carry game_id; a templated (derived) ref carries base.game_id.
+  const gameId = monster.ref?.game_id || monster.ref?.base?.game_id || ''
   const [showBlock, setShowBlock] = useState(false)
 
   if (!gameId) {
@@ -74,7 +75,7 @@ export default function MonsterLine({ monster, disabled, onChange, onRemove }) {
           <button type="button" className="link danger" onClick={onRemove}>Remove</button>
         )}
       </div>
-      {showBlock && <CreatureView gameId={gameId} />}
+      {showBlock && <MonsterView monster={monster} onChange={onChange} disabled={disabled} />}
     </div>
   )
 }
