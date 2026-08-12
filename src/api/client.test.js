@@ -2,8 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildHeaders, request, ApiError, bodyHash } from './client.js'
 
-test('bodyHash returns the hex SHA-256 (known vector for empty string)', async () => {
+test('bodyHash returns the hex SHA-256 (known vectors)', async () => {
   assert.equal(await bodyHash(''), 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+  // "abc" — its digest contains a 0x01 byte, so this vector guards the
+  // padStart(2,'0') leading-zero handling that real payloads depend on.
+  assert.equal(await bodyHash('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
 })
 
 test('buildHeaders attaches the bearer as X-Access-Token', () => {
