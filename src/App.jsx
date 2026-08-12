@@ -54,7 +54,6 @@ export default function App() {
             setCampaign(c)
             setEditing(null)
           }}
-          selectedId={campaign?.id}
         />
       )}
 

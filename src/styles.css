@@ -170,6 +170,8 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
 
 .main { flex: 1; min-width: 0; }
 
+.campaign-switcher-heading { margin: 0; font: inherit; }
+
 .campaign-switcher {
   width: 100%;
   display: flex;
