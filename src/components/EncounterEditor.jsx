@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 import { CURRENCIES, emptyMonster, emptyTreasure } from '../model.js'
 import MonsterLine from './MonsterLine.jsx'
@@ -16,7 +17,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     encounters
       .get(campaignId, encounterId)
       .then((e) => alive && setEnc(e))
-      .catch((e) => alive && setError(e.message || String(e)))
+      .catch((e) => alive && setError(errorMessage(e)))
     return () => {
       alive = false
     }
@@ -50,7 +51,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       setEnc(saved)
       onSaved && onSaved(saved)
     } catch (e) {
-      setError(e.message || String(e))
+      setError(errorMessage(e))
     } finally {
       setSaving(false)
     }

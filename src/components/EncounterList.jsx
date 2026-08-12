@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 
 // Encounters within a campaign: list, create, select-to-edit, delete.
@@ -15,7 +16,7 @@ export default function EncounterList({ campaignId, onEdit, reloadKey }) {
     encounters
       .list(campaignId)
       .then((l) => alive && setList(l))
-      .catch((e) => alive && setError(e.message || String(e)))
+      .catch((e) => alive && setError(errorMessage(e)))
     return () => {
       alive = false
     }
@@ -44,7 +45,7 @@ export default function EncounterList({ campaignId, onEdit, reloadKey }) {
       await encounters.remove(campaignId, id)
       setList((l) => (l || []).filter((e) => e.id !== id))
     } catch (e) {
-      setError(e.message || String(e))
+      setError(errorMessage(e))
     }
   }
 
