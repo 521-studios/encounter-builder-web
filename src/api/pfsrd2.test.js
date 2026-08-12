@@ -25,9 +25,10 @@ test('suggestMonsters queries suggest/unified for monsters + npcs', async () => 
   assert.match(url, /type=npcs/)
 })
 
-test('entryFull fetches the /full entry, url-encoding the game_id', async () => {
+test('entryFull keeps the raw colon in the game_id (the API 404s on %3A)', async () => {
   const fetchImpl = fakeFetch(ok({ name: 'Goblin Dog', schema_version: 1.4 }))
   const out = await pfsrd2.entryFull('Monsters:3028', { tokenProvider: tok, fetchImpl })
   assert.equal(out.name, 'Goblin Dog')
-  assert.match(fetchImpl.calls[0].url, /\/api\/pfsrd2\/entries\/Monsters%3A3028\/full$/)
+  assert.match(fetchImpl.calls[0].url, /\/api\/pfsrd2\/entries\/Monsters:3028\/full$/)
+  assert.ok(!fetchImpl.calls[0].url.includes('%3A'), 'must not encode the colon')
 })
