@@ -5,6 +5,16 @@ import { CURRENCIES, emptyMonster, emptyTreasure, withKey, stripKey } from '../m
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
 
+// Stamp a server encounter's lines with stable client keys (the server has no
+// per-line ids); stripped again before save.
+function keyed(e) {
+  return {
+    ...e,
+    monsters: (e.monsters || []).map(withKey),
+    treasure: (e.treasure || []).map(withKey),
+  }
+}
+
 export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved }) {
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
@@ -16,15 +26,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     setError(null)
     encounters
       .get(campaignId, encounterId)
-      .then((e) => {
-        if (!alive) return
-        // Stamp loaded lines with stable client keys (server has no line ids).
-        setEnc({
-          ...e,
-          monsters: (e.monsters || []).map(withKey),
-          treasure: (e.treasure || []).map(withKey),
-        })
-      })
+      .then((e) => alive && setEnc(keyed(e)))
       .catch((e) => alive && setError(errorMessage(e)))
     return () => {
       alive = false
@@ -42,22 +44,44 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const setMonster = (i, m) => patch({ monsters: monsters.map((x, j) => (j === i ? m : x)) })
   const setTreasure = (i, t) => patch({ treasure: treasure.map((x, j) => (j === i ? t : x)) })
 
+  function buildInput() {
+    return {
+      name: enc.name,
+      notes: enc.notes || '',
+      monsters: monsters.map(stripKey), // drop the client-only _key
+      treasure: treasure.map(stripKey),
+      currency: enc.currency || {},
+      // release is its own action; update keeps draft/run.
+      ...(released ? {} : { status: enc.status }),
+    }
+  }
+
   async function save() {
     setSaving(true)
     setError(null)
     try {
-      const input = {
-        name: enc.name,
-        notes: enc.notes || '',
-        monsters: monsters.map(stripKey), // drop the client-only _key
-        treasure: treasure.map(stripKey),
-        currency: enc.currency || {},
-        // release is its own action (slice 5); update keeps draft/run.
-        ...(released ? {} : { status: enc.status }),
-      }
-      const saved = await encounters.update(campaignId, encounterId, input)
-      setEnc(saved)
+      const saved = await encounters.update(campaignId, encounterId, buildInput())
+      setEnc(keyed(saved))
       onSaved && onSaved(saved)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Release hands the loot to the party: it saves current edits first (so the
+  // released encounter matches what the GM sees), then flips it to released —
+  // after which the editor renders read-only.
+  async function release() {
+    if (!window.confirm('Release this encounter to the party? It becomes read-only.')) return
+    setSaving(true)
+    setError(null)
+    try {
+      await encounters.update(campaignId, encounterId, buildInput())
+      const result = await encounters.release(campaignId, encounterId)
+      setEnc(keyed(result))
+      onSaved && onSaved(result)
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -144,9 +168,12 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       </fieldset>
 
       {!released && (
-        <button className="primary" onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
+        <div className="actions">
+          <button className="primary" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button onClick={release} disabled={saving}>Release to party</button>
+        </div>
       )}
     </section>
   )
