@@ -4,13 +4,7 @@
 // from X-Access-Token (forwarded untouched by the origin-request-policy). This
 // works identically for local dev (Vite proxies /api to the staging edge).
 import { config } from '../config.js'
-
-// The token provider is injected at startup (App wires it to the OIDC session)
-// so this module stays decoupled from the browser-only auth code and unit-testable.
-let currentTokenProvider = async () => null
-export function setTokenProvider(fn) {
-  currentTokenProvider = fn
-}
+import { getToken } from './token.js'
 
 export class ApiError extends Error {
   constructor(status, body) {
@@ -40,7 +34,7 @@ async function parseBody(res) {
 }
 
 // tokenProvider is injectable for testing; defaults to the wired OIDC session.
-export async function request(method, path, { body, tokenProvider = currentTokenProvider, fetchImpl = fetch } = {}) {
+export async function request(method, path, { body, tokenProvider = getToken, fetchImpl = fetch } = {}) {
   const token = await tokenProvider()
   const res = await fetchImpl(config.apiBase + path, {
     method,

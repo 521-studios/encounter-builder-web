@@ -44,3 +44,44 @@ button.primary { background: var(--accent); color: #14110f; font-weight: 600; }
 }
 
 .error { color: #e5736b; }
+.muted { opacity: 0.7; }
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+button.link {
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.campaigns h2, .selected h2 { font-size: 1.25rem; }
+
+.campaign-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+button.campaign {
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+}
+
+button.campaign.selected {
+  border-color: var(--accent);
+  background: var(--panel);
+}
+
+.empty { opacity: 0.8; }
+
+.selected { margin-top: 1.5rem; border-top: 1px solid var(--panel); padding-top: 1rem; }
+
