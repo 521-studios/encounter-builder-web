@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { CreatureSearch } from '@521studios/pfsrd2-display'
 import { ADJUSTMENTS } from '../model.js'
-import MonsterSearch from './MonsterSearch.jsx'
+import { pfsrd2 } from '../api/pfsrd2.js'
 import CreatureView from './CreatureView.jsx'
 
 // One monster row. Before a monster is chosen, a pfsrd2 search picker fills the
@@ -14,10 +15,13 @@ export default function MonsterLine({ monster, disabled, onChange, onRemove }) {
   if (!gameId) {
     return (
       <div className="line monster-line">
-        <MonsterSearch
-          disabled={disabled}
-          onPick={(m) => set({ ref: { game_id: m.game_id }, nickname: monster.nickname || m.name })}
-        />
+        <div className="monster-search grow">
+          <CreatureSearch
+            search={pfsrd2.suggestMonsters}
+            onSelect={(m) => set({ ref: { game_id: m.game_id }, nickname: monster.nickname || m.name })}
+            placeholder="search a monster…"
+          />
+        </div>
         {!disabled && (
           <button type="button" className="link danger" onClick={onRemove}>Remove</button>
         )}

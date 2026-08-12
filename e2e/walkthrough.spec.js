@@ -20,11 +20,11 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   await page.getByTestId('new-encounter').locator('button').click()
   await expect(page.locator('.editor')).toBeVisible()
 
-  // Add a monster via pfsrd2 search and confirm the stat block renders.
+  // Add a monster via the library CreatureSearch and confirm the stat block renders.
   await page.getByRole('button', { name: '+ monster' }).click()
-  await page.locator('.monster-search input').first().fill('goblin')
-  await expect(page.locator('.suggestions button').first()).toBeVisible()
-  await page.locator('.suggestions button').first().click()
+  await page.locator('.monster-search [data-testid="creature-search"]').first().fill('goblin')
+  await expect(page.locator('.monster-search [data-testid="search-result"]').first()).toBeVisible()
+  await page.locator('.monster-search [data-testid="search-result"]').first().click()
   await expect(page.locator('.picked')).toBeVisible()
   await page.getByRole('button', { name: 'stat block' }).first().click()
   await expect(page.locator('.statblock')).toBeVisible()
