@@ -1,19 +1,9 @@
 import { useEffect, useState } from 'react'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
-import { CURRENCIES, emptyMonster, emptyTreasure, withKey, stripKey } from '../model.js'
+import { CURRENCIES, emptyMonster, emptyTreasure, stripKey, keyed } from '../model.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
-
-// Stamp a server encounter's lines with stable client keys (the server has no
-// per-line ids); stripped again before save.
-function keyed(e) {
-  return {
-    ...e,
-    monsters: (e.monsters || []).map(withKey),
-    treasure: (e.treasure || []).map(withKey),
-  }
-}
 
 export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved }) {
   const [enc, setEnc] = useState(null) // null = loading
