@@ -1,0 +1,8 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+node_modules/
+dist/
+dist-site/
+.DS_Store
