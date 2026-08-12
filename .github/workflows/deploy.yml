@@ -1,0 +1,127 @@
+name: Deploy encounter-builder-web
+
+on:
+  push:
+    branches: [main] # → staging auto-deploy
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, production]
+
+permissions:
+  contents: read
+  id-token: write # OIDC
+
+env:
+  AWS_REGION: us-east-2
+  TF_VERSION: "1.9.0"
+
+jobs:
+  # ── Staging: auto on push to main, or manual dispatch ─────────────────────
+  deploy-staging:
+    name: Deploy — staging
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+
+    env:
+      TF_STATE_BUCKET: 521studios-infra-tfstate-242288027927
+      S3_BUCKET: 521studios-staging-encounter-builder-web
+      SITE_DOMAIN: encounters.staging.521studios.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: encounter-builder-web-deploy-staging
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: terraform
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=encounter-builder-web/staging/terraform.tfstate"
+
+      - name: Terraform apply
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var="env=staging" \
+            -var="active_sha=${{ github.sha }}"
+
+      - name: Upload site to S3
+        run: ./scripts/upload-site.sh "${{ env.S3_BUCKET }}" "${{ github.sha }}"
+
+      - name: Invalidate CloudFront
+        run: ./scripts/invalidate.sh "${{ env.SITE_DOMAIN }}"
+
+  # ── Production: manual dispatch only ──────────────────────────────────────
+  deploy-production:
+    name: Deploy — production
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    env:
+      TF_STATE_BUCKET: 521studios-infra-tfstate-242258465702
+      S3_BUCKET: 521studios-production-encounter-builder-web
+      SITE_DOMAIN: encounters.521studios.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require main branch for production
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "❌ Production deploys must be triggered from main (got: ${{ github.ref }})"
+          exit 1
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: encounter-builder-web-deploy-production
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: terraform
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="key=encounter-builder-web/production/terraform.tfstate"
+
+      - name: Terraform apply
+        working-directory: terraform
+        run: |
+          terraform apply -auto-approve -input=false \
+            -var="env=production" \
+            -var="active_sha=${{ github.sha }}"
+
+      - name: Upload site to S3
+        run: ./scripts/upload-site.sh "${{ env.S3_BUCKET }}" "${{ github.sha }}"
+
+      - name: Invalidate CloudFront
+        run: ./scripts/invalidate.sh "${{ env.SITE_DOMAIN }}"
