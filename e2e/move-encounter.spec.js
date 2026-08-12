@@ -1,9 +1,18 @@
 import { test, expect } from '@playwright/test'
 import { login, trackApiErrors } from './helpers/login.js'
 
-// Move an encounter between chapters (and to Unsorted) via the sidebar's per-row
-// "move to chapter" select, without opening the editor.
-test('move an encounter between chapters and to Unsorted from the sidebar', async ({ page, baseURL }) => {
+// HTML5 drag-and-drop: fire the drag events with a shared DataTransfer. (Playwright's
+// mouse-based dragTo can't reliably re-initiate a second consecutive native drag;
+// dispatching the events exercises the same React handlers a real drag triggers.)
+async function dragEncounterTo(page, sourceRow, targetGroup) {
+  const dt = await page.evaluateHandle(() => new DataTransfer())
+  await sourceRow.dispatchEvent('dragstart', { dataTransfer: dt })
+  await targetGroup.dispatchEvent('dragover', { dataTransfer: dt })
+  await targetGroup.dispatchEvent('drop', { dataTransfer: dt })
+  await sourceRow.dispatchEvent('dragend', { dataTransfer: dt })
+}
+
+test('drag an encounter between chapters and to Unsorted', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
   await page.locator('button.campaign').first().click()
@@ -13,50 +22,44 @@ test('move an encounter between chapters and to Unsorted from the sidebar', asyn
   const chA = `Move A ${stamp}`
   const chB = `Move B ${stamp}`
   const enc = `Wanderer ${stamp}`
+  const groupOf = (name) =>
+    page.locator('.chapter-group', { has: page.locator('.chapter-name', { hasText: name }) })
+  const encRow = (group) =>
+    groupOf(group).locator('li.encounter-row', { has: page.locator('button.encounter', { hasText: enc }) })
 
-  // Two chapters, and an encounter created under A. Wait for each to land before
-  // adding the next (the add-chapter button disables while a create is in flight).
-  const groupOf = (ch) => page.locator('.chapter-group', { has: page.locator('.chapter-name', { hasText: ch }) })
+  // Two chapters (wait for each to land before the next), encounter under A.
   for (const ch of [chA, chB]) {
     await page.getByTestId('add-chapter').locator('input').fill(ch)
     await page.getByTestId('add-chapter').locator('button').click()
     await expect(groupOf(ch)).toBeVisible()
   }
-  const groupA = groupOf(chA)
-  const groupB = groupOf(chB)
-  const unsorted = page.locator('.chapter-group', { has: page.locator('.chapter-name', { hasText: 'Unsorted' }) })
+  await groupOf(chA).locator('.new-encounter input').fill(enc)
+  await groupOf(chA).locator('.new-encounter button').click()
+  await expect(encRow(chA)).toBeVisible()
 
-  await groupA.locator('.new-encounter input').fill(enc)
-  await groupA.locator('.new-encounter button').click()
-  const rowInA = groupA.locator('li', { has: page.locator('button.encounter', { hasText: enc }) })
-  await expect(rowInA).toBeVisible()
+  // Drag A -> B.
+  await dragEncounterTo(page, encRow(chA), groupOf(chB))
+  await expect(groupOf(chB).locator('button.encounter', { hasText: enc })).toBeVisible()
+  await expect(groupOf(chA).locator('button.encounter', { hasText: enc })).toHaveCount(0)
 
-  // Move A -> B via the select.
-  await rowInA.locator('select.move-encounter').selectOption({ label: chB })
-  await expect(groupB.locator('button.encounter', { hasText: enc })).toBeVisible()
-  await expect(groupA.locator('button.encounter', { hasText: enc })).toHaveCount(0)
+  // Drag B -> Unsorted (the always-present drop zone).
+  await dragEncounterTo(page, encRow(chB), groupOf('Unsorted'))
+  await expect(groupOf('Unsorted').locator('button.encounter', { hasText: enc })).toBeVisible()
+  await expect(groupOf(chB).locator('button.encounter', { hasText: enc })).toHaveCount(0)
 
-  // Move B -> Unsorted.
-  const rowInB = groupB.locator('li', { has: page.locator('button.encounter', { hasText: enc }) })
-  await rowInB.locator('select.move-encounter').selectOption({ label: 'Unsorted' })
-  await expect(unsorted.locator('button.encounter', { hasText: enc })).toBeVisible()
-  await expect(groupB.locator('button.encounter', { hasText: enc })).toHaveCount(0)
-
-  // The move survives a reload (it was persisted, not just local).
+  // The move persisted: survives a reload.
   await page.reload()
   await page.locator('button.campaign').first().click()
-  const unsorted2 = page.locator('.chapter-group', { has: page.locator('.chapter-name', { hasText: 'Unsorted' }) })
-  await expect(unsorted2.locator('button.encounter', { hasText: enc })).toBeVisible()
+  await expect(groupOf('Unsorted').locator('button.encounter', { hasText: enc })).toBeVisible()
 
-  // Cleanup: delete the encounter, then both chapters.
+  // Cleanup.
   const row = page.locator('li', { has: page.locator('button.encounter', { hasText: enc }) })
   await row.getByRole('button', { name: `Delete ${enc}` }).click()
   await expect(row).toHaveCount(0)
   for (const ch of [chA, chB]) {
-    const g = page.locator('.chapter-group', { has: page.locator('.chapter-name', { hasText: ch }) })
     page.once('dialog', (d) => d.accept())
-    await g.getByRole('button', { name: `Delete chapter ${ch}` }).click()
-    await expect(g).toHaveCount(0)
+    await groupOf(ch).getByRole('button', { name: `Delete chapter ${ch}` }).click()
+    await expect(groupOf(ch)).toHaveCount(0)
   }
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])

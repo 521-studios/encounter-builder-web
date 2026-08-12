@@ -243,10 +243,19 @@ button.encounter.selected {
 .treasure-line-wrap { display: grid; gap: 0.5rem; border-top: 1px solid var(--panel); padding-top: 0.5rem; }
 .treasure-controls { flex-wrap: wrap; }
 
-/* Per-encounter "move to chapter" select in the sidebar tree. */
-.move-encounter {
-  font-size: 0.72rem;
-  padding: 0.1rem 0.2rem;
-  max-width: 6.5rem;
-  flex-shrink: 0;
+/* Drag an encounter onto a chapter group to move it there. */
+.encounter-row[draggable='true'] { cursor: grab; }
+.encounter-row[draggable='true']:active { cursor: grabbing; }
+.chapter-group.drag-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.drop-hint {
+  font-size: 0.78rem;
+  padding: 0.4rem;
+  margin: 0 0 0.3rem;
+  border: 1px dashed var(--panel);
+  border-radius: 0.3rem;
+  text-align: center;
 }
