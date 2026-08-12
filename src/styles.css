@@ -242,3 +242,11 @@ button.encounter.selected {
 /* Treasure line: library ItemSearch to pick, ItemCard to preview (masked-aware). */
 .treasure-line-wrap { display: grid; gap: 0.5rem; border-top: 1px solid var(--panel); padding-top: 0.5rem; }
 .treasure-controls { flex-wrap: wrap; }
+
+/* Per-encounter "move to chapter" select in the sidebar tree. */
+.move-encounter {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.2rem;
+  max-width: 6.5rem;
+  flex-shrink: 0;
+}

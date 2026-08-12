@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { keyed, withKey, stripKey, emptyMonster, emptyTreasure } from './model.js'
+import { keyed, withKey, stripKey, emptyMonster, emptyTreasure, toEncounterInput } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
   const out = keyed({
@@ -34,4 +34,37 @@ test('emptyMonster/emptyTreasure carry a _key that strips cleanly', () => {
   assert.ok(emptyTreasure()._key)
   assert.equal(stripKey(emptyMonster())._key, undefined)
   assert.equal(stripKey(emptyMonster()).ref.game_id, '')
+})
+
+test('toEncounterInput echoes every field for a full PUT, strips _key, keeps chapter_id', () => {
+  const enc = keyed({
+    id: 'e1',
+    name: 'Ambush',
+    chapter_id: 'ch-1',
+    description: '# Scene',
+    notes: 'gm note',
+    status: 'draft',
+    currency: { gp: 5 },
+    monsters: [{ ref: { game_id: 'Monsters:1' }, count: 2, adjustment: 'none' }],
+    treasure: [{ ref: { game_id: 'Weapons:1' }, qty: 1 }],
+  })
+  const input = toEncounterInput(enc)
+  assert.equal(input.name, 'Ambush')
+  assert.equal(input.chapter_id, 'ch-1')
+  assert.equal(input.description, '# Scene')
+  assert.equal(input.notes, 'gm note')
+  assert.equal(input.status, 'draft')
+  assert.deepEqual(input.currency, { gp: 5 })
+  // lines are sent without the client-only _key
+  assert.ok(input.monsters.every((m) => !('_key' in m)))
+  assert.ok(input.treasure.every((t) => !('_key' in t)))
+  assert.equal(input.monsters[0].ref.game_id, 'Monsters:1')
+})
+
+test('toEncounterInput defaults chapter_id to "" (Unsorted) and omits absent status', () => {
+  const input = toEncounterInput({ name: 'x' })
+  assert.equal(input.chapter_id, '') // moving to Unsorted / no chapter
+  assert.ok(!('status' in input)) // status omitted when the encounter has none
+  assert.deepEqual(input.monsters, [])
+  assert.deepEqual(input.treasure, [])
 })
