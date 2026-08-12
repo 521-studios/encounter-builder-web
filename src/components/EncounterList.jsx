@@ -3,7 +3,7 @@ import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 
 // Encounters within a campaign: list, create, select-to-edit, delete.
-export default function EncounterList({ campaignId, onEdit, reloadKey }) {
+export default function EncounterList({ campaignId, onEdit, reloadKey, selectedId }) {
   const [list, setList] = useState(null) // null = loading
   const [error, setError] = useState(null)
   const [newName, setNewName] = useState('')
@@ -70,7 +70,11 @@ export default function EncounterList({ campaignId, onEdit, reloadKey }) {
         <ul className="encounter-list">
           {list.map((e) => (
             <li key={e.id}>
-              <button className="encounter" onClick={() => onEdit(e)}>
+              <button
+                className={e.id === selectedId ? 'encounter selected' : 'encounter'}
+                aria-pressed={e.id === selectedId}
+                onClick={() => onEdit(e)}
+              >
                 {e.name} <span className="status">{e.status}</span>
               </button>
               <button className="link danger" onClick={() => remove(e.id)}>Delete</button>

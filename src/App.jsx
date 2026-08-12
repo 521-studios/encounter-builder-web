@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getUser, getAccessToken, login, logout, completeLogin, onUserChange } from './auth/oidc.js'
 import { setTokenProvider } from './api/token.js'
 import CampaignList from './components/CampaignList.jsx'
+import CampaignSwitcher from './components/CampaignSwitcher.jsx'
 import EncounterList from './components/EncounterList.jsx'
 import EncounterEditor from './components/EncounterEditor.jsx'
 
@@ -47,34 +48,50 @@ export default function App() {
       {status === 'anon' && (
         <button className="primary" onClick={() => login()}>Sign in with lets-roll</button>
       )}
-      {status === 'authed' && (
-        <>
-          <CampaignList
-            onSelect={(c) => {
-              setCampaign(c)
-              setEditing(null)
-            }}
-            selectedId={campaign?.id}
-          />
-          {campaign && (
-            <section className="selected">
-              <h2>{campaign.name}</h2>
-              {editing ? (
-                <EncounterEditor
-                  campaignId={campaign.id}
-                  encounterId={editing.id}
-                  onClose={() => {
-                    setEditing(null)
-                    setReloadKey((k) => k + 1)
-                  }}
-                  onSaved={() => setReloadKey((k) => k + 1)}
-                />
-              ) : (
-                <EncounterList campaignId={campaign.id} reloadKey={reloadKey} onEdit={setEditing} />
-              )}
-            </section>
-          )}
-        </>
+      {status === 'authed' && !campaign && (
+        <CampaignList
+          onSelect={(c) => {
+            setCampaign(c)
+            setEditing(null)
+          }}
+        />
+      )}
+
+      {status === 'authed' && campaign && (
+        <div className="two-pane">
+          <aside className="sidebar">
+            <CampaignSwitcher
+              campaign={campaign}
+              onSwitch={() => {
+                setCampaign(null)
+                setEditing(null)
+              }}
+            />
+            <EncounterList
+              campaignId={campaign.id}
+              reloadKey={reloadKey}
+              onEdit={setEditing}
+              selectedId={editing?.id}
+            />
+          </aside>
+          <section className="main">
+            {editing ? (
+              <EncounterEditor
+                campaignId={campaign.id}
+                encounterId={editing.id}
+                onClose={() => {
+                  setEditing(null)
+                  setReloadKey((k) => k + 1)
+                }}
+                onSaved={() => setReloadKey((k) => k + 1)}
+              />
+            ) : (
+              <div className="empty-main" data-testid="empty-main">
+                Select an encounter, or create one in the sidebar.
+              </div>
+            )}
+          </section>
+        </div>
       )}
       {error && <p className="error" role="alert">{error}</p>}
     </main>
