@@ -12,11 +12,12 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   const campaigns = page.locator('button.campaign')
   await expect(campaigns.first()).toBeVisible()
   await campaigns.first().click()
-  await expect(page.locator('.encounters')).toBeVisible()
+  await expect(page.locator('[data-testid="chapter-tree"]')).toBeVisible()
 
+  // Create an (unsorted) encounter via the always-present bottom "+ encounter".
   const name = `E2E ${Date.now()}`
-  await page.locator('.new-encounter input').fill(name)
-  await page.locator('.new-encounter button').click()
+  await page.getByTestId('new-encounter').locator('input').fill(name)
+  await page.getByTestId('new-encounter').locator('button').click()
   await expect(page.locator('.editor')).toBeVisible()
 
   // Add a monster via pfsrd2 search and confirm the stat block renders.
@@ -62,6 +63,6 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   // acceptable on throwaway staging and keeps the failure's state inspectable.)
   await page.getByRole('button', { name: /^Close/ }).click()
   const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
-  await row.getByRole('button', { name: 'Delete' }).click()
+  await row.getByRole('button', { name: `Delete ${name}` }).click()
   await expect(row).toHaveCount(0)
 })

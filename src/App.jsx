@@ -3,7 +3,7 @@ import { getUser, getAccessToken, login, logout, completeLogin, onUserChange } f
 import { setTokenProvider } from './api/token.js'
 import CampaignList from './components/CampaignList.jsx'
 import CampaignSwitcher from './components/CampaignSwitcher.jsx'
-import EncounterList from './components/EncounterList.jsx'
+import ChapterTree from './components/ChapterTree.jsx'
 import EncounterEditor from './components/EncounterEditor.jsx'
 
 // The API clients pull the bearer from the live OIDC session.
@@ -67,7 +67,7 @@ export default function App() {
                 setEditing(null)
               }}
             />
-            <EncounterList
+            <ChapterTree
               campaignId={campaign.id}
               reloadKey={reloadKey}
               onEdit={setEditing}

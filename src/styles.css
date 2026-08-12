@@ -204,3 +204,34 @@ button.encounter.selected {
   .two-pane { flex-direction: column; }
   .sidebar { flex-basis: auto; position: static; width: 100%; }
 }
+
+/* Chapter tree (sidebar): chapters expand to their natural-sorted encounters. */
+.chapters { display: grid; gap: 0.5rem; }
+
+.chapter-group { border: 1px solid var(--panel); border-radius: 0.4rem; }
+
+.chapter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.chapter-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: none;
+  padding: 0.15rem 0;
+  text-align: left;
+  font-weight: 600;
+}
+.chapter-caret { opacity: 0.7; width: 0.9em; }
+.chapter-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+.chapter-actions .link { font-size: 0.8rem; }
+
+.chapter-body { padding: 0 0.5rem 0.5rem; display: grid; gap: 0.4rem; }
+
+.add-chapter { display: flex; gap: 0.5rem; margin-top: 0.25rem; }

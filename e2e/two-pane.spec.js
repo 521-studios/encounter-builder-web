@@ -19,7 +19,7 @@ test('selecting a campaign opens the two-pane shell; the switcher returns to the
   const switcher = page.getByTestId('campaign-switcher')
   await expect(switcher).toBeVisible()
   await expect(switcher).toContainText(campaignName)
-  await expect(page.locator('.sidebar .encounters')).toBeVisible()
+  await expect(page.locator('.sidebar [data-testid="chapter-tree"]')).toBeVisible()
   await expect(page.getByTestId('empty-main')).toBeVisible()
 
   // The switcher returns to the campaign picker.
