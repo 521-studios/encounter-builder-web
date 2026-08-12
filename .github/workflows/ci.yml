@@ -17,6 +17,11 @@ jobs:
           node-version: "20"
           cache: npm
 
+      # npm pins the public pfsrd2-display git dep as git+ssh; CI has no ssh key,
+      # so rewrite to https (public repo, no token needed).
+      - name: Use https for GitHub git deps
+        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+
       - run: npm ci
 
       - name: Build
