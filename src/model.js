@@ -7,12 +7,23 @@ export const TREASURE_STATES = ['intact', 'consumed', 'destroyed']
 // Coin denominations, high-to-low for display.
 export const CURRENCIES = ['pp', 'gp', 'sp', 'cp']
 
+// _key is a client-only stable React key (line objects have no server id). It's
+// stripped before sending to the API (which rejects unknown fields). withKey()
+// stamps loaded lines the same way.
+export function withKey(line) {
+  return { ...line, _key: crypto.randomUUID() }
+}
+
+export function stripKey({ _key, ...rest }) {
+  return rest
+}
+
 export function emptyMonster() {
-  return { ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '' }
+  return withKey({ ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '' })
 }
 
 export function emptyTreasure() {
-  return {
+  return withKey({
     ref: { game_id: '' },
     qty: 1,
     masked: false,
@@ -20,5 +31,5 @@ export function emptyTreasure() {
     identify_dc: 0,
     sale_class: 'normal',
     state: 'intact',
-  }
+  })
 }

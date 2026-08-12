@@ -12,11 +12,13 @@ export default function MonsterSearch({ onPick, disabled }) {
 
   useEffect(() => {
     const query = q.trim()
+    // Invalidate any in-flight request on every change — including shortening
+    // below the min length — so a late response can't repopulate a cleared box.
+    const mine = ++seq.current
     if (query.length < 2) {
       setResults([])
       return
     }
-    const mine = ++seq.current
     const t = setTimeout(() => {
       pfsrd2
         .suggestMonsters(query)
