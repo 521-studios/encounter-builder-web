@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { errorMessage } from '../api/errors.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
-import { groupEncountersByChapter, nextChapterOrder, UNSORTED } from '../chapters.js'
+import { groupEncountersByChapter, nextChapterOrder, ensureUnsortedGroup, UNSORTED } from '../chapters.js'
 import { toEncounterInput } from '../model.js'
 
 // The sidebar chapter tree: chapters (in order) each expand to their encounters
@@ -15,6 +15,8 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
   const [error, setError] = useState(null)
   const [collapsed, setCollapsed] = useState(() => new Set()) // chapter ids that are collapsed
   const [moving, setMoving] = useState(false) // an encounter move is in flight
+  const [dragOverKey, setDragOverKey] = useState(null) // group being dragged over
+  const dragEnc = useRef(null) // the encounter currently being dragged
   // Monotonic token: only the newest load may commit, so a slow fetch for a
   // previous campaign can't overwrite a newer one on a rapid campaign switch.
   const loadToken = useRef(0)
@@ -109,15 +111,37 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
   if (error) return <p className="error" role="alert">Could not load chapters: {error}</p>
   if (chapters === null) return <p>Loading…</p>
 
-  const groups = groupEncountersByChapter(chapters, encounters)
+  // Always render an Unsorted group so it's a drop target even when empty.
+  const groups = ensureUnsortedGroup(groupEncountersByChapter(chapters, encounters))
 
   return (
     <section className="chapters" data-testid="chapter-tree">
       {groups.map((g) => {
         const key = g.chapter ? g.chapter.id : UNSORTED
         const isOpen = !collapsed.has(key)
+        const chapterId = g.chapter ? g.chapter.id : '' // '' = Unsorted
         return (
-          <div key={key} className="chapter-group" data-testid="chapter-group">
+          <div
+            key={key}
+            className={`chapter-group${dragOverKey === key ? ' drag-over' : ''}`}
+            data-testid="chapter-group"
+            data-chapter-id={chapterId}
+            onDragOver={(ev) => {
+              if (!dragEnc.current) return
+              ev.preventDefault() // allow the drop
+              if (dragOverKey !== key) setDragOverKey(key)
+            }}
+            onDrop={(ev) => {
+              ev.preventDefault()
+              const enc = dragEnc.current
+              setDragOverKey(null)
+              // Skip only a true no-op (dropped on its own group). Dropping an
+              // encounter with a dangling chapter_id (deleted chapter → shown in
+              // Unsorted) onto Unsorted does fire a move to '' — a beneficial
+              // normalization that clears the dead id.
+              if (enc && (enc.chapter_id || '') !== chapterId) moveEncounter(enc, chapterId)
+            }}
+          >
             <div className="chapter-head">
               <button
                 className="chapter-toggle"
@@ -148,9 +172,24 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
             </div>
             {isOpen && (
               <div className="chapter-body">
+                {g.encounters.length === 0 && (
+                  <p className="muted drop-hint">Drop an encounter here</p>
+                )}
                 <ul className="encounter-list">
                   {g.encounters.map((e) => (
-                    <li key={e.id}>
+                    <li
+                      key={e.id}
+                      className="encounter-row"
+                      // Released encounters are read-only, so not draggable.
+                      draggable={e.status !== 'released' && !moving}
+                      onDragStart={() => {
+                        dragEnc.current = e
+                      }}
+                      onDragEnd={() => {
+                        dragEnc.current = null
+                        setDragOverKey(null)
+                      }}
+                    >
                       <button
                         className={e.id === selectedId ? 'encounter selected' : 'encounter'}
                         aria-pressed={e.id === selectedId}
@@ -158,18 +197,6 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
                       >
                         {e.name} <span className="status">{e.status}</span>
                       </button>
-                      <select
-                        className="move-encounter"
-                        aria-label={`Move ${e.name} to chapter`}
-                        value={g.chapter ? g.chapter.id : ''}
-                        disabled={e.status === 'released' || moving}
-                        onChange={(ev) => moveEncounter(e, ev.target.value)}
-                      >
-                        <option value="">Unsorted</option>
-                        {chapters.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
                       <button
                         className="link danger"
                         aria-label={`Delete ${e.name}`}
