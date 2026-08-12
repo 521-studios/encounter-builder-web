@@ -8,6 +8,7 @@ import {
 } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import { errorMessage } from '../api/errors.js'
+import { buildMonsterRef } from '../monsterRef.js'
 
 // The monster stat block with template application. The library owns the
 // machinery (list/apply/merge + the picker); this component wires it to the web
@@ -28,7 +29,12 @@ export default function MonsterView({ monster, onChange, disabled }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
-  // Load the base creature and rebuild the applied-template stack from the ref.
+  // Load the base creature and rebuild the applied-template stack from the ref by
+  // re-applying each stored modification (N sequential /templates/apply calls per
+  // open). Deliberate: re-deriving gives fresh change-highlighting and lets the GM
+  // keep stacking. The persisted ref.json is the snapshot downstream/released
+  // consumers read — the editor showing a fresh derive of the latest data is the
+  // intended authoring behavior.
   useEffect(() => {
     let alive = true
     setBase(null)
@@ -79,23 +85,9 @@ export default function MonsterView({ monster, onChange, disabled }) {
     }
   }, [current?.edition])
 
-  // Write the stack back onto the monster ref (pristine when empty).
+  // Write the stack back onto the monster ref (pristine when empty, else derived).
   function persist(nextStack) {
-    if (nextStack.length === 0) {
-      onChange({ ...monster, ref: { game_id: baseGameId } })
-    } else {
-      onChange({
-        ...monster,
-        ref: {
-          base: { game_id: baseGameId },
-          modifications: nextStack.map((s) => ({
-            template_game_id: s.template.game_id,
-            template_name: s.template.name,
-          })),
-          json: nextStack[nextStack.length - 1].creature,
-        },
-      })
-    }
+    onChange({ ...monster, ref: buildMonsterRef(baseGameId, nextStack) })
   }
 
   async function onApply(template) {

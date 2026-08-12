@@ -43,11 +43,11 @@ export const pfsrd2 = {
   // /templates/apply that returns the raw Response (the library parses the
   // multipart body itself). Same OAC signing as request(); it doesn't throw —
   // applyTemplate checks res.ok.
-  applyTemplatePost: async (bodyStr) => {
-    const token = await getToken()
+  applyTemplatePost: async (bodyStr, { tokenProvider = getToken, fetchImpl = fetch } = {}) => {
+    const token = await tokenProvider()
     const headers = buildHeaders(token, { json: true })
     headers['x-amz-content-sha256'] = await bodyHash(bodyStr)
-    return fetch(`${config.apiBase}/api/pfsrd2/templates/apply`, {
+    return fetchImpl(`${config.apiBase}/api/pfsrd2/templates/apply`, {
       method: 'POST',
       headers,
       body: bodyStr,

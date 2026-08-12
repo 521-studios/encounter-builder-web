@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { CreatureSearch } from '@521studios/pfsrd2-display'
-import { ADJUSTMENTS } from '../model.js'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import MonsterView from './MonsterView.jsx'
 
@@ -52,16 +51,6 @@ export default function MonsterLine({ monster, disabled, onChange, onRemove }) {
           disabled={disabled}
           onChange={(e) => set({ count: Number(e.target.value) })}
         />
-        <select
-          aria-label="adjustment"
-          value={monster.adjustment}
-          disabled={disabled}
-          onChange={(e) => set({ adjustment: e.target.value })}
-        >
-          {ADJUSTMENTS.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
         <input
           placeholder="nickname"
           value={monster.nickname || ''}
