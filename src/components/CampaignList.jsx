@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { errorMessage } from '../api/errors.js'
 import { fetchGames } from '../api/letsroll.js'
 
 // Lists the campaigns the signed-in user GMs (this is the GM tool, so non-GM
@@ -11,7 +12,7 @@ export default function CampaignList({ onSelect, selectedId }) {
     let alive = true
     fetchGames()
       .then((gs) => alive && setGames(gs))
-      .catch((e) => alive && setError(e.message || String(e)))
+      .catch((e) => alive && setError(errorMessage(e)))
     return () => {
       alive = false
     }

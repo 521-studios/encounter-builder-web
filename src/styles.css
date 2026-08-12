@@ -85,3 +85,48 @@ button.campaign.selected {
 
 .selected { margin-top: 1.5rem; border-top: 1px solid var(--panel); padding-top: 1rem; }
 
+input, textarea, select {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  background: #1c1815;
+  color: var(--fg);
+  border: 1px solid #3a332d;
+  border-radius: 0.3rem;
+}
+textarea { width: 100%; min-height: 4rem; }
+
+.status {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-left: 0.5rem;
+}
+
+button.danger { color: #e5736b; }
+
+.new-encounter { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
+.new-encounter input { flex: 1; }
+
+.encounter-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
+.encounter-list li { display: flex; align-items: center; gap: 0.5rem; }
+button.encounter { flex: 1; text-align: left; }
+
+.editor { display: grid; gap: 1rem; }
+.editor-head { display: flex; align-items: center; gap: 0.5rem; }
+.title-input { flex: 1; font-size: 1.1rem; }
+
+.field { display: grid; gap: 0.25rem; }
+
+fieldset { border: 1px solid #3a332d; border-radius: 0.5rem; padding: 0.75rem; display: grid; gap: 0.5rem; }
+legend { padding: 0 0.4rem; opacity: 0.8; }
+
+.coins { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.coin { display: inline-grid; gap: 0.2rem; text-transform: uppercase; font-size: 0.8rem; }
+.coin input { width: 5rem; }
+
+.line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.line .grow { flex: 1; min-width: 10rem; }
+.line input[type="number"] { width: 5rem; }
+.check { display: inline-flex; align-items: center; gap: 0.3rem; }
+
