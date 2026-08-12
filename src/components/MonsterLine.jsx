@@ -15,13 +15,20 @@ export default function MonsterLine({ monster, disabled, onChange, onRemove }) {
   if (!gameId) {
     return (
       <div className="line monster-line">
-        <div className="monster-search grow">
-          <CreatureSearch
-            search={pfsrd2.suggestMonsters}
-            onSelect={(m) => set({ ref: { game_id: m.game_id }, nickname: monster.nickname || m.name })}
-            placeholder="search a monster…"
-          />
-        </div>
+        {disabled ? (
+          // Released/read-only: the library CreatureSearch has no `disabled`
+          // passthrough, so render an inert placeholder instead of a live picker
+          // (an interactive one would let a viewer mutate a read-only encounter).
+          <span className="picked grow muted">— no monster</span>
+        ) : (
+          <div className="monster-search grow">
+            <CreatureSearch
+              search={pfsrd2.suggestMonsters}
+              onSelect={(m) => set({ ref: { game_id: m.game_id }, nickname: monster.nickname || m.name })}
+              placeholder="search a monster…"
+            />
+          </div>
+        )}
         {!disabled && (
           <button type="button" className="link danger" onClick={onRemove}>Remove</button>
         )}
