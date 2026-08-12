@@ -4,9 +4,10 @@ import { pfsrd2 } from '../api/pfsrd2.js'
 import { errorMessage } from '../api/errors.js'
 
 // Renders a pfsrd2 item's card from its game_id, via the shared display library.
-// Honors the treasure line's masked/maskLabel so the preview shows exactly what
-// the party would see for an unidentified item (ItemCard fails closed when masked).
-export default function ItemView({ gameId, masked, maskLabel }) {
+// This is the GM authoring view, so it always shows the REAL item — masking is a
+// player-facing concern (the party-treasure app renders the mask); the GM needs
+// to see what they picked. TreasureLine shows the mask label separately.
+export default function ItemView({ gameId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
 
@@ -27,7 +28,7 @@ export default function ItemView({ gameId, masked, maskLabel }) {
   if (!data) return <p className="muted">Loading item…</p>
   return (
     <div className="itemcard">
-      <ItemCard data={data} masked={masked} maskLabel={maskLabel} />
+      <ItemCard data={data} />
     </div>
   )
 }

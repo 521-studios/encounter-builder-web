@@ -98,7 +98,10 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
 
   return (
     <div className="treasure-line-wrap">
-      <ItemView gameId={gameId} masked={treasure.masked} maskLabel={treasure.mask_label} />
+      <ItemView gameId={gameId} />
+      {treasure.masked && (
+        <p className="muted mask-note">Players see: {treasure.mask_label || 'Unidentified Item'}</p>
+      )}
       {!disabled && (
         <button type="button" className="link" onClick={() => set({ ref: { game_id: '' } })}>change item</button>
       )}
