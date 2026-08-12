@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { errorMessage } from '../api/errors.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
-import { groupEncountersByChapter, nextChapterOrder, UNSORTED } from '../chapters.js'
+import { groupEncountersByChapter, nextChapterOrder, ensureUnsortedGroup, UNSORTED } from '../chapters.js'
 import { toEncounterInput } from '../model.js'
 
 // The sidebar chapter tree: chapters (in order) each expand to their encounters
@@ -111,12 +111,8 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
   if (error) return <p className="error" role="alert">Could not load chapters: {error}</p>
   if (chapters === null) return <p>Loading…</p>
 
-  const grouped = groupEncountersByChapter(chapters, encounters)
-  // Always render an Unsorted group so it's a drop target even when empty —
-  // otherwise you couldn't drag an encounter out of every chapter into Unsorted.
-  const groups = grouped.some((g) => g.chapter === null)
-    ? grouped
-    : [...grouped, { chapter: null, encounters: [] }]
+  // Always render an Unsorted group so it's a drop target even when empty.
+  const groups = ensureUnsortedGroup(groupEncountersByChapter(chapters, encounters))
 
   return (
     <section className="chapters" data-testid="chapter-tree">
@@ -139,7 +135,10 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
               ev.preventDefault()
               const enc = dragEnc.current
               setDragOverKey(null)
-              // No-op if dropped back on its own group.
+              // Skip only a true no-op (dropped on its own group). Dropping an
+              // encounter with a dangling chapter_id (deleted chapter → shown in
+              // Unsorted) onto Unsorted does fire a move to '' — a beneficial
+              // normalization that clears the dead id.
               if (enc && (enc.chapter_id || '') !== chapterId) moveEncounter(enc, chapterId)
             }}
           >

@@ -64,3 +64,46 @@ test('drag an encounter between chapters and to Unsorted', async ({ page, baseUR
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
 })
+
+// The keyboard-accessible move path: a Chapter <select> in the editor (details).
+test('move an encounter via the editor Chapter select (no mouse needed)', async ({ page, baseURL }) => {
+  const apiErrors = trackApiErrors(page)
+  await login(page, baseURL)
+  await page.locator('button.campaign').first().click()
+  const stamp = Date.now()
+  const ch = `Ed Ch ${stamp}`
+  const enc = `Ed Enc ${stamp}`
+  const groupOf = (name) =>
+    page.locator('.chapter-group', { has: page.locator('.chapter-name', { hasText: name }) })
+
+  await page.getByTestId('add-chapter').locator('input').fill(ch)
+  await page.getByTestId('add-chapter').locator('button').click()
+  await expect(groupOf(ch)).toBeVisible()
+
+  // Create an Unsorted encounter (opens the editor).
+  await page.getByTestId('new-encounter').locator('input').fill(enc)
+  await page.getByTestId('new-encounter').locator('button').click()
+  await expect(page.locator('.editor')).toBeVisible()
+
+  // Change its Chapter in the editor, then save.
+  await page.locator('select[aria-label="chapter"]').selectOption({ label: ch })
+  const savePut = page.waitForResponse(
+    (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
+  )
+  await page.getByRole('button', { name: /^Save/ }).click()
+  expect((await savePut).ok()).toBeTruthy()
+
+  // The sidebar tree now shows it under the chosen chapter.
+  await expect(groupOf(ch).locator('button.encounter', { hasText: enc })).toBeVisible()
+
+  // Cleanup.
+  await page.locator('button.encounter', { hasText: enc }).first().click() // ensure it's in the list
+  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: enc }) })
+  await row.getByRole('button', { name: `Delete ${enc}` }).click()
+  await expect(row).toHaveCount(0)
+  page.once('dialog', (d) => d.accept())
+  await groupOf(ch).getByRole('button', { name: `Delete chapter ${ch}` }).click()
+  await expect(groupOf(ch)).toHaveCount(0)
+
+  expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
+})
