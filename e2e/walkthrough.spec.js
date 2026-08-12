@@ -29,6 +29,11 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   await page.getByRole('button', { name: 'stat block' }).first().click()
   await expect(page.locator('.statblock')).toBeVisible()
 
+  // Give it a markdown description (v2) and confirm the library Markdown renders it.
+  await page.locator('.description-input').fill('# The Vault\n\nA **giant** guards the door.')
+  await expect(page.getByTestId('description-preview').locator('h1')).toHaveText('The Vault')
+  await expect(page.getByTestId('description-preview').locator('strong')).toHaveText('giant')
+
   // Save — wait for the PUT to actually land. Asserting toHaveCount(0) alone
   // passes instantly (before the request settles), so the following reload
   // could abort an in-flight save and mask a broken persist.
@@ -47,6 +52,9 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   await expect(encounterBtn).toBeVisible()
   await encounterBtn.click()
   await expect(page.locator('.editor')).toBeVisible()
+  // The markdown description persisted (raw in the textarea, rendered in preview).
+  await expect(page.locator('.description-input')).toHaveValue(/The Vault/)
+  await expect(page.getByTestId('description-preview').locator('h1')).toHaveText('The Vault')
   await expect(page.locator('.picked')).toBeVisible()
   await page.getByRole('button', { name: 'stat block' }).first().click()
   await expect(page.locator('.statblock')).toBeVisible()
