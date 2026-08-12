@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Markdown } from '@521studios/pfsrd2-display'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
+import { chapters as chaptersApi } from '../api/chapters.js'
 import { CURRENCIES, emptyMonster, emptyTreasure, keyed, toEncounterInput } from '../model.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
@@ -10,6 +11,18 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [chapters, setChapters] = useState([]) // for the Chapter picker (keyboard-accessible move)
+
+  useEffect(() => {
+    let alive = true
+    chaptersApi
+      .list(campaignId)
+      .then((cs) => alive && setChapters(cs))
+      .catch(() => {}) // the picker just falls back to Unsorted-only if this fails
+    return () => {
+      alive = false
+    }
+  }, [campaignId])
 
   useEffect(() => {
     let alive = true
@@ -90,6 +103,21 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
       {released && <p className="muted">Released — read-only.</p>}
       {error && <p className="error" role="alert">{error}</p>}
+
+      <label className="field">
+        <span>Chapter</span>
+        <select
+          aria-label="chapter"
+          value={chapters.some((c) => c.id === enc.chapter_id) ? enc.chapter_id : ''}
+          disabled={released}
+          onChange={(e) => patch({ chapter_id: e.target.value })}
+        >
+          <option value="">Unsorted</option>
+          {chapters.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      </label>
 
       <label className="field">
         <span>Description</span>

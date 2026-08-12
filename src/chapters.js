@@ -30,3 +30,12 @@ export function groupEncountersByChapter(chapters, encounters) {
 export function nextChapterOrder(chapters) {
   return chapters.reduce((max, c) => Math.max(max, c.order ?? 0), 0) + 1
 }
+
+// Ensure an Unsorted group is present (empty if needed) so it's ALWAYS a
+// drag-and-drop target — groupEncountersByChapter only emits one when non-empty,
+// but you must be able to drag an encounter out of every chapter into Unsorted.
+export function ensureUnsortedGroup(groups) {
+  return groups.some((g) => g.chapter === null)
+    ? groups
+    : [...groups, { chapter: null, encounters: [] }]
+}

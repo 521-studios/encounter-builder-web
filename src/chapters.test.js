@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { groupEncountersByChapter, nextChapterOrder } from './chapters.js'
+import { groupEncountersByChapter, nextChapterOrder, ensureUnsortedGroup } from './chapters.js'
 
 const chapters = [
   { id: 'c1', name: 'Chapter 1', order: 1 },
@@ -44,4 +44,21 @@ test('nextChapterOrder returns max order + 1 (1 for an empty list)', () => {
   assert.equal(nextChapterOrder([]), 1)
   assert.equal(nextChapterOrder(chapters), 3)
   assert.equal(nextChapterOrder([{ order: 5 }, { order: 2 }]), 6)
+})
+
+test('ensureUnsortedGroup appends an empty Unsorted group only when absent', () => {
+  const withUnsorted = [
+    { chapter: { id: 'c1', name: 'C1' }, encounters: [] },
+    { chapter: null, encounters: [{ id: 'e1' }] },
+  ]
+  // already has an Unsorted group → returned unchanged (same reference)
+  assert.equal(ensureUnsortedGroup(withUnsorted), withUnsorted)
+
+  const noUnsorted = [{ chapter: { id: 'c1', name: 'C1' }, encounters: [{ id: 'e1' }] }]
+  const out = ensureUnsortedGroup(noUnsorted)
+  assert.equal(out.length, 2)
+  assert.equal(out[1].chapter, null) // appended, empty, last
+  assert.deepEqual(out[1].encounters, [])
+  // exactly one Unsorted group (no duplicates)
+  assert.equal(out.filter((g) => g.chapter === null).length, 1)
 })
