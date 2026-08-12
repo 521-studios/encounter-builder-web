@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
-import { CURRENCIES, emptyMonster, emptyTreasure } from '../model.js'
+import { CURRENCIES, emptyMonster, emptyTreasure, withKey, stripKey } from '../model.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
 
@@ -16,7 +16,15 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     setError(null)
     encounters
       .get(campaignId, encounterId)
-      .then((e) => alive && setEnc(e))
+      .then((e) => {
+        if (!alive) return
+        // Stamp loaded lines with stable client keys (server has no line ids).
+        setEnc({
+          ...e,
+          monsters: (e.monsters || []).map(withKey),
+          treasure: (e.treasure || []).map(withKey),
+        })
+      })
       .catch((e) => alive && setError(errorMessage(e)))
     return () => {
       alive = false
@@ -41,8 +49,8 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       const input = {
         name: enc.name,
         notes: enc.notes || '',
-        monsters,
-        treasure,
+        monsters: monsters.map(stripKey), // drop the client-only _key
+        treasure: treasure.map(stripKey),
         currency: enc.currency || {},
         // release is its own action (slice 5); update keeps draft/run.
         ...(released ? {} : { status: enc.status }),
@@ -103,7 +111,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         <legend>Monsters</legend>
         {monsters.map((m, i) => (
           <MonsterLine
-            key={i}
+            key={m._key}
             monster={m}
             disabled={released}
             onChange={(m2) => setMonster(i, m2)}
@@ -121,7 +129,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         <legend>Treasure</legend>
         {treasure.map((t, i) => (
           <TreasureLine
-            key={i}
+            key={t._key}
             treasure={t}
             disabled={released}
             onChange={(t2) => setTreasure(i, t2)}

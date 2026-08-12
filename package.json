@@ -10,6 +10,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@521studios/pfsrd2-display": "git+https://github.com/521-studios/pfsrd2-display.git",
     "oidc-client-ts": "^3.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
