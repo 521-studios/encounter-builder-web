@@ -14,6 +14,7 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
   const [encounters, setEncounters] = useState([])
   const [error, setError] = useState(null)
   const [collapsed, setCollapsed] = useState(() => new Set()) // chapter ids that are collapsed
+  const [moving, setMoving] = useState(false) // an encounter move is in flight
   // Monotonic token: only the newest load may commit, so a slow fetch for a
   // previous campaign can't overwrite a newer one on a rapid campaign switch.
   const loadToken = useRef(0)
@@ -58,13 +59,17 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
   }
 
   // Move an encounter to another chapter (or Unsorted, chapterId=''). PUT replaces
-  // the resource, so send the whole encounter with the new chapter_id.
+  // the resource, so send the whole encounter with the new chapter_id. `moving`
+  // disables the selects during the in-flight PUT so a fast double-pick can't race.
   async function moveEncounter(enc, chapterId) {
+    setMoving(true)
     try {
       await encountersApi.update(campaignId, enc.id, { ...toEncounterInput(enc), chapter_id: chapterId })
       await load()
     } catch (e) {
       setError(errorMessage(e))
+    } finally {
+      setMoving(false)
     }
   }
 
@@ -157,7 +162,7 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
                         className="move-encounter"
                         aria-label={`Move ${e.name} to chapter`}
                         value={g.chapter ? g.chapter.id : ''}
-                        disabled={e.status === 'released'}
+                        disabled={e.status === 'released' || moving}
                         onChange={(ev) => moveEncounter(e, ev.target.value)}
                       >
                         <option value="">Unsorted</option>
