@@ -25,6 +25,18 @@ test('suggestMonsters queries suggest/unified for monsters + npcs', async () => 
   assert.match(url, /type=npcs/)
 })
 
+test('suggestItems queries suggest/unified for equipment/weapons/armor/shields', async () => {
+  const fetchImpl = fakeFetch(ok([{ game_id: 'Weapons:1', name: 'Sword Cane', type: 'weapons' }]))
+  const out = await pfsrd2.suggestItems('sword', { tokenProvider: tok, fetchImpl })
+  assert.equal(out[0].name, 'Sword Cane')
+  const url = fetchImpl.calls[0].url
+  assert.match(url, /\/api\/pfsrd2\/search\/suggest\/unified\?/)
+  assert.match(url, /q=sword/)
+  for (const t of ['equipment', 'weapons', 'armor', 'shields']) {
+    assert.match(url, new RegExp(`type=${t}`))
+  }
+})
+
 test('entryFull keeps the raw colon in the game_id (the API 404s on %3A)', async () => {
   const fetchImpl = fakeFetch(ok({ name: 'Goblin Dog', schema_version: 1.4 }))
   const out = await pfsrd2.entryFull('Monsters:3028', { tokenProvider: tok, fetchImpl })
