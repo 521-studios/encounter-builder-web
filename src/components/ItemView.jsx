@@ -7,7 +7,10 @@ import { errorMessage } from '../api/errors.js'
 // This is the GM authoring view, so it always shows the REAL item — masking is a
 // player-facing concern (the party-treasure app renders the mask); the GM needs
 // to see what they picked. TreasureLine shows the mask label separately.
-export default function ItemView({ gameId }) {
+//
+// The treasure line persists the chosen variant by NAME (stable). ItemCard is
+// index-based, so this maps name<->index against the loaded item's variants.
+export default function ItemView({ gameId, variant, onVariantChange }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
 
@@ -26,9 +29,16 @@ export default function ItemView({ gameId }) {
 
   if (error) return <p className="error">Could not load item: {error}</p>
   if (!data) return <p className="muted">Loading item…</p>
+
+  const variants = (data.stat_block && data.stat_block.variants) || []
+  const index = Math.max(0, variants.findIndex((v) => v.name === variant)) // name -> index (base if unset/unknown)
   return (
     <div className="itemcard">
-      <ItemCard data={data} />
+      <ItemCard
+        data={data}
+        variant={index}
+        onVariantChange={onVariantChange ? (i) => onVariantChange(variants[i] ? variants[i].name : '') : undefined}
+      />
     </div>
   )
 }
