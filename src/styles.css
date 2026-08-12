@@ -235,3 +235,12 @@ button.encounter.selected {
 .chapter-body { padding: 0 0.5rem 0.5rem; display: grid; gap: 0.4rem; }
 
 .add-chapter { display: flex; gap: 0.5rem; margin-top: 0.25rem; }
+
+/* Encounter description (markdown, rendered by the pfsrd2-display Markdown export). */
+.description-input { min-height: 4rem; }
+.description-preview {
+  background: var(--panel);
+  border-radius: 0.4rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.95rem;
+}
