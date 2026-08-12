@@ -132,15 +132,9 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
 .check { display: inline-flex; align-items: center; gap: 0.3rem; }
 
 .monster-line-wrap { display: grid; gap: 0.5rem; }
-.monster-search { position: relative; }
-.monster-search input { width: 100%; }
-.suggestions {
-  list-style: none; margin: 0.25rem 0 0; padding: 0.25rem;
-  background: #1c1815; border: 1px solid #3a332d; border-radius: 0.4rem;
-  max-height: 14rem; overflow-y: auto; display: grid; gap: 0.1rem;
-}
-.suggestions button { width: 100%; text-align: left; border: none; padding: 0.35rem 0.5rem; }
-.suggestions button:hover { background: var(--panel); }
+/* The monster picker now renders the library CreatureSearch (.CreatureSearch__*,
+   styled by the lib's style.css); the old .monster-search/.suggestions rules
+   for the hand-rolled dropdown are gone with MonsterSearch.jsx. */
 .picked { font-weight: 600; }
 .statblock {
   background: #efe9dd; color: #1a1512;
