@@ -7,6 +7,13 @@
 // stores so a later view can re-fetch the same creature.
 import { request } from './client.js'
 
+// pfsrd2 game ids look like "Monsters:2382" — the colon is part of the id and
+// the API matches on the RAW colon (encoding it to %3A 404s). Encode everything
+// else but keep the colon, matching the pfsrd2-display harness.
+function gameIdPath(gameId) {
+  return encodeURIComponent(gameId).replace(/%3A/gi, ':')
+}
+
 export const pfsrd2 = {
   // Autocomplete over monsters + NPCs. Returns [{ game_id, name, type, level, edition, ... }].
   suggestMonsters: (q, opts = {}) => {
@@ -17,5 +24,5 @@ export const pfsrd2 = {
   },
   // Full creature entry (with schema_version) for CreatureStatBlock.
   entryFull: (gameId, opts = {}) =>
-    request('GET', `/api/pfsrd2/entries/${encodeURIComponent(gameId)}/full`, opts),
+    request('GET', `/api/pfsrd2/entries/${gameIdPath(gameId)}/full`, opts),
 }
