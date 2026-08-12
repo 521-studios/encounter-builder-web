@@ -18,6 +18,16 @@ export function stripKey({ _key, ...rest }) {
   return rest
 }
 
+// Stamp a server encounter's lines with stable client keys (the server has no
+// per-line ids); the keys are stripped again before save.
+export function keyed(e) {
+  return {
+    ...e,
+    monsters: (e.monsters || []).map(withKey),
+    treasure: (e.treasure || []).map(withKey),
+  }
+}
+
 export function emptyMonster() {
   return withKey({ ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '' })
 }
