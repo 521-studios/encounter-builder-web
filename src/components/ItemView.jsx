@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ItemCard } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import { errorMessage } from '../api/errors.js'
+import { variantIndex } from '../variants.js'
 
 // Renders a pfsrd2 item's card from its game_id, via the shared display library.
 // This is the GM authoring view, so it always shows the REAL item — masking is a
@@ -31,7 +32,7 @@ export default function ItemView({ gameId, variant, onVariantChange }) {
   if (!data) return <p className="muted">Loading item…</p>
 
   const variants = (data.stat_block && data.stat_block.variants) || []
-  const index = Math.max(0, variants.findIndex((v) => v.name === variant)) // name -> index (base if unset/unknown)
+  const index = variantIndex(variants, variant) // name -> index (base if unset/unknown)
   return (
     <div className="itemcard">
       <ItemCard
