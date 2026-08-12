@@ -84,7 +84,7 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
           <div className="item-search grow">
             <ItemSearch
               search={pfsrd2.suggestItems}
-              onSelect={(it) => set({ ref: { game_id: it.game_id } })}
+              onSelect={(it) => set({ ref: { game_id: it.game_id }, variant: '' })}
               placeholder="search an item…"
             />
           </div>
@@ -98,12 +98,16 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
 
   return (
     <div className="treasure-line-wrap">
-      <ItemView gameId={gameId} />
+      <ItemView
+        gameId={gameId}
+        variant={treasure.variant}
+        onVariantChange={disabled ? undefined : (name) => set({ variant: name })}
+      />
       {treasure.masked && (
         <p className="muted mask-note">Players see: {treasure.mask_label || 'Unidentified Item'}</p>
       )}
       {!disabled && (
-        <button type="button" className="link" onClick={() => set({ ref: { game_id: '' } })}>change item</button>
+        <button type="button" className="link" onClick={() => set({ ref: { game_id: '' }, variant: '' })}>change item</button>
       )}
       {controls}
     </div>
