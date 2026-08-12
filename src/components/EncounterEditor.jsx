@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Markdown } from '@521studios/pfsrd2-display'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 import { CURRENCIES, emptyMonster, emptyTreasure, stripKey, keyed } from '../model.js'
@@ -37,6 +38,10 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   function buildInput() {
     return {
       name: enc.name,
+      // PUT replaces the resource, so echo chapter_id/description back or the API
+      // clears them — a chapter-assigned encounter would silently jump to Unsorted.
+      chapter_id: enc.chapter_id || '',
+      description: enc.description || '',
       notes: enc.notes || '',
       monsters: monsters.map(stripKey), // drop the client-only _key
       treasure: treasure.map(stripKey),
@@ -95,6 +100,22 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
       {released && <p className="muted">Released — read-only.</p>}
       {error && <p className="error" role="alert">{error}</p>}
+
+      <label className="field">
+        <span>Description</span>
+        <textarea
+          className="description-input"
+          value={enc.description || ''}
+          disabled={released}
+          onChange={(e) => patch({ description: e.target.value })}
+          placeholder="Scene-setting, read-aloud text, GM notes… (markdown)"
+        />
+      </label>
+      {enc.description && (
+        <div className="description-preview" data-testid="description-preview">
+          <Markdown block text={enc.description} />
+        </div>
+      )}
 
       <label className="field">
         <span>Notes</span>
