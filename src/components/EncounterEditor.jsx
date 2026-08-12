@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Markdown } from '@521studios/pfsrd2-display'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
-import { CURRENCIES, emptyMonster, emptyTreasure, stripKey, keyed } from '../model.js'
+import { CURRENCIES, emptyMonster, emptyTreasure, keyed, toEncounterInput } from '../model.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
 
@@ -36,19 +36,9 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const setTreasure = (i, t) => patch({ treasure: treasure.map((x, j) => (j === i ? t : x)) })
 
   function buildInput() {
-    return {
-      name: enc.name,
-      // PUT replaces the resource, so echo chapter_id/description back or the API
-      // clears them — a chapter-assigned encounter would silently jump to Unsorted.
-      chapter_id: enc.chapter_id || '',
-      description: enc.description || '',
-      notes: enc.notes || '',
-      monsters: monsters.map(stripKey), // drop the client-only _key
-      treasure: treasure.map(stripKey),
-      currency: enc.currency || {},
-      // release is its own action; update keeps draft/run.
-      ...(released ? {} : { status: enc.status }),
-    }
+    const input = toEncounterInput(enc) // echoes chapter_id/description/monsters/…
+    if (released) delete input.status // release is its own action; don't move status here
+    return input
   }
 
   async function save() {
