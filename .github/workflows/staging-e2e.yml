@@ -10,6 +10,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Serialize runs: a manual dispatch racing an auto workflow_run (or back-to-back
+# deploys) would otherwise drive overlapping suites against the shared staging
+# account. Newer run wins; in-flight one is cancelled.
+concurrency:
+  group: staging-e2e
+  cancel-in-progress: true
+
 jobs:
   e2e:
     name: Playwright vs staging

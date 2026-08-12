@@ -28,20 +28,40 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   await page.getByRole('button', { name: 'stat block' }).first().click()
   await expect(page.locator('.statblock')).toBeVisible()
 
-  // Save, then confirm it persists across a reload.
+  // Save — wait for the PUT to actually land. Asserting toHaveCount(0) alone
+  // passes instantly (before the request settles), so the following reload
+  // could abort an in-flight save and mask a broken persist.
+  const savePut = page.waitForResponse(
+    (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
+  )
   await page.getByRole('button', { name: /^Save/ }).click()
+  expect((await savePut).ok(), 'save PUT should succeed').toBeTruthy()
   await expect(page.locator('.editor .error[role="alert"]')).toHaveCount(0)
 
+  // Reload and re-open the encounter — confirm the *monster* persisted, not just
+  // the name (a silently-failed save would still show the name in the list).
   await page.reload()
   await page.locator('button.campaign').first().click()
   const encounterBtn = page.locator('button.encounter', { hasText: name })
   await expect(encounterBtn).toBeVisible()
+  await encounterBtn.click()
+  await expect(page.locator('.editor')).toBeVisible()
+  await expect(page.locator('.picked')).toBeVisible()
+  await page.getByRole('button', { name: 'stat block' }).first().click()
+  await expect(page.locator('.statblock')).toBeVisible()
 
   // Release → read-only.
-  await encounterBtn.click()
   page.once('dialog', (d) => d.accept())
   await page.getByRole('button', { name: /Release/ }).click()
   await expect(page.getByText(/Released/)).toBeVisible()
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
+
+  // Clean up so staging doesn't accumulate one encounter per run. (Left to the
+  // end rather than afterEach: a failure earlier leaves one row, which is
+  // acceptable on throwaway staging and keeps the failure's state inspectable.)
+  await page.getByRole('button', { name: /^Close/ }).click()
+  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
+  await row.getByRole('button', { name: 'Delete' }).click()
+  await expect(row).toHaveCount(0)
 })
