@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { errorMessage } from '../api/errors.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
-import { groupEncountersByChapter, nextChapterOrder } from '../chapters.js'
+import { groupEncountersByChapter, nextChapterOrder, UNSORTED } from '../chapters.js'
 
 // The sidebar chapter tree: chapters (in order) each expand to their encounters
 // (natural-sorted), with a "+ encounter" per chapter and chapter add/rename/delete.
@@ -13,17 +13,23 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
   const [encounters, setEncounters] = useState([])
   const [error, setError] = useState(null)
   const [collapsed, setCollapsed] = useState(() => new Set()) // chapter ids that are collapsed
+  // Monotonic token: only the newest load may commit, so a slow fetch for a
+  // previous campaign can't overwrite a newer one on a rapid campaign switch.
+  const loadToken = useRef(0)
 
   const load = useCallback(async () => {
+    const mine = ++loadToken.current
     setError(null)
     try {
       const [chs, encs] = await Promise.all([
         chaptersApi.list(campaignId),
         encountersApi.list(campaignId),
       ])
+      if (mine !== loadToken.current) return // superseded by a newer load
       setChapters(chs)
       setEncounters(encs)
     } catch (e) {
+      if (mine !== loadToken.current) return
       setError(errorMessage(e))
     }
   }, [campaignId])
@@ -91,7 +97,7 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
   return (
     <section className="chapters" data-testid="chapter-tree">
       {groups.map((g) => {
-        const key = g.chapter ? g.chapter.id : '__unsorted__'
+        const key = g.chapter ? g.chapter.id : UNSORTED
         const isOpen = !collapsed.has(key)
         return (
           <div key={key} className="chapter-group" data-testid="chapter-group">
@@ -106,8 +112,20 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
               </button>
               {g.chapter && (
                 <span className="chapter-actions">
-                  <button className="link" onClick={() => renameChapter(g.chapter)}>Rename</button>
-                  <button className="link danger" onClick={() => deleteChapter(g.chapter)}>Delete</button>
+                  <button
+                    className="link"
+                    aria-label={`Rename chapter ${g.chapter.name}`}
+                    onClick={() => renameChapter(g.chapter)}
+                  >
+                    Rename
+                  </button>
+                  <button
+                    className="link danger"
+                    aria-label={`Delete chapter ${g.chapter.name}`}
+                    onClick={() => deleteChapter(g.chapter)}
+                  >
+                    Delete
+                  </button>
                 </span>
               )}
             </div>
@@ -123,7 +141,13 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
                       >
                         {e.name} <span className="status">{e.status}</span>
                       </button>
-                      <button className="link danger" onClick={() => removeEncounter(e.id)}>Delete</button>
+                      <button
+                        className="link danger"
+                        aria-label={`Delete ${e.name}`}
+                        onClick={() => removeEncounter(e.id)}
+                      >
+                        Delete
+                      </button>
                     </li>
                   ))}
                 </ul>

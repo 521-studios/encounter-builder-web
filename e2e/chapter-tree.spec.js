@@ -46,11 +46,11 @@ test('chapter tree: create a chapter, add naturally-sorted encounters, collapse'
     const row = page.locator('li', {
       has: page.locator('button.encounter', { hasText: `${label}-${stamp}` }),
     })
-    await row.getByRole('button', { name: 'Delete' }).click()
+    await row.getByRole('button', { name: `Delete ${label}-${stamp}` }).click()
     await expect(row).toHaveCount(0)
   }
   page.once('dialog', (d) => d.accept())
-  await group.locator('.chapter-actions').getByRole('button', { name: 'Delete' }).click()
+  await group.getByRole('button', { name: `Delete chapter ${chapterName}` }).click()
   await expect(group).toHaveCount(0)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
