@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { pfsrd2 } from './pfsrd2.js'
+import { bodyHash } from './client.js'
 
 function fakeFetch(res) {
   const calls = []
@@ -35,6 +36,22 @@ test('suggestItems queries suggest/unified for equipment/weapons/armor/shields',
   for (const t of ['equipment', 'weapons', 'armor', 'shields']) {
     assert.match(url, new RegExp(`type=${t}`))
   }
+})
+
+test('applyTemplatePost signs the body with x-amz-content-sha256 (OAC) + X-Access-Token', async () => {
+  const body = JSON.stringify({ creature: { name: 'Goblin' }, template_game_id: 'Templates:1' })
+  const raw = { ok: true, status: 200 }
+  const fetchImpl = fakeFetch(raw)
+  const res = await pfsrd2.applyTemplatePost(body, { tokenProvider: tok, fetchImpl })
+  assert.equal(res, raw) // returns the RAW response (library parses the multipart)
+  const call = fetchImpl.calls[0]
+  assert.match(call.url, /\/api\/pfsrd2\/templates\/apply$/)
+  assert.equal(call.opts.method, 'POST')
+  assert.equal(call.opts.body, body)
+  assert.equal(call.opts.headers['Content-Type'], 'application/json')
+  assert.equal(call.opts.headers['X-Access-Token'], 'jwt')
+  // the OAC payload hash must be sha256 of the exact body string
+  assert.equal(call.opts.headers['x-amz-content-sha256'], await bodyHash(body))
 })
 
 test('entryFull keeps the raw colon in the game_id (the API 404s on %3A)', async () => {
