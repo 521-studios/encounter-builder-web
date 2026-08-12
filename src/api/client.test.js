@@ -64,6 +64,13 @@ test('request throws ApiError with status + body on non-ok', async () => {
   )
 })
 
+test('request returns a raw string when the body is not JSON', async () => {
+  // e.g. a plain-text 5xx or a non-JSON error page.
+  const fetchImpl = fakeFetch({ ok: true, status: 200, text: async () => 'plain text' })
+  const out = await request('GET', '/api/app/healthz', { tokenProvider: async () => 't', fetchImpl })
+  assert.equal(out, 'plain text')
+})
+
 test('request returns null on 204', async () => {
   const fetchImpl = fakeFetch({ ok: true, status: 204, text: async () => '' })
   assert.equal(await request('DELETE', '/api/app/campaigns/g1/encounters/e1', { tokenProvider: async () => 't', fetchImpl }), null)

@@ -51,6 +51,6 @@ This repo SHALL NOT own CloudFront/DNS — see the layering in `../infra-fronten
 ## Deploy
 
 Staging auto-deploys on merge to `main`; production is manual `workflow_dispatch`
-(main only). Deploy = `terraform apply` (bucket) → sync `site/` to `s3://.../current`
+(main only). Deploy = `terraform apply` (bucket) → sync `dist/` (Vite build) to `s3://.../current`
 → CloudFront invalidation (soft-fails until the edge exists). Domains:
 `encounters.staging.521studios.com`, `encounters.521studios.com`.

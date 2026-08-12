@@ -30,12 +30,17 @@ const userManager = new UserManager({
 })
 
 export function onUserChange(cb) {
-  userManager.events.addUserLoaded((u) => cb(u))
-  userManager.events.addUserUnloaded(() => cb(null))
-  userManager.events.addAccessTokenExpired(() => cb(null))
+  // Keep the exact handler references so the returned cleanup actually
+  // unsubscribes (oidc-client-ts removes listeners by identity).
+  const onLoaded = (u) => cb(u)
+  const onGone = () => cb(null)
+  userManager.events.addUserLoaded(onLoaded)
+  userManager.events.addUserUnloaded(onGone)
+  userManager.events.addAccessTokenExpired(onGone)
   return () => {
-    userManager.events.removeUserLoaded(cb)
-    userManager.events.removeUserUnloaded(cb)
+    userManager.events.removeUserLoaded(onLoaded)
+    userManager.events.removeUserUnloaded(onGone)
+    userManager.events.removeAccessTokenExpired(onGone)
   }
 }
 
