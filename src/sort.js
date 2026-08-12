@@ -1,7 +1,9 @@
 // Natural (alphanumeric) ordering for the encounter sidebar: numeric runs sort
 // by value, not lexically, so "2" < "10" and "B2" < "B10". This is exactly what
 // Intl.Collator with { numeric: true } does natively — no hand-rolled parser.
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+// Pin the locale to 'en' so ordering is identical across CI/browser/host rather
+// than following whatever default locale the runtime happens to have.
+const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
 
 // naturalCompare(a, b): a comparator for Array.prototype.sort over strings.
 export const naturalCompare = (a, b) => collator.compare(String(a), String(b))
