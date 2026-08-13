@@ -20,6 +20,13 @@ test('monster + treasure pickers filter by tag / category', async ({ page, baseU
     '.monster-search [data-testid="search-result"][data-name="Adult Cinder Dragon"]',
   )
   await page.locator('.monster-search [data-testid="creature-search"]').fill('adult cinder dragon')
+  await expect(cinder).toBeVisible() // level 14
+
+  // Level range narrows: capping at 5 drops the level-14 dragon; clear it back.
+  const levelMax = page.locator('.monster-search [data-testid="CreatureSearch-level-max"]')
+  await levelMax.fill('5')
+  await expect(cinder).toHaveCount(0)
+  await levelMax.fill('')
   await expect(cinder).toBeVisible()
 
   const creatureTrait = page.locator('.monster-search [data-testid="CreatureSearch-trait-input"]')

@@ -31,6 +31,8 @@ export const pfsrd2 = {
     params.append('type', 'monsters')
     params.append('type', 'npcs')
     if (filters.traits?.length) params.set('traits', filters.traits.join(','))
+    if (filters.levelMin) params.set('level_min', filters.levelMin)
+    if (filters.levelMax) params.set('level_max', filters.levelMax)
     return request('GET', `/api/pfsrd2/search/suggest/unified?${params.toString()}`, opts)
   },
   // Co-occurring trait typeahead for the CreatureSearch trait filter: only traits
@@ -51,6 +53,8 @@ export const pfsrd2 = {
     if (filters.traits?.length) params.set('traits', filters.traits.join(','))
     if (filters.category) params.set('category', filters.category)
     if (filters.subcategory) params.set('subcategory', filters.subcategory)
+    if (filters.levelMin) params.set('level_min', filters.levelMin)
+    if (filters.levelMax) params.set('level_max', filters.levelMax)
     return request('GET', `/api/pfsrd2/search/suggest/unified?${params.toString()}`, opts)
   },
   // Co-occurring trait typeahead for the ItemSearch trait filter, narrowed by the
