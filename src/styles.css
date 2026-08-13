@@ -322,3 +322,13 @@ button.encounter.selected {
   border-radius: var(--radius);
   text-align: center;
 }
+
+/* Campaign/chapter detail pages + expected-party override fields (Slice 3). */
+.detail { display: grid; gap: 1rem; }
+.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.detail-head h2 { margin: 0; }
+.party-fields .line { gap: 1rem; align-items: flex-start; }
+.party-fields .field input { width: 5rem; }
+.party-inherit-hint { font-size: 0.78rem; }
+.campaign-switcher-block { display: grid; gap: 0.3rem; }
+.campaign-settings-link { justify-self: start; font-size: 0.85rem; }

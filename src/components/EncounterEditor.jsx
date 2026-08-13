@@ -3,9 +3,12 @@ import { Markdown } from '@521studios/pfsrd2-display'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
+import { settings as settingsApi } from '../api/settings.js'
 import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, keyed } from '../model.js'
+import { resolveParty } from '../party.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
+import PartyFields from './PartyFields.jsx'
 
 const AUTOSAVE_MS = 800
 
@@ -15,6 +18,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
   const [releasing, setReleasing] = useState(false)
   const [chapters, setChapters] = useState([]) // for the Chapter picker (keyboard-accessible move)
+  const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
 
   // Refs let the debounced autosave read the latest edit without re-subscribing:
   // encRef is the current working copy; dirtyRef marks unsaved user edits;
@@ -33,6 +37,10 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       .list(campaignId)
       .then((cs) => alive && setChapters(cs))
       .catch(() => {}) // the picker just falls back to Unsorted-only if this fails
+    settingsApi
+      .get(campaignId)
+      .then((s) => alive && setCampaignSettings(s))
+      .catch(() => alive && setCampaignSettings({})) // inheritance falls back to app default
     return () => {
       alive = false
     }
@@ -175,6 +183,17 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           ))}
         </select>
       </label>
+
+      <PartyFields
+        value={{ party_level: enc.party_level ?? null, party_size: enc.party_size ?? null }}
+        inherited={resolveParty({
+          // Layers below the encounter: its chapter, then campaign settings.
+          chapter: chapters.find((c) => c.id === enc.chapter_id) || null,
+          campaign: campaignSettings || null,
+        })}
+        disabled={released}
+        onChange={(next) => patch({ party_level: next.party_level, party_size: next.party_size })}
+      />
 
       <label className="field">
         <span>Description</span>

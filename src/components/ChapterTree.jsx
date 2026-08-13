@@ -9,7 +9,7 @@ import { toEncounterInput } from '../model.js'
 // (natural-sorted), with a "+ encounter" per chapter and chapter add/rename/delete.
 // Chapterless/dangling encounters render under a synthetic "Unsorted" group.
 // (Reorder is deferred — new chapters append; tracked as a follow-up.)
-export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId }) {
+export default function ChapterTree({ campaignId, onEdit, onEditChapter, reloadKey, selectedId }) {
   const [chapters, setChapters] = useState(null) // null = loading
   const [encounters, setEncounters] = useState([])
   const [error, setError] = useState(null)
@@ -84,7 +84,14 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
     const name = window.prompt('Rename chapter', ch.name)
     if (!name || name.trim() === '' || name === ch.name) return
     try {
-      await chaptersApi.update(campaignId, ch.id, { name: name.trim(), order: ch.order })
+      // Chapter update full-replaces party defaults, so a rename must round-trip
+      // them (party_level/party_size) or it would clear the chapter's override.
+      await chaptersApi.update(campaignId, ch.id, {
+        name: name.trim(),
+        order: ch.order,
+        party_level: ch.party_level ?? null,
+        party_size: ch.party_size ?? null,
+      })
       await load()
     } catch (e) {
       setError(errorMessage(e))
@@ -153,6 +160,15 @@ export default function ChapterTree({ campaignId, onEdit, reloadKey, selectedId 
               </button>
               {g.chapter && (
                 <span className="chapter-actions">
+                  {onEditChapter && (
+                    <button
+                      className="link"
+                      aria-label={`Chapter settings ${g.chapter.name}`}
+                      onClick={() => onEditChapter(g.chapter)}
+                    >
+                      Settings
+                    </button>
+                  )}
                   <button
                     className="link"
                     aria-label={`Rename chapter ${g.chapter.name}`}

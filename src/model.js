@@ -52,6 +52,10 @@ export function toEncounterInput(enc) {
     treasure: (enc.treasure || []).filter(hasRef).map(stripKey),
     currency: enc.currency || {},
   }
+  // Party overrides are echoed only when set; omitting a nil override lets the
+  // full-replace PUT clear it back to inherit (encounter -> chapter -> campaign).
+  if (enc.party_level != null) input.party_level = enc.party_level
+  if (enc.party_size != null) input.party_size = enc.party_size
   if (enc.status) input.status = enc.status
   return input
 }
