@@ -55,7 +55,7 @@ export function emptyTreasure() {
   return withKey({
     ref: { game_id: '' },
     qty: 1,
-    variant: '', // chosen item variant by name (e.g. "Striking (Greater)"); '' = base
+    variant: '', // chosen version by name (e.g. "Striking (Greater)"); '' = none picked yet
     masked: false,
     mask_label: '',
     identify_dc: 0,

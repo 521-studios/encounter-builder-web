@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { login, trackApiErrors } from './helpers/login.js'
 
-// Pick an item with variants (a Striking rune), switch to the Greater variant,
-// and confirm the choice persists across a reload (stored by name on the line).
-test('treasure item variant is switchable and persists', async ({ page, baseURL }) => {
+// Pick an item with versions (a Striking rune). It reads like the book — every
+// version stacked, nothing selected until the GM locks one in — and the chosen
+// version persists across a reload (stored by name on the line).
+test('treasure item version is locked in by selecting it and persists', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
   await page.locator('button.campaign').first().click()
@@ -13,34 +14,41 @@ test('treasure item variant is switchable and persists', async ({ page, baseURL 
   await page.getByTestId('new-encounter').locator('button').click()
   await expect(page.locator('.editor')).toBeVisible()
 
-  // Add a treasure line and pick the Striking rune (has variants).
+  // Add a treasure line and pick the Striking rune (has versions).
   await page.getByRole('button', { name: '+ treasure' }).click()
   await page.locator('.item-search [data-testid="item-search"]').first().fill('striking')
   const striking = page.locator('.item-search [data-testid="item-search-result"][data-name="Striking"]').first()
   await expect(striking).toBeVisible()
   await striking.click()
 
-  const card = page.locator('.treasure-line-wrap .itemcard')
-  const select = card.locator('.Monster__variant-select')
-  await expect(select).toBeVisible()
-  await expect(card.locator('.Monster__level')).toContainText('4') // base Striking
+  const wrap = page.locator('.treasure-line-wrap')
+  const card = wrap.locator('.itemcard')
+  // Book header + a prompt to pick; nothing selected yet (require a lock-in).
+  await expect(card.locator('.Monster__level')).toContainText('4+')
+  await expect(wrap.locator('.variant-hint')).toBeVisible()
+  await expect(card.locator('.Monster__variant--selected')).toHaveCount(0)
 
-  // Switch to the Greater variant (option value = index 1) and save.
-  await select.selectOption('1')
-  await expect(card.locator('.Monster__level')).toContainText('12')
+  // Lock in the Greater version.
+  const greater = card.locator('.Monster__variant', { hasText: 'Striking (Greater)' })
+  await expect(greater).toContainText('Item 12')
+  await greater.click()
+  await expect(greater).toHaveAttribute('aria-checked', 'true')
+  await expect(wrap.locator('.variant-hint')).toHaveCount(0) // prompt clears once picked
+
   const savePut = page.waitForResponse(
     (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
   )
   await page.getByRole('button', { name: /^Save/ }).click()
   expect((await savePut).ok()).toBeTruthy()
 
-  // Reload, re-open — the Greater variant is still selected.
+  // Reload, re-open — the Greater version is still locked in, no prompt.
   await page.reload()
   await page.locator('button.campaign').first().click()
   await page.locator('button.encounter', { hasText: name }).click()
-  const card2 = page.locator('.treasure-line-wrap .itemcard')
-  await expect(card2.locator('.Monster__level')).toContainText('12')
-  await expect(card2.locator('.Monster__variant-select')).toHaveValue('1')
+  const wrap2 = page.locator('.treasure-line-wrap')
+  const greater2 = wrap2.locator('.itemcard .Monster__variant', { hasText: 'Striking (Greater)' })
+  await expect(greater2).toHaveAttribute('aria-checked', 'true')
+  await expect(wrap2.locator('.variant-hint')).toHaveCount(0)
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()
