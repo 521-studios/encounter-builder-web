@@ -6,6 +6,8 @@ import { chapters as chaptersApi } from '../api/chapters.js'
 import { settings as settingsApi } from '../api/settings.js'
 import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, keyed } from '../model.js'
 import { resolveParty } from '../party.js'
+import { BAND_LABELS } from '../pf2eRules.js'
+import { useEncounterBudget } from '../useEncounterBudget.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
 import PartyFields from './PartyFields.jsx'
@@ -123,6 +125,16 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     }
   }, [campaignId, encounterId])
 
+  // Effective party (own override → chapter → campaign → app default) and the
+  // shared treasure/difficulty budget. Computed before the early returns to
+  // satisfy the rules of hooks; both tolerate a still-loading (null) encounter.
+  const effectiveParty = resolveParty({
+    encounter: enc,
+    chapter: enc ? chapters.find((c) => c.id === enc.chapter_id) || null : null,
+    campaign: campaignSettings || null,
+  })
+  const budget = useEncounterBudget(enc || {}, effectiveParty.level, effectiveParty.size)
+
   if (error && !enc) return <p className="error" role="alert">{error}</p>
   if (!enc) return <p>Loading encounter…</p>
 
@@ -160,15 +172,6 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
   const saveLabel = { saving: 'Saving…', unsaved: 'Unsaved changes…', error: 'Save failed', saved: 'Saved' }[saveState]
 
-  // The encounter's effective party (its own override, else chapter, else
-  // campaign, else app default) — the level/size the treasure + difficulty budget
-  // is measured against.
-  const effectiveParty = resolveParty({
-    encounter: enc,
-    chapter: chapters.find((c) => c.id === enc.chapter_id) || null,
-    campaign: campaignSettings || null,
-  })
-
   return (
     <section className="editor">
       <div className="editor-head">
@@ -179,6 +182,13 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           disabled={released}
           onChange={(e) => patch({ name: e.target.value })}
         />
+        <span
+          className={`difficulty-badge difficulty-badge--${budget.threat}`}
+          data-testid="difficulty-badge"
+          title={`${BAND_LABELS[budget.threat]} encounter for a level-${effectiveParty.level} party (from monster XP)`}
+        >
+          {BAND_LABELS[budget.threat]} {effectiveParty.level}
+        </span>
         <span className="status">{enc.status}</span>
         <button type="button" className="link" onClick={onClose}>Close</button>
       </div>
@@ -291,7 +301,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       </fieldset>
 
       <TreasureBudget
-        encounter={enc}
+        budget={budget}
         partyLevel={effectiveParty.level}
         partySize={effectiveParty.size}
       />

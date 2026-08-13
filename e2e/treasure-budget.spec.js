@@ -35,6 +35,8 @@ test('encounter budget panel: difficulty band, treasure value, and over/under th
   // Difficulty resolves to Extreme once the creature entry loads; treasure (0 gp)
   // is under the Extreme target (35 gp at level 1) and the Extreme cell marks ▲.
   await expect(page.getByTestId('encounter-threat')).toHaveText('Extreme')
+  // Book-style difficulty badge on the title: band + party level ("Extreme 1").
+  await expect(page.getByTestId('difficulty-badge')).toHaveText('Extreme 1')
   await expect(page.getByTestId('treasure-delta')).toContainText('under the Extreme target')
   const extremeCell = budget.locator('.treasure-chart td[data-band="extreme"]')
   await expect(extremeCell).toHaveAttribute('data-active', 'true')
