@@ -89,3 +89,41 @@ test('gameIdsInEncounter dedupes and skips derived + destroyed', () => {
   })
   assert.deepEqual(ids.sort(), ['Monsters:goblin', 'Weapons:1'])
 })
+
+import { rollupEncounters } from './budget.js'
+
+test('rollupEncounters aggregates treasure vs summed per-encounter budgets + breakdown', () => {
+  const items = { 'W:1': { stat_block: { price: { value: 100, currency: 'gp' } } } } // 10000 cp
+  const creatures = { 'M:1': { stat_block: { creature_type: { level: 5 } } } } // PL creature
+  const entryOf = (id) => items[id] || creatures[id] || null
+  // Two encounters, both at party level 5 / 4 PCs.
+  const partyFor = () => ({ level: 5, size: 4 })
+  const encounters = [
+    // 1 PL-creature (40 XP -> Trivial: no target) + 1 gp item worth 100 gp
+    { id: 'e1', name: 'A', monsters: [{ ref: { game_id: 'M:1' }, count: 1 }], treasure: [{ ref: { game_id: 'W:1' }, qty: 1 }], currency: {} },
+    // 3 PL-creatures (120 XP -> Severe; L5 severe target = 200 gp) + 20 gp coin
+    { id: 'e2', name: 'B', monsters: [{ ref: { game_id: 'M:1' }, count: 3 }], treasure: [], currency: { gp: 20 } },
+  ]
+  const { totalCp, totalTargetCp, rows, anyIncomplete } = rollupEncounters(encounters, entryOf, partyFor)
+  assert.equal(totalCp, 10000 + 2000) // 100 gp item + 20 gp coin
+  assert.equal(rows.length, 2)
+  assert.equal(rows[0].threat, 'trivial') // 40 XP
+  assert.equal(rows[0].targetCp, 0) // trivial has no treasure target
+  assert.equal(rows[1].threat, 'severe') // 120 XP
+  assert.equal(rows[1].targetCp, 200 * 100) // L5 severe = 200 gp
+  assert.equal(totalTargetCp, 0 + 200 * 100)
+  assert.equal(anyIncomplete, false)
+})
+
+test('rollupEncounters flags incomplete rows (unpriced/unknown) and tolerates empty', () => {
+  const entryOf = () => null // nothing loads
+  const partyFor = () => ({ level: 3, size: 4 })
+  const r = rollupEncounters(
+    [{ id: 'e', name: 'X', monsters: [{ ref: { game_id: 'M:?' }, count: 1 }], treasure: [{ ref: { game_id: 'W:?' }, qty: 1 }], currency: {} }],
+    entryOf,
+    partyFor,
+  )
+  assert.equal(r.rows[0].incomplete, true)
+  assert.equal(r.anyIncomplete, true)
+  assert.deepEqual(rollupEncounters([], entryOf, partyFor), { totalCp: 0, totalTargetCp: 0, rows: [], anyIncomplete: false })
+})
