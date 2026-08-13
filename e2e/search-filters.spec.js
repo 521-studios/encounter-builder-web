@@ -39,6 +39,12 @@ test('monster + treasure pickers filter by tag / category', async ({ page, baseU
   await expect(category.locator('option', { hasText: 'Runes' })).toBeAttached()
   await expect(page.locator('.item-search [data-testid="ItemSearch-trait-input"]')).toBeVisible()
 
+  // Filter-only browse: picking a category populates the list with no typing.
+  const results = page.locator('.item-search [data-testid="item-search-result"]')
+  await expect(results).toHaveCount(0) // nothing typed, no filter yet
+  await category.selectOption('Runes')
+  await expect(results.first()).toBeVisible() // the list fills from the filter alone
+
   const striking = page.locator(
     '.item-search [data-testid="item-search-result"][data-name="Striking"]',
   )
