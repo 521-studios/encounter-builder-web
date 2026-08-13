@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
 
 // The library search filters wired into the app's monster + treasure pickers:
 // CreatureSearch by trait, ItemSearch by category/subcategory (+ trait). The
@@ -7,12 +7,10 @@ import { login, trackApiErrors } from './helpers/login.js'
 test('monster + treasure pickers filter by tag / category', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
+  await openFirstCampaign(page)
 
   const name = `Filters ${Date.now()}`
-  await page.getByTestId('new-encounter').locator('input').fill(name)
-  await page.getByTestId('new-encounter').locator('button').click()
-  await expect(page.locator('.editor')).toBeVisible()
+  await createEncounter(page, name)
 
   // --- Monster picker: trait filter present + narrows the results ---
   await page.getByRole('button', { name: '+ monster' }).click()
@@ -63,9 +61,7 @@ test('monster + treasure pickers filter by tag / category', async ({ page, baseU
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()
-  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
-  await row.getByRole('button', { name: `Delete ${name}` }).click()
-  await expect(row).toHaveCount(0)
+  await deleteEncounter(page, name)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
 })

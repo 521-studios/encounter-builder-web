@@ -1,32 +1,28 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter } from './helpers/login.js'
 
 // The sidebar chapter tree: add a chapter, add encounters under it (which sort
-// naturally: B1, B2, B10 — not B1, B10, B2), collapse/expand, then clean up.
+// naturally: B1, B2, B10 — not B1, B10, B2), collapse/expand via the caret, then
+// clean up. Direct manipulation: name opens the chapter, caret toggles, "+ x"
+// buttons create-and-open.
 test('chapter tree: create a chapter, add naturally-sorted encounters, collapse', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
+  await openFirstCampaign(page)
 
-  await page.locator('button.campaign').first().click()
-  await expect(page.getByTestId('chapter-tree')).toBeVisible()
-
-  // Add a chapter.
   const chapterName = `E2E Ch ${Date.now()}`
-  await page.getByTestId('add-chapter').locator('input').fill(chapterName)
-  await page.getByTestId('add-chapter').locator('button').click()
+  await createChapter(page, chapterName)
 
   const group = page.locator('.chapter-group', {
     has: page.locator('.chapter-name', { hasText: chapterName }),
   })
   await expect(group).toBeVisible()
 
-  // Add three encounters under it, out of natural order.
+  // Add three encounters under it, out of natural order (each "+ encounter"
+  // creates an untitled encounter and opens the editor to name it).
   const stamp = Date.now()
   for (const label of ['B10', 'B1', 'B2']) {
-    const form = group.locator('.new-encounter')
-    await form.locator('input').fill(`${label}-${stamp}`)
-    await form.locator('button').click()
-    // each add opens the editor in the main pane; wait for the row to appear
+    await createEncounter(page, `${label}-${stamp}`, group)
     await expect(group.locator('button.encounter', { hasText: `${label}-${stamp}` })).toBeVisible()
   }
 
@@ -35,22 +31,17 @@ test('chapter tree: create a chapter, add naturally-sorted encounters, collapse'
   const order = names.map((n) => n.trim().split(' ')[0]) // strip the trailing status
   expect(order).toEqual([`B1-${stamp}`, `B2-${stamp}`, `B10-${stamp}`])
 
-  // Collapse hides the encounters; expand shows them again.
-  await group.locator('.chapter-toggle').click()
+  // The caret (only) collapses/expands; the name button opens the detail, not toggles.
+  await group.locator('.chapter-caret-btn').click()
   await expect(group.locator('button.encounter').first()).toBeHidden()
-  await group.locator('.chapter-toggle').click()
+  await group.locator('.chapter-caret-btn').click()
   await expect(group.locator('button.encounter').first()).toBeVisible()
 
-  // Clean up: delete the three encounters, then the chapter.
+  // Clean up: delete the three encounters (from their editors), then the chapter.
   for (const label of ['B1', 'B2', 'B10']) {
-    const row = page.locator('li', {
-      has: page.locator('button.encounter', { hasText: `${label}-${stamp}` }),
-    })
-    await row.getByRole('button', { name: `Delete ${label}-${stamp}` }).click()
-    await expect(row).toHaveCount(0)
+    await deleteEncounter(page, `${label}-${stamp}`)
   }
-  page.once('dialog', (d) => d.accept())
-  await group.getByRole('button', { name: `Delete chapter ${chapterName}` }).click()
+  await deleteChapter(page, chapterName)
   await expect(group).toHaveCount(0)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])

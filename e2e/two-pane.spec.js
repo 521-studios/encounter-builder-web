@@ -13,16 +13,16 @@ test('selecting a campaign opens the two-pane shell; the switcher returns to the
   const campaignName = (await campaigns.first().innerText()).trim()
   await campaigns.first().click()
 
-  // Two-pane structure: sidebar with the switcher + encounter list, main with
-  // the empty prompt (nothing selected yet).
+  // Two-pane structure: sidebar with the campaign name (opens its detail) + a
+  // distinct switch control + encounter list, main with the empty prompt.
   await expect(page.locator('.two-pane')).toBeVisible()
+  await expect(page.getByTestId('campaign-settings')).toContainText(campaignName)
   const switcher = page.getByTestId('campaign-switcher')
   await expect(switcher).toBeVisible()
-  await expect(switcher).toContainText(campaignName)
   await expect(page.locator('.sidebar [data-testid="chapter-tree"]')).toBeVisible()
   await expect(page.getByTestId('empty-main')).toBeVisible()
 
-  // The switcher returns to the campaign picker.
+  // The switch control returns to the campaign picker.
   await switcher.click()
   await expect(page.locator('.campaigns')).toBeVisible()
   await expect(page.locator('.two-pane')).toHaveCount(0)

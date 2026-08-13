@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
 
 // Slice 4: the encounter's treasure-vs-budget panel — difficulty band from
 // monster XP, treasure value from coins/item prices, shown against the Table 5-3
@@ -8,12 +8,10 @@ import { login, trackApiErrors } from './helpers/login.js'
 test('encounter budget panel: difficulty band, treasure value, and over/under the Table 5-3 target', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
+  await openFirstCampaign(page)
 
   const name = `Budget ${Date.now()}`
-  await page.getByTestId('new-encounter').locator('input').fill(name)
-  await page.getByTestId('new-encounter').locator('button').click()
-  await expect(page.locator('.editor')).toBeVisible()
+  await createEncounter(page, name)
 
   const budget = page.getByTestId('treasure-budget')
   await expect(budget).toBeVisible()
@@ -56,9 +54,7 @@ test('encounter budget panel: difficulty band, treasure value, and over/under th
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()
-  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
-  await row.getByRole('button', { name: `Delete ${name}` }).click()
-  await expect(row).toHaveCount(0)
+  await deleteEncounter(page, name)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
 })
