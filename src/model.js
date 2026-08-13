@@ -56,6 +56,16 @@ export function toEncounterInput(enc) {
   return input
 }
 
+// The exact PUT body for a save: toEncounterInput plus the rule that a released
+// encounter's body must not carry status — release is its own endpoint, so a
+// regular save/move must never move status. (Today's callers only save drafts,
+// so the strip is defensive; the invariant is asserted in the tests.)
+export function buildInput(enc) {
+  const input = toEncounterInput(enc)
+  if (enc.status === 'released') delete input.status
+  return input
+}
+
 export function emptyMonster() {
   return withKey({ ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '' })
 }

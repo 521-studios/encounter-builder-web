@@ -77,6 +77,10 @@ export default function App() {
           <section className="main">
             {editing ? (
               <EncounterEditor
+                // Remount per encounter so autosave refs (dirty/saving/enc) are
+                // isolated: switching mid-save must not reset the outgoing
+                // encounter's dirty flag and drop its last edit.
+                key={editing.id}
                 campaignId={campaign.id}
                 encounterId={editing.id}
                 onClose={() => {

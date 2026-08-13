@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { keyed, withKey, stripKey, emptyMonster, emptyTreasure, toEncounterInput, hasRef } from './model.js'
+import { keyed, withKey, stripKey, emptyMonster, emptyTreasure, toEncounterInput, hasRef, buildInput } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
   const out = keyed({
@@ -99,6 +99,18 @@ test('toEncounterInput keeps a templated (derived) monster whose ref carries bas
   const input = toEncounterInput(enc)
   assert.equal(input.monsters.length, 1)
   assert.equal(input.monsters[0].ref.base.game_id, 'Monsters:1')
+})
+
+test('buildInput keeps status for a draft (a normal save echoes it)', () => {
+  const input = buildInput({ name: 'x', status: 'draft' })
+  assert.equal(input.status, 'draft')
+})
+
+test('buildInput strips status for a released encounter (release is its own endpoint)', () => {
+  // A regular save/move of a released encounter must not carry status, or the
+  // PUT would move it — release owns that transition.
+  const input = buildInput({ name: 'x', status: 'released' })
+  assert.ok(!('status' in input))
 })
 
 test('toEncounterInput defaults chapter_id to "" (Unsorted) and omits absent status', () => {

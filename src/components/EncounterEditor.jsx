@@ -3,17 +3,11 @@ import { Markdown } from '@521studios/pfsrd2-display'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
-import { CURRENCIES, emptyMonster, emptyTreasure, keyed, toEncounterInput } from '../model.js'
+import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, keyed } from '../model.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
 
 const AUTOSAVE_MS = 800
-
-function buildInput(enc) {
-  const input = toEncounterInput(enc) // echoes chapter_id/description/monsters/…
-  if (enc.status === 'released') delete input.status // release is its own action
-  return input
-}
 
 export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved }) {
   const [enc, setEnc] = useState(null) // null = loading
