@@ -25,7 +25,7 @@ export default function MonsterView({ monster, onChange, disabled }) {
   const baseGameId = ref.base?.game_id || ref.game_id || ''
 
   const [base, setBase] = useState(null)
-  const [stack, setStack] = useState([]) // [{ template:{game_id,name}, patches, creature }]
+  const [stack, setStack] = useState([]) // [{ template:{game_id,name}, patches, creature, templateData }]
   const [templates, setTemplates] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
