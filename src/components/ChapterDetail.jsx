@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { settings as settingsApi } from '../api/settings.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { errorMessage } from '../api/errors.js'
-import { resolveParty } from '../party.js'
+import { resolveParty, partyFields } from '../party.js'
 import PartyFields from './PartyFields.jsx'
 
 // Chapter detail: the chapter's expected-party override. Inherits from campaign
@@ -15,6 +15,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
     party_size: chapter.party_size ?? null,
   })
   const [campaignSettings, setCampaignSettings] = useState(null) // null while loading
+  const [settingsError, setSettingsError] = useState(false) // campaign settings load failed
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -24,7 +25,13 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
     settingsApi
       .get(campaignId)
       .then((s) => alive && setCampaignSettings(s))
-      .catch(() => alive && setCampaignSettings({})) // fall back to app default on failure
+      .catch(() => {
+        // The chapter's own override is still editable; flag that the inherited
+        // campaign values couldn't load so the shown defaults aren't a silent lie.
+        if (!alive) return
+        setCampaignSettings({})
+        setSettingsError(true)
+      })
     return () => {
       alive = false
     }
@@ -37,8 +44,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
       const updated = await chaptersApi.update(campaignId, chapter.id, {
         name: chapter.name,
         order: chapter.order,
-        party_level: value.party_level,
-        party_size: value.party_size,
+        ...partyFields(value),
       })
       setValue({ party_level: updated.party_level ?? null, party_size: updated.party_size ?? null })
       setSaved(true)
@@ -69,6 +75,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
       <PartyFields
         value={value}
         inherited={inherited}
+        inheritedError={settingsError}
         disabled={saving}
         onChange={(next) => {
           setValue(next)

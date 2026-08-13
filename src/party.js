@@ -39,3 +39,16 @@ export function resolveParty(layers = {}) {
 export function sourceLabel(source) {
   return { encounter: 'this encounter', chapter: 'chapter', campaign: 'campaign', default: 'default' }[source] || source
 }
+
+// partyFields builds the party portion of a PUT body from an override value,
+// including a field only when it's set. This is the single clear-encoding
+// convention across every writer (encounter, chapter, campaign settings, chapter
+// rename): a nil override is OMITTED, and the full-replace PUT clears it back to
+// inherit. (The API collapses absent and JSON null to a nil pointer, but keeping
+// one encoding avoids relying on that.)
+export function partyFields(value) {
+  const out = {}
+  if (value?.party_level != null) out.party_level = value.party_level
+  if (value?.party_size != null) out.party_size = value.party_size
+  return out
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { settings as settingsApi } from '../api/settings.js'
 import { errorMessage } from '../api/errors.js'
-import { PARTY_DEFAULT } from '../party.js'
+import { PARTY_DEFAULT, partyFields } from '../party.js'
 import PartyFields from './PartyFields.jsx'
 
 // Campaign detail: the base of the expected-party inheritance chain. Set the
@@ -30,7 +30,7 @@ export default function CampaignDetail({ campaign, onClose, onSaved }) {
     setSaving(true)
     setError(null)
     try {
-      const s = await settingsApi.put(campaign.id, { party_level: value.party_level, party_size: value.party_size })
+      const s = await settingsApi.put(campaign.id, partyFields(value))
       setValue({ party_level: s.party_level ?? null, party_size: s.party_size ?? null })
       setSaved(true)
       onSaved && onSaved()

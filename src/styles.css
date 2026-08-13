@@ -332,3 +332,4 @@ button.encounter.selected {
 .party-inherit-hint { font-size: 0.78rem; }
 .campaign-switcher-block { display: grid; gap: 0.3rem; }
 .campaign-settings-link { justify-self: start; font-size: 0.85rem; }
+.party-inherit-error { font-size: 0.82rem; margin: 0 0 0.25rem; }

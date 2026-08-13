@@ -10,7 +10,7 @@
 // onChange:  (next) => void with the updated { party_level, party_size }.
 import { sourceLabel } from '../party.js'
 
-export default function PartyFields({ value, inherited, onChange, disabled }) {
+export default function PartyFields({ value, inherited, onChange, disabled, inheritedError }) {
   const set = (field, raw) => {
     const n = raw === '' ? null : Number(raw)
     onChange({ ...value, [field]: n })
@@ -18,6 +18,11 @@ export default function PartyFields({ value, inherited, onChange, disabled }) {
   return (
     <fieldset className="party-fields">
       <legend>Expected party</legend>
+      {inheritedError && (
+        <p className="error party-inherit-error" role="alert">
+          Couldn’t load inherited party values — the defaults shown may be inaccurate.
+        </p>
+      )}
       <div className="line">
         <label className="field">
           <span>Level</span>
@@ -25,6 +30,7 @@ export default function PartyFields({ value, inherited, onChange, disabled }) {
             type="number"
             min="1"
             max="20"
+            step="1"
             aria-label="party level"
             value={value?.party_level ?? ''}
             placeholder={String(inherited.level)}
@@ -42,6 +48,7 @@ export default function PartyFields({ value, inherited, onChange, disabled }) {
           <input
             type="number"
             min="1"
+            step="1"
             aria-label="party size"
             value={value?.party_size ?? ''}
             placeholder={String(inherited.size)}

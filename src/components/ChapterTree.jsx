@@ -4,6 +4,7 @@ import { encounters as encountersApi } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { groupEncountersByChapter, nextChapterOrder, ensureUnsortedGroup, UNSORTED } from '../chapters.js'
 import { toEncounterInput } from '../model.js'
+import { partyFields } from '../party.js'
 
 // The sidebar chapter tree: chapters (in order) each expand to their encounters
 // (natural-sorted), with a "+ encounter" per chapter and chapter add/rename/delete.
@@ -85,12 +86,11 @@ export default function ChapterTree({ campaignId, onEdit, onEditChapter, reloadK
     if (!name || name.trim() === '' || name === ch.name) return
     try {
       // Chapter update full-replaces party defaults, so a rename must round-trip
-      // them (party_level/party_size) or it would clear the chapter's override.
+      // them (via the shared clear-encoding) or it would clear the override.
       await chaptersApi.update(campaignId, ch.id, {
         name: name.trim(),
         order: ch.order,
-        party_level: ch.party_level ?? null,
-        party_size: ch.party_size ?? null,
+        ...partyFields(ch),
       })
       await load()
     } catch (e) {

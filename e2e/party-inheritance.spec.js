@@ -58,6 +58,24 @@ test('party level/size inherits campaign -> chapter -> encounter with per-layer 
   await expect(page.locator('.editor').getByLabel('party level')).toHaveValue('10')
   await expect(page.locator('.editor').getByLabel('party size')).toHaveAttribute('placeholder', '4') // still inheriting
 
+  // --- Clear-to-inherit, per layer, and confirm the resolved value reverts ---
+  // Clear the encounter's own level override → it inherits the chapter's 8.
+  const encLevel = page.locator('.editor').getByLabel('party level')
+  await encLevel.fill('')
+  await expect(page.getByTestId('save-state')).toHaveText('Saved')
+  await expect(encLevel).toHaveValue('')
+  await expect(encLevel).toHaveAttribute('placeholder', '8') // now inherits the chapter
+
+  // Clear the CHAPTER's level override → the encounter's inherited level reverts
+  // from 8 to the campaign's 5 (proves chapter clear-to-inherit via full-replace).
+  await page.getByRole('button', { name: `Chapter settings ${chapterName}` }).click()
+  const chapterDetail2 = page.getByTestId('chapter-detail')
+  await chapterDetail2.getByLabel('party level').fill('')
+  await chapterDetail2.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByTestId('chapter-saved')).toBeVisible()
+  await page.locator('button.encounter', { hasText: encName }).first().click()
+  await expect(page.locator('.editor').getByLabel('party level')).toHaveAttribute('placeholder', '5')
+
   // --- Cleanup: delete the encounter + chapter, and clear the campaign default ---
   await page.getByRole('button', { name: /^Close/ }).click()
   const encRow = page.locator('li', { has: page.locator('button.encounter', { hasText: encName }) })
@@ -67,12 +85,16 @@ test('party level/size inherits campaign -> chapter -> encounter with per-layer 
   await group.getByRole('button', { name: `Delete chapter ${chapterName}` }).click()
   await expect(group).toHaveCount(0)
 
+  // Clear the campaign default and confirm it reverts (reopen → fields empty).
   await page.getByTestId('campaign-settings').click()
   const detail2 = page.getByTestId('campaign-detail')
   await detail2.getByLabel('party level').fill('')
   await detail2.getByLabel('party size').fill('')
   await detail2.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByTestId('settings-saved')).toBeVisible()
+  await detail2.getByRole('button', { name: 'Close' }).click()
+  await page.getByTestId('campaign-settings').click()
+  await expect(page.getByTestId('campaign-detail').getByLabel('party level')).toHaveValue('')
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
 })

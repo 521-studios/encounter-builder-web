@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveParty, PARTY_DEFAULT, sourceLabel } from './party.js'
+import { resolveParty, PARTY_DEFAULT, sourceLabel, partyFields } from './party.js'
 
 test('resolveParty falls back to the app default when nothing is set', () => {
   const r = resolveParty({})
@@ -54,4 +54,12 @@ test('sourceLabel maps sources to hints', () => {
   assert.equal(sourceLabel('campaign'), 'campaign')
   assert.equal(sourceLabel('default'), 'default')
   assert.equal(sourceLabel('encounter'), 'this encounter')
+})
+
+test('partyFields includes a field only when set (nil = omit, so full-replace clears)', () => {
+  assert.deepEqual(partyFields({ party_level: 8, party_size: 4 }), { party_level: 8, party_size: 4 })
+  assert.deepEqual(partyFields({ party_level: 8, party_size: null }), { party_level: 8 })
+  assert.deepEqual(partyFields({ party_level: null, party_size: null }), {})
+  assert.deepEqual(partyFields({}), {})
+  assert.deepEqual(partyFields(null), {})
 })
