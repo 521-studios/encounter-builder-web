@@ -28,12 +28,13 @@ test('treasure item version is locked in by selecting it and persists', async ({
   await expect(wrap.locator('.variant-hint')).toBeVisible()
   await expect(card.locator('.Monster__variant--selected')).toHaveCount(0)
 
-  // Lock in the Greater version.
+  // Lock in the Greater version → the card collapses to just it; prompt clears.
   const greater = card.locator('.Monster__variant', { hasText: 'Striking (Greater)' })
   await expect(greater).toContainText('Item 12')
   await greater.click()
-  await expect(greater).toHaveAttribute('aria-checked', 'true')
-  await expect(wrap.locator('.variant-hint')).toHaveCount(0) // prompt clears once picked
+  await expect(card.locator('.Monster__name')).toHaveText('Striking (Greater)')
+  await expect(card.locator('.Monster__variants')).toHaveCount(0) // collapsed — list gone
+  await expect(wrap.locator('.variant-hint')).toHaveCount(0)
 
   const savePut = page.waitForResponse(
     (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
@@ -41,13 +42,14 @@ test('treasure item version is locked in by selecting it and persists', async ({
   await page.getByRole('button', { name: /^Save/ }).click()
   expect((await savePut).ok()).toBeTruthy()
 
-  // Reload, re-open — the Greater version is still locked in, no prompt.
+  // Reload, re-open — the Greater version is still locked in (collapsed), no prompt.
   await page.reload()
   await page.locator('button.campaign').first().click()
   await page.locator('button.encounter', { hasText: name }).click()
   const wrap2 = page.locator('.treasure-line-wrap')
-  const greater2 = wrap2.locator('.itemcard .Monster__variant', { hasText: 'Striking (Greater)' })
-  await expect(greater2).toHaveAttribute('aria-checked', 'true')
+  const card2 = wrap2.locator('.itemcard')
+  await expect(card2.locator('.Monster__name')).toHaveText('Striking (Greater)')
+  await expect(card2.locator('.Monster__variants')).toHaveCount(0)
   await expect(wrap2.locator('.variant-hint')).toHaveCount(0)
 
   // Cleanup.
