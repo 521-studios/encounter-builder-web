@@ -16,6 +16,7 @@ export function useEncounterBudget(encounter, partyLevel, partySize) {
   const threat = encounterThreat(xp, partySize)
 
   return {
+    entryOf, // shared with the monster lines so each creature's entry is fetched once
     cp,
     xp,
     threat,

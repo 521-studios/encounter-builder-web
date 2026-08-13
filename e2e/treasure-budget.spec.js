@@ -32,6 +32,12 @@ test('encounter budget panel: difficulty band, treasure value, and over/under th
   await dragon.click()
   await expect(page.locator('.picked')).toBeVisible()
 
+  // uku9: the collapsed monster line reads like the book creature stat header —
+  // NAME / CREATURE {level} / source / Initiative {stat} {mod}. Level is the
+  // creature's own level (14), distinct from the difficulty badge's party level.
+  await expect(page.getByTestId('monster-header-level')).toHaveText('CREATURE 14')
+  await expect(page.getByTestId('monster-header-init')).toContainText('Initiative Perception')
+
   // Difficulty resolves to Extreme once the creature entry loads; treasure (0 gp)
   // is under the Extreme target (35 gp at level 1) and the Extreme cell marks ▲.
   await expect(page.getByTestId('encounter-threat')).toHaveText('Extreme')

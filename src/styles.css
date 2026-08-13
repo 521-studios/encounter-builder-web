@@ -154,6 +154,12 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
    styled by the lib's style.css); the old .monster-search/.suggestions rules
    for the hand-rolled dropdown are gone with MonsterSearch.jsx. */
 .picked { font-weight: 600; }
+/* Book-style creature stat header (name + CREATURE level / source / initiative). */
+.monster-header { display: grid; gap: 0.1rem; font-weight: 400; }
+.monster-header-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.monster-header-name { font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+.monster-header-level { font-weight: 700; white-space: nowrap; color: var(--gold); }
+.monster-header-source, .monster-header-init, .monster-header-loading { font-size: 0.85em; color: var(--muted); }
 .statblock {
   background: var(--card);
   border: 1px solid var(--border);
