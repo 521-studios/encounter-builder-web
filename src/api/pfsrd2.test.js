@@ -132,3 +132,15 @@ test('entryFull keeps the raw colon in the game_id (the API 404s on %3A)', async
   assert.match(fetchImpl.calls[0].url, /\/api\/pfsrd2\/entries\/Monsters:3028\/full$/)
   assert.ok(!fetchImpl.calls[0].url.includes('%3A'), 'must not encode the colon')
 })
+
+test('suggest fns forward level_min/level_max (and omit unset)', async () => {
+  const mFetch = fakeFetch(ok([]))
+  await pfsrd2.suggestMonsters('orc', { levelMin: '1', levelMax: '5' }, { tokenProvider: tok, fetchImpl: mFetch })
+  assert.match(mFetch.calls[0].url, /level_min=1/)
+  assert.match(mFetch.calls[0].url, /level_max=5/)
+
+  const iFetch = fakeFetch(ok([]))
+  await pfsrd2.suggestItems('rune', { levelMin: '3' }, { tokenProvider: tok, fetchImpl: iFetch })
+  assert.match(iFetch.calls[0].url, /level_min=3/)
+  assert.ok(!iFetch.calls[0].url.includes('level_max'), 'no level_max when unset')
+})

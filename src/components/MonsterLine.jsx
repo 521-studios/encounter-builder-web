@@ -25,6 +25,7 @@ export default function MonsterLine({ monster, disabled, onChange, onRemove }) {
             <CreatureSearch
               search={pfsrd2.suggestMonsters}
               suggestTraits={pfsrd2.suggestMonsterTraits}
+              levelFilter
               onSelect={(m) => set({ ref: { game_id: m.game_id }, nickname: monster.nickname || m.name })}
               placeholder="search a monster…"
             />
