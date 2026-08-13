@@ -44,6 +44,13 @@ test('suggestMonsterTraits queries /search/traits with types + selected chips', 
   assert.match(url, /type=monsters/)
   assert.match(url, /type=npcs/)
   assert.match(url, /trait=Fire/)
+  assert.match(url, /limit=10/) // client overrides the API's default 50
+})
+
+test('suggestMonsterTraits omits q when no prefix is given', async () => {
+  const fetchImpl = fakeFetch(ok([]))
+  await pfsrd2.suggestMonsterTraits('', [], { tokenProvider: tok, fetchImpl })
+  assert.ok(!fetchImpl.calls[0].url.includes('q='), 'no q param without a prefix')
 })
 
 test('suggestItems queries suggest/unified for equipment/weapons/armor/shields', async () => {
@@ -85,6 +92,10 @@ test('suggestItemTraits narrows /search/traits by the active facet context', asy
   assert.match(url, /trait=Evocation/)
   assert.match(url, /category=Runes/)
   assert.match(url, /subcategory=Property\+Runes/)
+  assert.match(url, /limit=10/)
+  for (const t of ['equipment', 'weapons', 'armor', 'shields']) {
+    assert.match(url, new RegExp(`type=${t}`))
+  }
 })
 
 test('loadItemFacets returns the categories map from /search/facets', async () => {
