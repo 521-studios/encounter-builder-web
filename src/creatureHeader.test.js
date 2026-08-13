@@ -45,3 +45,23 @@ test('creatureHeader falls back to top-level sources when stat_block.sources is 
   const e = { sources: [{ name: 'Monster Core', page: 40 }], stat_block: { creature_type: { level: 1 } } }
   assert.equal(creatureHeader(e).source, 'Monster Core 40')
 })
+
+test('creatureHeader prefers stat_block.sources over top-level sources', () => {
+  // The stat block is the resolved citation (a reprint/errata can differ from the
+  // top-level source); it wins when both are present.
+  const e = {
+    sources: [{ name: 'Bestiary', page: 100 }],
+    stat_block: { creature_type: { level: 1 }, sources: [{ name: 'Monster Core', page: 200 }] },
+  }
+  assert.equal(creatureHeader(e).source, 'Monster Core 200')
+})
+
+test('creatureHeader renders a zero-page and zero-Perception with explicit sign', () => {
+  const e = {
+    sources: [{ name: 'Bestiary', page: 0 }],
+    stat_block: { creature_type: { level: 0 }, senses: { perception: { value: 0 } } },
+  }
+  const h = creatureHeader(e)
+  assert.equal(h.source, 'Bestiary 0') // page 0 still renders (not dropped as falsy)
+  assert.equal(h.initiative, 'Perception +0')
+})

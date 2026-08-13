@@ -23,7 +23,7 @@ export function creatureHeader(entry, monster = {}) {
   const src = (sb.sources || entry.sources || [])[0]
   const source = src && src.name ? `${src.name}${src.page != null ? ` ${src.page}` : ''}` : null
 
-  const perc = ((sb.senses || {}).perception || {}).value
+  const perc = sb.senses?.perception?.value
   const initiative = typeof perc === 'number' ? `Perception ${perc >= 0 ? '+' : ''}${perc}` : null
 
   return { level, source, initiative }
