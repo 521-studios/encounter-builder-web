@@ -270,6 +270,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           <MonsterLine
             key={m._key}
             monster={m}
+            entryOf={budget.entryOf}
             disabled={released}
             onChange={(m2) => setMonster(i, m2)}
             onRemove={() => patch({ monsters: monsters.filter((_, j) => j !== i) })}

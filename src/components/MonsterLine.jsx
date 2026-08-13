@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { CreatureSearch } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
+import { creatureHeader } from '../creatureHeader.js'
 import MonsterView from './MonsterView.jsx'
 
 // One monster row. Before a monster is chosen, a pfsrd2 search picker fills the
-// ref (and seeds the nickname with the monster's name). Once chosen: count,
-// elite/weak, an editable nickname, and a toggleable stat-block preview.
-export default function MonsterLine({ monster, disabled, onChange, onRemove }) {
+// ref (and seeds the nickname with the monster's name). Once chosen it reads like
+// the book's creature stat header — name (+count), CREATURE level, source book +
+// page, Perception-based initiative — over the count/nickname/stat-block controls.
+export default function MonsterLine({ monster, entryOf, disabled, onChange, onRemove }) {
   const set = (fields) => onChange({ ...monster, ...fields })
   // Pristine refs carry game_id; a templated (derived) ref carries base.game_id.
   const gameId = monster.ref?.game_id || monster.ref?.base?.game_id || ''
@@ -38,10 +40,29 @@ export default function MonsterLine({ monster, disabled, onChange, onRemove }) {
     )
   }
 
+  const entry = entryOf ? entryOf(gameId) : null
+  const hdr = creatureHeader(entry, monster)
+  const count = monster.count || 1
+  const name = monster.nickname || entry?.name || gameId
+
   return (
     <div className="monster-line-wrap">
       <div className="line monster-line">
-        <span className="picked grow">{monster.nickname || gameId}</span>
+        <div className="picked grow monster-header" data-testid="monster-header">
+          <div className="monster-header-top">
+            <span className="monster-header-name">
+              {name}{count > 1 ? ` (${count})` : ''}
+            </span>
+            {hdr.level != null && (
+              <span className="monster-header-level" data-testid="monster-header-level">CREATURE {hdr.level}</span>
+            )}
+          </div>
+          {hdr.source && <div className="monster-header-source">{hdr.source}</div>}
+          {hdr.initiative && (
+            <div className="monster-header-init" data-testid="monster-header-init">Initiative {hdr.initiative}</div>
+          )}
+          {entry == null && <div className="muted monster-header-loading">Loading…</div>}
+        </div>
         {!disabled && (
           <button type="button" className="link" onClick={() => set({ ref: { game_id: '' } })}>change</button>
         )}
