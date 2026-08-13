@@ -24,6 +24,7 @@ export default function MonsterLine({ monster, disabled, onChange, onRemove }) {
           <div className="monster-search grow">
             <CreatureSearch
               search={pfsrd2.suggestMonsters}
+              suggestTraits={pfsrd2.suggestMonsterTraits}
               onSelect={(m) => set({ ref: { game_id: m.game_id }, nickname: monster.nickname || m.name })}
               placeholder="search a monster…"
             />
