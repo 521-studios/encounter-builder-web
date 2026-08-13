@@ -84,6 +84,8 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
           <div className="item-search grow">
             <ItemSearch
               search={pfsrd2.suggestItems}
+              suggestTraits={pfsrd2.suggestItemTraits}
+              loadFacets={pfsrd2.loadItemFacets}
               onSelect={(it) => set({ ref: { game_id: it.game_id }, variant: '' })}
               placeholder="search an item…"
             />
