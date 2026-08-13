@@ -1,40 +1,54 @@
 :root {
-  color-scheme: light dark;
-  --bg: #14110f;
-  --fg: #e8e2d6;
-  --panel: #2a2521;
-  --accent: #c8963c;
+  color-scheme: dark;
+  /* Aligned to the pfsrd2-display design language (harness + .Monster theme). */
+  --bg: #1a1a1a;          /* app ground */
+  --panel: #222;          /* pinned panels (sidebar / main) */
+  --card: #2a2a2a;        /* raised object cards ("bubbles") */
+  --raised: #262220;      /* subtle warm raise for list rows */
+  --border: #333;         /* hairline */
+  --border-strong: #555;  /* inputs / interactive edges */
+  --fg: #e0e0e0;
+  --muted: #8b8b8b;
+  --accent: #f79639;      /* the library's interactive orange */
+  --gold: #e8c882;        /* the library's entity-name gold */
+  --danger: #e5736b;
+  --radius: 6px;
 }
 
 * { box-sizing: border-box; }
 
+html, body { height: 100%; }
 body {
   margin: 0;
-  min-height: 100vh;
   font: 16px/1.5 system-ui, sans-serif;
   background: var(--bg);
   color: var(--fg);
 }
 
+/* Campaign-picker view stays a comfortable centered column. */
 .app {
   max-width: 48rem;
   margin: 0 auto;
   padding: 2rem 1.5rem;
 }
 
-h1 { font-size: 1.75rem; margin: 0 0 1rem; }
+h1 { font-size: 1.75rem; margin: 0 0 1rem; color: var(--gold); }
+h2 { color: var(--gold); }
 
 button {
   font: inherit;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--accent);
-  border-radius: 0.375rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
   background: transparent;
   color: var(--fg);
   cursor: pointer;
 }
+button:hover { border-color: var(--muted); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-button.primary { background: var(--accent); color: #14110f; font-weight: 600; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #1a1207; font-weight: 600; }
+button.primary:hover { filter: brightness(1.05); }
 
 .me {
   background: var(--panel);
@@ -78,21 +92,22 @@ button.campaign {
 
 button.campaign.selected {
   border-color: var(--accent);
-  background: var(--panel);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .empty { opacity: 0.8; }
 
-.selected { margin-top: 1.5rem; border-top: 1px solid var(--panel); padding-top: 1rem; }
+.selected { margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem; }
 
 input, textarea, select {
   font: inherit;
   padding: 0.4rem 0.5rem;
-  background: #1c1815;
+  background: #1a1a1a;
   color: var(--fg);
-  border: 1px solid #3a332d;
-  border-radius: 0.3rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
 }
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 textarea { width: 100%; min-height: 4rem; }
 
 .status {
@@ -106,7 +121,7 @@ textarea { width: 100%; min-height: 4rem; }
 button.danger { color: #e5736b; }
 
 .new-encounter { display: flex; gap: 0.5rem; margin: 0.5rem 0; }
-.new-encounter input { flex: 1; }
+.new-encounter input { flex: 1; min-width: 0; }
 
 .encounter-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
 .encounter-list li { display: flex; align-items: center; gap: 0.5rem; }
@@ -119,7 +134,7 @@ button.encounter { flex: 1; text-align: left; }
 
 .field { display: grid; gap: 0.25rem; }
 
-fieldset { border: 1px solid #3a332d; border-radius: 0.5rem; padding: 0.75rem; display: grid; gap: 0.5rem; }
+fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.5rem; }
 legend { padding: 0 0.4rem; opacity: 0.8; }
 
 .coins { display: flex; flex-wrap: wrap; gap: 0.75rem; }
@@ -131,38 +146,68 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
 .line input[type="number"] { width: 5rem; }
 .check { display: inline-flex; align-items: center; gap: 0.3rem; }
 
-.monster-line-wrap { display: grid; gap: 0.5rem; }
+.monster-line-wrap { display: grid; gap: 0.5rem; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.7rem; }
 /* The monster picker now renders the library CreatureSearch (.CreatureSearch__*,
    styled by the lib's style.css); the old .monster-search/.suggestions rules
    for the hand-rolled dropdown are gone with MonsterSearch.jsx. */
 .picked { font-weight: 600; }
 .statblock {
-  background: #efe9dd; color: #1a1512;
-  border-radius: 0.5rem; padding: 1rem; overflow-x: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1rem; overflow-x: auto;
 }
 
 
-/* Two-pane layout: sidebar (campaign switcher + encounter list) | main (editor).
-   Widen the app shell only when the two-pane is present; the campaign picker
-   stays in the narrow single column. */
-.app:has(.two-pane) { max-width: 72rem; }
+/* Two-pane layout (pfsrd2-display design language): the app fills the viewport —
+   a slim top bar, then a LEFT sidebar pinned to a fixed width while the RIGHT
+   main pane expands to fill and scrolls on its own. */
+.app:has(.two-pane) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.app:has(.two-pane) .topbar {
+  flex-shrink: 0;
+  padding: 0.55rem 1.25rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.app:has(.two-pane) h1 { font-size: 1.15rem; margin: 0; }
 
 .two-pane {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  gap: 1.5rem;
-  margin-top: 1.5rem;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .sidebar {
-  flex: 0 0 18rem;
+  flex: 0 0 20rem;         /* pinned width; doesn't shrink */
+  min-width: 0;
+  overflow-y: auto;
+  padding: 1rem;
   display: grid;
+  /* Constrain the grid column to the track — an implicit `auto` column would
+     grow to its widest child's min-content and overflow the fixed width. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
-  position: sticky;
-  top: 1rem;
+  align-content: start;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
 }
+/* Same guard for the nested grids inside the sidebar. */
+.chapters, .chapter-body { grid-template-columns: minmax(0, 1fr); }
 
-.main { flex: 1; min-width: 0; }
+.main {
+  flex: 1;                 /* expands to fill */
+  min-width: 0;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  background: var(--panel);
+}
 
 .campaign-switcher-heading { margin: 0; font: inherit; }
 
@@ -174,22 +219,22 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
   gap: 0.5rem;
   text-align: left;
   padding: 0.6rem 0.85rem;
-  background: var(--panel);
-  border-color: var(--panel);
+  background: var(--card);
+  border-color: var(--border);
 }
-.campaign-switcher-name { font-weight: 600; }
+.campaign-switcher-name { color: var(--gold); font-weight: 600; }
 .campaign-switcher-hint { opacity: 0.6; font-size: 0.85rem; }
 
 button.encounter.selected {
   border-color: var(--accent);
-  background: var(--panel);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .empty-main {
   opacity: 0.6;
   padding: 2rem 1rem;
-  border: 1px dashed var(--panel);
-  border-radius: 0.5rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
   text-align: center;
 }
 
@@ -202,7 +247,7 @@ button.encounter.selected {
 /* Chapter tree (sidebar): chapters expand to their natural-sorted encounters. */
 .chapters { display: grid; gap: 0.5rem; }
 
-.chapter-group { border: 1px solid var(--panel); border-radius: 0.4rem; }
+.chapter-group { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
 
 .chapter-head {
   display: flex;
@@ -214,6 +259,7 @@ button.encounter.selected {
 
 .chapter-toggle {
   flex: 1;
+  min-width: 0;              /* let a long chapter name wrap instead of pushing actions out */
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -221,6 +267,7 @@ button.encounter.selected {
   padding: 0.15rem 0;
   text-align: left;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .chapter-caret { opacity: 0.7; width: 0.9em; }
 .chapter-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
@@ -233,14 +280,14 @@ button.encounter.selected {
 /* Encounter description (markdown, rendered by the pfsrd2-display Markdown export). */
 .description-input { min-height: 4rem; }
 .description-preview {
-  background: var(--panel);
-  border-radius: 0.4rem;
+  background: var(--card);
+  border-radius: var(--radius);
   padding: 0.25rem 0.75rem;
   font-size: 0.95rem;
 }
 
 /* Treasure line: library ItemSearch to pick, ItemCard to preview (masked-aware). */
-.treasure-line-wrap { display: grid; gap: 0.5rem; border-top: 1px solid var(--panel); padding-top: 0.5rem; }
+.treasure-line-wrap { display: grid; gap: 0.5rem; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.7rem; }
 .treasure-controls { flex-wrap: wrap; }
 /* Prompt shown until a versioned item has a version locked in. */
 .variant-hint { margin: 0; font-size: 0.85rem; color: #f79639; }
@@ -257,7 +304,7 @@ button.encounter.selected {
   font-size: 0.78rem;
   padding: 0.4rem;
   margin: 0 0 0.3rem;
-  border: 1px dashed var(--panel);
-  border-radius: 0.3rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
   text-align: center;
 }
