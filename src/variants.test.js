@@ -13,10 +13,10 @@ test('variantIndex resolves a known name to its index', () => {
   assert.equal(variantIndex(variants, 'Striking (Major)'), 2)
 })
 
-test('variantIndex falls back to 0 (base) for empty, unknown, or missing input', () => {
-  assert.equal(variantIndex(variants, ''), 0)
-  assert.equal(variantIndex(variants, undefined), 0)
-  assert.equal(variantIndex(variants, 'Nonexistent'), 0)
-  assert.equal(variantIndex([], 'Striking'), 0)
-  assert.equal(variantIndex(undefined, 'Striking'), 0)
+test('variantIndex returns -1 (no version picked yet) for empty, unknown, or missing input', () => {
+  assert.equal(variantIndex(variants, ''), -1)
+  assert.equal(variantIndex(variants, undefined), -1)
+  assert.equal(variantIndex(variants, 'Nonexistent'), -1)
+  assert.equal(variantIndex([], 'Striking'), -1)
+  assert.equal(variantIndex(undefined, 'Striking'), -1)
 })

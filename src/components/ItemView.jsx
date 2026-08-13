@@ -32,9 +32,14 @@ export default function ItemView({ gameId, variant, onVariantChange }) {
   if (!data) return <p className="muted">Loading item…</p>
 
   const variants = (data.stat_block && data.stat_block.variants) || []
-  const index = variantIndex(variants, variant) // name -> index (base if unset/unknown)
+  const index = variantIndex(variants, variant) // name -> index; -1 when no pick yet
+  // A versioned item must have a version locked in; prompt until it does (authoring only).
+  const needsPick = variants.length > 1 && index < 0 && !!onVariantChange
   return (
     <div className="itemcard">
+      {needsPick ? (
+        <p className="variant-hint">Choose a version below to lock this item in.</p>
+      ) : null}
       <ItemCard
         data={data}
         variant={index}

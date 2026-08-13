@@ -242,6 +242,8 @@ button.encounter.selected {
 /* Treasure line: library ItemSearch to pick, ItemCard to preview (masked-aware). */
 .treasure-line-wrap { display: grid; gap: 0.5rem; border-top: 1px solid var(--panel); padding-top: 0.5rem; }
 .treasure-controls { flex-wrap: wrap; }
+/* Prompt shown until a versioned item has a version locked in. */
+.variant-hint { margin: 0; font-size: 0.85rem; color: #f79639; }
 
 /* Drag an encounter onto a chapter group to move it there. */
 .encounter-row[draggable='true'] { cursor: grab; }
