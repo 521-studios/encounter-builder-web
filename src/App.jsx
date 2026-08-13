@@ -5,6 +5,8 @@ import CampaignList from './components/CampaignList.jsx'
 import CampaignSwitcher from './components/CampaignSwitcher.jsx'
 import ChapterTree from './components/ChapterTree.jsx'
 import EncounterEditor from './components/EncounterEditor.jsx'
+import CampaignDetail from './components/CampaignDetail.jsx'
+import ChapterDetail from './components/ChapterDetail.jsx'
 
 // The API clients pull the bearer from the live OIDC session.
 setTokenProvider(getAccessToken)
@@ -13,9 +15,12 @@ export default function App() {
   const [status, setStatus] = useState('loading') // loading | anon | authed
   const [error, setError] = useState(null)
   const [campaign, setCampaign] = useState(null)
-  const [editing, setEditing] = useState(null) // encounter being edited, or null
-  const [reloadKey, setReloadKey] = useState(0) // bump to refresh the encounter list
+  // What the main pane shows: an encounter editor, the campaign/chapter detail
+  // pages, or nothing. { kind: 'empty' | 'encounter' | 'campaign' | 'chapter', … }
+  const [view, setView] = useState({ kind: 'empty' })
+  const [reloadKey, setReloadKey] = useState(0) // bump to refresh the sidebar tree
   const booted = useRef(false)
+  const backToEmpty = () => setView({ kind: 'empty' })
 
   useEffect(() => {
     if (booted.current) return // once, even under StrictMode (the auth code is single-use)
@@ -52,7 +57,7 @@ export default function App() {
         <CampaignList
           onSelect={(c) => {
             setCampaign(c)
-            setEditing(null)
+            backToEmpty()
           }}
         />
       )}
@@ -64,32 +69,54 @@ export default function App() {
               campaign={campaign}
               onSwitch={() => {
                 setCampaign(null)
-                setEditing(null)
+                backToEmpty()
               }}
+              onSettings={() => setView({ kind: 'campaign' })}
             />
             <ChapterTree
               campaignId={campaign.id}
               reloadKey={reloadKey}
-              onEdit={setEditing}
-              selectedId={editing?.id}
+              onEdit={(enc) => setView({ kind: 'encounter', enc })}
+              onEditChapter={(chapter) => setView({ kind: 'chapter', chapter })}
+              selectedId={view.kind === 'encounter' ? view.enc.id : null}
             />
           </aside>
           <section className="main">
-            {editing ? (
+            {view.kind === 'encounter' && (
               <EncounterEditor
                 // Remount per encounter so autosave refs (dirty/saving/enc) are
                 // isolated: switching mid-save must not reset the outgoing
                 // encounter's dirty flag and drop its last edit.
-                key={editing.id}
+                key={view.enc.id}
                 campaignId={campaign.id}
-                encounterId={editing.id}
+                encounterId={view.enc.id}
                 onClose={() => {
-                  setEditing(null)
+                  backToEmpty()
                   setReloadKey((k) => k + 1)
                 }}
                 onSaved={() => setReloadKey((k) => k + 1)}
               />
-            ) : (
+            )}
+            {view.kind === 'campaign' && (
+              <CampaignDetail
+                campaign={campaign}
+                onClose={backToEmpty}
+                onSaved={() => setReloadKey((k) => k + 1)}
+              />
+            )}
+            {view.kind === 'chapter' && (
+              <ChapterDetail
+                key={view.chapter.id}
+                campaignId={campaign.id}
+                chapter={view.chapter}
+                onClose={() => {
+                  backToEmpty()
+                  setReloadKey((k) => k + 1)
+                }}
+                onSaved={() => setReloadKey((k) => k + 1)}
+              />
+            )}
+            {view.kind === 'empty' && (
               <div className="empty-main" data-testid="empty-main">
                 Select an encounter, or create one in the sidebar.
               </div>

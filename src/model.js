@@ -1,3 +1,5 @@
+import { partyFields } from './party.js'
+
 // Enum values mirroring encounter-builder-api's model (internal/model/model.go).
 // The API validates + normalizes these, so the UI just offers the valid choices.
 export const ADJUSTMENTS = ['none', 'elite', 'weak']
@@ -52,6 +54,10 @@ export function toEncounterInput(enc) {
     treasure: (enc.treasure || []).filter(hasRef).map(stripKey),
     currency: enc.currency || {},
   }
+  // Party overrides use the shared clear-encoding: set when overridden, omitted
+  // when nil so the full-replace PUT clears back to inherit (encounter -> chapter
+  // -> campaign).
+  Object.assign(input, partyFields(enc))
   if (enc.status) input.status = enc.status
   return input
 }

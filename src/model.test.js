@@ -120,3 +120,14 @@ test('toEncounterInput defaults chapter_id to "" (Unsorted) and omits absent sta
   assert.deepEqual(input.monsters, [])
   assert.deepEqual(input.treasure, [])
 })
+
+test('toEncounterInput echoes a party override when set, omits it when null (inherit)', () => {
+  const withOverride = toEncounterInput(keyed({ name: 'x', party_level: 7, party_size: 5 }))
+  assert.equal(withOverride.party_level, 7)
+  assert.equal(withOverride.party_size, 5)
+
+  // Omitting a nil override lets the full-replace PUT clear it back to inherit.
+  const inheriting = toEncounterInput(keyed({ name: 'x' }))
+  assert.ok(!('party_level' in inheriting))
+  assert.ok(!('party_size' in inheriting))
+})
