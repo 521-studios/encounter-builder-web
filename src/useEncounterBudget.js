@@ -47,13 +47,16 @@ export function useEncounterBudget(encounter, partyLevel, partySize) {
   const loading = ids.some((g) => !(g in cache.current) && !failed.current.has(g))
   const failedCount = ids.filter((g) => failed.current.has(g)).length
 
+  // Incompleteness is reported as uniform counts: unpricedCount (treasure lines
+  // that couldn't be valued), unknownCount (monsters with no readable level),
+  // failedCount (entry fetches that errored). The consumer only needs the counts.
   return {
     cp,
-    unpriced,
     xp,
-    unknown,
     threat,
     loading,
+    unpricedCount: unpriced.length,
+    unknownCount: unknown.length,
     failedCount,
     onRetry: () => {
       failed.current.clear()

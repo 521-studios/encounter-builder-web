@@ -6,14 +6,12 @@ import { chapters as chaptersApi } from '../api/chapters.js'
 import { settings as settingsApi } from '../api/settings.js'
 import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, keyed } from '../model.js'
 import { resolveParty } from '../party.js'
+import { BAND_LABELS } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
-
-// Book-style difficulty label (AoN area headers: "A1. Damp Entrance … LOW 1").
-const THREAT_LABEL = { trivial: 'Trivial', low: 'Low', moderate: 'Moderate', severe: 'Severe', extreme: 'Extreme' }
 
 const AUTOSAVE_MS = 800
 
@@ -187,9 +185,9 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         <span
           className={`difficulty-badge difficulty-badge--${budget.threat}`}
           data-testid="difficulty-badge"
-          title={`${THREAT_LABEL[budget.threat]} encounter for a level-${effectiveParty.level} party (from monster XP)`}
+          title={`${BAND_LABELS[budget.threat]} encounter for a level-${effectiveParty.level} party (from monster XP)`}
         >
-          {THREAT_LABEL[budget.threat]} {effectiveParty.level}
+          {BAND_LABELS[budget.threat]} {effectiveParty.level}
         </span>
         <span className="status">{enc.status}</span>
         <button type="button" className="link" onClick={onClose}>Close</button>

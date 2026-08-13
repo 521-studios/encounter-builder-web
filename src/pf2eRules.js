@@ -42,6 +42,10 @@ export const ENCOUNTER_BUDGET = {
   extreme: { xp: 160, adjust: 40 },
 }
 
+// Display labels for the threat bands — the single band vocabulary shared by the
+// difficulty badge and the budget chart so they can't drift.
+export const BAND_LABELS = { trivial: 'Trivial', low: 'Low', moderate: 'Moderate', severe: 'Severe', extreme: 'Extreme' }
+
 // Table 10-2 — Creature XP by level relative to the party. Outside -4..+4 a
 // single creature is off-table; below -4 it's negligible (0), above +4 it's
 // capped at the +4 value.
