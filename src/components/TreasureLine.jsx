@@ -86,6 +86,7 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
               search={pfsrd2.suggestItems}
               suggestTraits={pfsrd2.suggestItemTraits}
               loadFacets={pfsrd2.loadItemFacets}
+              levelFilter
               onSelect={(it) => set({ ref: { game_id: it.game_id }, variant: '' })}
               placeholder="search an item…"
             />
