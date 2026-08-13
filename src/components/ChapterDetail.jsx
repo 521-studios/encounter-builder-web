@@ -29,6 +29,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
   useEffect(() => {
     let alive = true
     setEncountersError(false)
+    setSettingsError(false) // a retry (reloadKey) re-fetches settings too — clear the stale banner
     settingsApi
       .get(campaignId)
       .then((s) => alive && setCampaignSettings(s))
