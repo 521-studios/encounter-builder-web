@@ -28,6 +28,10 @@ test('chapter + campaign treasure rollups sum the encounters loot', async ({ pag
     await page.locator('.editor .coins').getByLabel('gp', { exact: true }).fill(gp)
     await expect(page.getByTestId('save-state')).toHaveText('Saved')
     await page.getByRole('button', { name: /^Close/ }).click()
+    // Wait for the tree reload to settle (the new encounter shows in the group)
+    // before creating the next one — otherwise the reload can land mid-fill and
+    // wipe the next name, leaving the disabled "Add" button unclickable.
+    await expect(group.locator('button.encounter', { hasText: name })).toBeVisible()
   }
 
   // Chapter rollup: 30 + 20 = 50 gp total across the two encounters. The rollup

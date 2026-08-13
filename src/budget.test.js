@@ -127,3 +127,27 @@ test('rollupEncounters flags incomplete rows (unpriced/unknown) and tolerates em
   assert.equal(r.anyIncomplete, true)
   assert.deepEqual(rollupEncounters([], entryOf, partyFor), { totalCp: 0, totalTargetCp: 0, rows: [], anyIncomplete: false })
 })
+
+test('rollupEncounters resolves party per-encounter, not once for all rows', () => {
+  const creatures = {
+    'M:5': { stat_block: { creature_type: { level: 5 } } },
+    'M:8': { stat_block: { creature_type: { level: 8 } } },
+  }
+  const entryOf = (id) => creatures[id] || null
+  const seen = []
+  // Two Severe encounters (3 party-level creatures each) but at different party
+  // levels — so the Table 5-3 budget target differs. This is the whole point of
+  // the slice (inheritance-driven budgeting): a regression that resolved party
+  // once for all rows would fail both the per-encounter call log and the target.
+  const partyFor = (enc) => {
+    seen.push(enc.id)
+    return enc.id === 'e1' ? { level: 5, size: 4 } : { level: 8, size: 4 }
+  }
+  const mk = (id, mon) => ({ id, name: id, monsters: [{ ref: { game_id: mon }, count: 3 }], treasure: [], currency: {} })
+  const { rows } = rollupEncounters([mk('e1', 'M:5'), mk('e2', 'M:8')], entryOf, partyFor)
+  assert.deepEqual(seen, ['e1', 'e2']) // called once per encounter, in order
+  assert.equal(rows[0].threat, 'severe') // 3×PL at L5 = 120 XP
+  assert.equal(rows[1].threat, 'severe') // 3×PL at L8 = 120 XP
+  assert.notEqual(rows[0].targetCp, rows[1].targetCp) // same band, different level ⇒ different budget
+  assert.ok(rows[0].targetCp > 0 && rows[1].targetCp > 0)
+})

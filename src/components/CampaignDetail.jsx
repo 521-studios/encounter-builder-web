@@ -19,21 +19,27 @@ export default function CampaignDetail({ campaign, onClose, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showRollup, setShowRollup] = useState(false) // rollup fetches on demand — keep page load light
+  const [rollupError, setRollupError] = useState(false) // chapters/encounters list failed — rollup can't be trusted
+  const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the rollup's lists on retry
 
   useEffect(() => {
     let alive = true
     setValue(null)
     setError(null)
+    setRollupError(false)
     settingsApi
       .get(campaign.id)
       .then((s) => alive && setValue({ party_level: s.party_level ?? null, party_size: s.party_size ?? null }))
       .catch((e) => alive && setError(errorMessage(e)))
-    chaptersApi.list(campaign.id).then((cs) => alive && setAllChapters(cs)).catch(() => {})
-    encountersApi.list(campaign.id).then((es) => alive && setAllEncounters(es)).catch(() => {})
+    // The rollup needs both lists: chapters drive per-encounter party inheritance,
+    // encounters are the loot. If either fails, flag it so the rollup shows an
+    // error instead of a plausible-but-wrong (or empty) total.
+    chaptersApi.list(campaign.id).then((cs) => alive && setAllChapters(cs)).catch(() => alive && setRollupError(true))
+    encountersApi.list(campaign.id).then((es) => alive && setAllEncounters(es)).catch(() => alive && setRollupError(true))
     return () => {
       alive = false
     }
-  }, [campaign.id])
+  }, [campaign.id, reloadKey])
 
   async function save() {
     setSaving(true)
@@ -104,6 +110,8 @@ export default function CampaignDetail({ campaign, onClose, onSaved }) {
           title="Campaign treasure"
           referenceCp={referenceCp}
           emptyLabel="No encounters in this campaign yet."
+          loadError={rollupError}
+          onReload={() => setReloadKey((k) => k + 1)}
         />
       )}
     </section>

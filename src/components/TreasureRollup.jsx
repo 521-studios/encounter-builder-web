@@ -8,7 +8,7 @@ import { useRollup } from '../useRollup.js'
 // pages render it only when the GM expands the rollup, keeping the settings page
 // fast. `partyFor(encounter) -> {level, size}` resolves each encounter's party;
 // `referenceCp` (optional, campaign page) is a "full level's treasure" figure.
-export default function TreasureRollup({ encounters, partyFor, title, referenceCp, emptyLabel = 'No encounters yet.' }) {
+export default function TreasureRollup({ encounters, partyFor, title, referenceCp, emptyLabel = 'No encounters yet.', loadError = false, onReload }) {
   const { totalCp, totalTargetCp, rows, anyIncomplete, loading, failedCount, onRetry } = useRollup(encounters, partyFor)
   const over = totalCp >= totalTargetCp
   const delta = Math.abs(totalCp - totalTargetCp)
@@ -16,7 +16,14 @@ export default function TreasureRollup({ encounters, partyFor, title, referenceC
   return (
     <section className="treasure-rollup" data-testid="treasure-rollup">
       <h3 className="budget-title">{title}</h3>
-      {rows.length === 0 ? (
+      {loadError ? (
+        // The encounter list itself failed to load — don't render an empty
+        // rollup that reads as "no treasure" (a silent lie); say so and offer a retry.
+        <p className="error budget-error" role="alert" data-testid="rollup-load-error">
+          Couldn’t load encounters for this rollup.{' '}
+          {onReload && <button type="button" className="link" onClick={onReload}>Retry</button>}
+        </p>
+      ) : rows.length === 0 ? (
         <p className="muted" data-testid="rollup-empty">{emptyLabel}</p>
       ) : (
         <>

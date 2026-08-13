@@ -19,13 +19,16 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
   const [campaignSettings, setCampaignSettings] = useState(null) // null while loading
   const [settingsError, setSettingsError] = useState(false) // campaign settings load failed
   const [chapterEncounters, setChapterEncounters] = useState([]) // this chapter's encounters (for the rollup)
+  const [encountersError, setEncountersError] = useState(false) // encounters list failed to load (rollup is unreliable)
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showRollup, setShowRollup] = useState(false) // rollup fetches on demand — keep page load light
+  const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the encounters list on retry
 
   useEffect(() => {
     let alive = true
+    setEncountersError(false)
     settingsApi
       .get(campaignId)
       .then((s) => alive && setCampaignSettings(s))
@@ -39,11 +42,15 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
     encountersApi
       .list(campaignId)
       .then((all) => alive && setChapterEncounters(all.filter((e) => e.chapter_id === chapter.id)))
-      .catch(() => {}) // the rollup just shows no encounters if this fails
+      .catch(() => {
+        // Don't let a load failure masquerade as an empty chapter in the rollup —
+        // flag it so TreasureRollup shows an error + retry instead of "no encounters".
+        if (alive) setEncountersError(true)
+      })
     return () => {
       alive = false
     }
-  }, [campaignId, chapter.id])
+  }, [campaignId, chapter.id, reloadKey])
 
   async function save() {
     setSaving(true)
@@ -108,6 +115,8 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
           partyFor={(enc) => resolveParty({ encounter: enc, chapter, campaign: campaignSettings })}
           title="Chapter treasure"
           emptyLabel="No encounters in this chapter yet."
+          loadError={encountersError}
+          onReload={() => setReloadKey((k) => k + 1)}
         />
       )}
     </section>

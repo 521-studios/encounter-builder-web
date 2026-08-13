@@ -18,7 +18,14 @@ export function useEntries(ids) {
     const missing = ids.filter((g) => !(g in cache.current) && !failed.current.has(g))
     if (!missing.length) return
     Promise.all(
-      missing.map((g) => pfsrd2.entryFull(g).then((e) => ({ g, e })).catch(() => ({ g, err: true }))),
+      missing.map((g) =>
+        pfsrd2.entryFull(g).then((e) => ({ g, e })).catch((err) => {
+          // Keep an observability breadcrumb — otherwise every failure (a real
+          // outage vs. an expected stale-ref 404) collapses to a bare count.
+          console.warn(`pfsrd2 entry fetch failed for ${g}:`, err)
+          return { g, err: true }
+        }),
+      ),
     ).then((results) => {
       if (!alive) return
       for (const r of results) {
