@@ -16,20 +16,60 @@ function gameIdPath(gameId) {
   return encodeURIComponent(gameId).replace(/%3A/gi, ':')
 }
 
+// Item content types, shared by the item suggest/trait/facet queries.
+const ITEM_TYPES = ['equipment', 'weapons', 'armor', 'shields']
+
 export const pfsrd2 = {
-  // Autocomplete over monsters + NPCs. Returns [{ game_id, name, type, level, edition, ... }].
-  suggestMonsters: (q, opts = {}) => {
+  // Autocomplete over monsters + NPCs. The library CreatureSearch calls this as
+  // search(q, filters); filters = { traits: string[] } → the API's comma-separated
+  // traits param. Returns [{ game_id, name, type, level, edition, ... }].
+  // The library calls these as search(q, filters) / suggestTraits(prefix, selected
+  // [, context]) / loadFacets(); the trailing `opts` (never passed by the library)
+  // is the request DI seam used by tests, mirroring entryFull/applyTemplatePost.
+  suggestMonsters: (q, filters = {}, opts = {}) => {
     const params = new URLSearchParams({ q })
     params.append('type', 'monsters')
     params.append('type', 'npcs')
+    if (filters.traits?.length) params.set('traits', filters.traits.join(','))
     return request('GET', `/api/pfsrd2/search/suggest/unified?${params.toString()}`, opts)
   },
-  // Autocomplete over items (equipment/weapons/armor/shields). Same result shape
-  // as suggestMonsters, so the library ItemSearch consumes it directly.
-  suggestItems: (q, opts = {}) => {
+  // Co-occurring trait typeahead for the CreatureSearch trait filter: only traits
+  // that still narrow the current (type + selected) set.
+  suggestMonsterTraits: (prefix, selected = [], opts = {}) => {
+    const params = new URLSearchParams({ limit: '10' })
+    if (prefix) params.set('q', prefix)
+    params.append('type', 'monsters')
+    params.append('type', 'npcs')
+    for (const t of selected) params.append('trait', t)
+    return request('GET', `/api/pfsrd2/search/traits?${params.toString()}`, opts)
+  },
+  // Autocomplete over items. filters = { traits, category, subcategory } from the
+  // library ItemSearch. Same result shape as suggestMonsters.
+  suggestItems: (q, filters = {}, opts = {}) => {
     const params = new URLSearchParams({ q })
-    for (const t of ['equipment', 'weapons', 'armor', 'shields']) params.append('type', t)
+    for (const t of ITEM_TYPES) params.append('type', t)
+    if (filters.traits?.length) params.set('traits', filters.traits.join(','))
+    if (filters.category) params.set('category', filters.category)
+    if (filters.subcategory) params.set('subcategory', filters.subcategory)
     return request('GET', `/api/pfsrd2/search/suggest/unified?${params.toString()}`, opts)
+  },
+  // Co-occurring trait typeahead for the ItemSearch trait filter, narrowed by the
+  // active facet (3rd arg { category, subcategory } from the library).
+  suggestItemTraits: (prefix, selected = [], context = {}, opts = {}) => {
+    const params = new URLSearchParams({ limit: '10' })
+    if (prefix) params.set('q', prefix)
+    for (const t of ITEM_TYPES) params.append('type', t)
+    for (const t of selected) params.append('trait', t)
+    if (context.category) params.set('category', context.category)
+    if (context.subcategory) params.set('subcategory', context.subcategory)
+    return request('GET', `/api/pfsrd2/search/traits?${params.toString()}`, opts)
+  },
+  // Category → subcategories map for the ItemSearch facet dropdowns.
+  loadItemFacets: async (opts = {}) => {
+    const params = new URLSearchParams()
+    for (const t of ITEM_TYPES) params.append('type', t)
+    const data = await request('GET', `/api/pfsrd2/search/facets?${params.toString()}`, opts)
+    return data.categories
   },
   // Full creature entry (with schema_version) for CreatureStatBlock.
   entryFull: (gameId, opts = {}) =>
