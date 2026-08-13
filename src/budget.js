@@ -3,7 +3,7 @@
 // The pure functions take an `entryOf(gameId)` resolver so they're testable
 // without fetching; the TreasureBudget component wires the real fetched entries.
 import { itemPriceCp, creatureLevel, coinsToCp } from '@521studios/pfsrd2-display'
-import { creatureXp } from './pf2eRules.js'
+import { creatureXp, encounterThreat, treasureBudget } from './pf2eRules.js'
 
 // refGameId: the game_id a monster/treasure ref resolves to — a pristine ref, or
 // a derived (templated/runed) ref's base.game_id.
@@ -60,6 +60,30 @@ export function encounterXp(monsters, partyLevel, entryOf) {
     xp += creatureXp(lvl, partyLevel, m.adjustment) * (m.count || 1)
   }
   return { xp, unknown }
+}
+
+// rollupEncounters aggregates a set of encounters into a treasure total vs the
+// summed per-encounter budget (each encounter's difficulty-band target), plus a
+// per-encounter breakdown. `partyFor(encounter) -> {level, size}` resolves each
+// encounter's effective party (its own override → chapter → campaign → default);
+// `entryOf(gameId)` resolves a loaded item/creature entry. Both are injected so
+// this stays pure/testable — the rollup component wires the real fetches.
+export function rollupEncounters(encounters, entryOf, partyFor) {
+  const rows = []
+  let totalCp = 0
+  let totalTargetCp = 0
+  for (const enc of encounters || []) {
+    const { level, size } = partyFor(enc)
+    const { cp, unpriced } = treasureValueCp(enc.treasure, enc.currency, entryOf)
+    const { xp, unknown } = encounterXp(enc.monsters, level, entryOf)
+    const threat = encounterThreat(xp, size)
+    const targetGp = treasureBudget(level, threat, size) // null for a Trivial encounter
+    const targetCp = targetGp == null ? 0 : targetGp * 100
+    rows.push({ id: enc.id, name: enc.name, cp, threat, targetCp, incomplete: unpriced.length > 0 || unknown.length > 0 })
+    totalCp += cp
+    totalTargetCp += targetCp
+  }
+  return { totalCp, totalTargetCp, rows, anyIncomplete: rows.some((r) => r.incomplete) }
 }
 
 // gameIdsInEncounter: the distinct entry ids an encounter references (monsters +

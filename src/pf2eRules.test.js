@@ -1,6 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { treasureBudget, creatureXp, budgetFor, encounterThreat, TREASURE_BY_LEVEL } from './pf2eRules.js'
+import { treasureBudget, treasureTotalForLevel, creatureXp, budgetFor, encounterThreat, TREASURE_BY_LEVEL } from './pf2eRules.js'
+
+test('treasureTotalForLevel returns the per-level total, party-scaled', () => {
+  assert.equal(treasureTotalForLevel(5), 1350)
+  assert.equal(treasureTotalForLevel(5, 6), Math.round((1350 * 6) / 4))
+  assert.equal(treasureTotalForLevel(99), TREASURE_BY_LEVEL[20].total) // clamp
+})
 
 test('treasureBudget returns the Table 5-3 value for a 4-PC party', () => {
   assert.equal(treasureBudget(1, 'moderate'), 18)

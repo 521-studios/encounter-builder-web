@@ -354,3 +354,10 @@ button.encounter.selected {
 }
 .difficulty-badge--trivial { background: color-mix(in srgb, var(--muted) 25%, transparent); }
 .difficulty-badge--severe, .difficulty-badge--extreme { background: color-mix(in srgb, var(--danger) 28%, transparent); }
+
+/* Chapter/campaign treasure rollup (Slice 5). */
+.rollup-toggle { margin-top: 0.75rem; }
+.treasure-rollup { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.5rem; margin-top: 0.5rem; }
+.rollup-table { width: 100%; }
+.rollup-table td, .rollup-table th { text-align: left; }
+.rollup-table td:nth-child(3), .rollup-table td:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
