@@ -345,3 +345,12 @@ button.encounter.selected {
 .treasure-chart thead th[data-active], .chart-band--active { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--fg); font-weight: 700; }
 .budget-flags { font-size: 0.82rem; }
 .budget-error { font-size: 0.85rem; margin: 0; }
+
+/* Book-style difficulty badge on the encounter title (Slice ncnq.6). */
+.difficulty-badge {
+  font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 0.1rem 0.5rem; border-radius: var(--radius); white-space: nowrap;
+  background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--fg);
+}
+.difficulty-badge--trivial { background: color-mix(in srgb, var(--muted) 25%, transparent); }
+.difficulty-badge--severe, .difficulty-badge--extreme { background: color-mix(in srgb, var(--danger) 28%, transparent); }
