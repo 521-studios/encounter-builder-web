@@ -36,6 +36,11 @@ test('apply a template to a monster: highlights, persists, and re-derives on rel
   await expect(block.locator('.Monster__changed').first()).toBeVisible()
   await expect(page.getByTestId('template-tag')).toContainText(choice)
 
+  // The library renders the applied template's OWN section (the app now passes
+  // appliedTemplates; the gathering lives in the library).
+  await expect(block.locator('.Monster__template-title').first()).toBeVisible()
+  await expect(block.locator('.Monster__template-title').first()).toContainText('Template')
+
   // Save, reload, re-open, re-open the stat block — the template re-derives.
   const savePut = page.waitForResponse(
     (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
@@ -49,6 +54,7 @@ test('apply a template to a monster: highlights, persists, and re-derives on rel
   await page.getByRole('button', { name: 'stat block' }).first().click()
   const block2 = page.locator('.monster-view .statblock')
   await expect(block2.locator('.Monster__changed').first()).toBeVisible() // re-derived highlighting
+  await expect(block2.locator('.Monster__template-title').first()).toBeVisible() // section re-derives too
   await expect(page.getByTestId('template-tag')).toContainText(choice)
 
   // Cleanup.

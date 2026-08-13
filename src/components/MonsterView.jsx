@@ -5,6 +5,7 @@ import {
   listTemplates,
   applyTemplate,
   mergePatches,
+  appliedTemplates,
 } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import { errorMessage } from '../api/errors.js'
@@ -50,6 +51,7 @@ export default function MonsterView({ monster, onChange, disabled }) {
         for (const m of ref.modifications || []) {
           const applied = await applyTemplate({
             post: pfsrd2.applyTemplatePost,
+            get: pfsrd2.templatesGet,
             creature: current,
             templateGameId: m.template_game_id,
           })
@@ -57,6 +59,7 @@ export default function MonsterView({ monster, onChange, disabled }) {
             template: { game_id: m.template_game_id, name: m.template_name || m.template_game_id },
             patches: applied.patches,
             creature: applied.creature,
+            templateData: applied.templateData,
           })
           current = applied.creature
         }
@@ -96,12 +99,18 @@ export default function MonsterView({ monster, onChange, disabled }) {
     try {
       const applied = await applyTemplate({
         post: pfsrd2.applyTemplatePost,
+        get: pfsrd2.templatesGet,
         creature: current,
         templateGameId: template.game_id,
       })
       const next = [
         ...stack,
-        { template: { game_id: template.game_id, name: template.name }, patches: applied.patches, creature: applied.creature },
+        {
+          template: { game_id: template.game_id, name: template.name },
+          patches: applied.patches,
+          creature: applied.creature,
+          templateData: applied.templateData,
+        },
       ]
       setStack(next)
       persist(next)
@@ -140,6 +149,7 @@ export default function MonsterView({ monster, onChange, disabled }) {
         <CreatureStatBlock
           data={current}
           patches={mergePatches(stack)}
+          appliedTemplates={appliedTemplates(stack)}
           onRoll={() => {}}
           onLoadMonster={() => {}}
           imageBaseUrl="/api/pfsrd2/images"
