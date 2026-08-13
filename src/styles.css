@@ -333,3 +333,14 @@ button.encounter.selected {
 .campaign-switcher-block { display: grid; gap: 0.3rem; }
 .campaign-settings-link { justify-self: start; font-size: 0.85rem; }
 .party-inherit-error { font-size: 0.82rem; margin: 0 0 0.25rem; }
+
+/* Treasure/difficulty budget panel + Table 5-3 chart (Slice 4). */
+.treasure-budget { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.5rem; }
+.budget-title { margin: 0; font-size: 1rem; }
+.budget-summary { margin: 0; font-size: 0.95rem; }
+.chart-scroll { overflow-x: auto; }
+.treasure-chart { border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.treasure-chart th, .treasure-chart td { border: 1px solid var(--border); padding: 0.25rem 0.6rem; text-align: right; }
+.treasure-chart thead th { color: var(--muted); font-weight: 600; }
+.treasure-chart thead th[data-active], .chart-band--active { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--fg); font-weight: 700; }
+.budget-flags { font-size: 0.82rem; }

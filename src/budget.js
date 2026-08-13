@@ -1,0 +1,82 @@
+// Encounter treasure valuation + XP/difficulty, built on the pfsrd2-display
+// numeric accessors (Slice 2) and the PF2e rules calculators (pf2eRules.js).
+// The pure functions take an `entryOf(gameId)` resolver so they're testable
+// without fetching; the TreasureBudget component wires the real fetched entries.
+import { itemPriceCp, creatureLevel, coinsToCp } from '@521studios/pfsrd2-display'
+import { creatureXp } from './pf2eRules.js'
+
+// refGameId: the game_id a monster/treasure ref resolves to — a pristine ref, or
+// a derived (templated/runed) ref's base.game_id.
+export function refGameId(ref) {
+  return (ref && (ref.game_id || (ref.base && ref.base.game_id))) || ''
+}
+
+// A derived ref (a runed weapon, a templated monster) carries a base + edits; its
+// resolved price/level isn't the base entry's, so we flag rather than mis-value.
+function isDerived(ref) {
+  return !!(ref && (ref.base || (Array.isArray(ref.modifications) && ref.modifications.length)))
+}
+
+// treasureValueCp sums an encounter's treasure to copper: coin reward + each
+// line's item price (variant-aware) × qty. Skips DESTROYED loot (not awarded).
+// Lines whose value can't be resolved — a derived/runed item, a "Varies" price,
+// or an entry not yet loaded — are returned in `unpriced` so the UI flags them
+// for manual review instead of silently counting them as 0.
+export function treasureValueCp(treasure, currency, entryOf) {
+  let cp = coinsToCp(currency)
+  const unpriced = []
+  for (const line of treasure || []) {
+    if (line.state === 'destroyed') continue
+    if (isDerived(line.ref)) {
+      unpriced.push(line)
+      continue
+    }
+    const gid = refGameId(line.ref)
+    const entry = gid ? entryOf(gid) : null
+    const per = entry ? itemPriceCp(entry, line.variant || undefined) : null
+    if (per == null) {
+      unpriced.push(line)
+      continue
+    }
+    cp += per * (line.qty || 1)
+  }
+  return { cp, unpriced }
+}
+
+// encounterXp sums the monsters' XP against the party level (Table 10-2 via
+// creatureXp, honoring elite/weak). Monsters whose creature level can't be read
+// (entry not loaded, or a level-changing template) are returned in `unknown`.
+export function encounterXp(monsters, partyLevel, entryOf) {
+  let xp = 0
+  const unknown = []
+  for (const m of monsters || []) {
+    const gid = refGameId(m.ref)
+    const entry = gid ? entryOf(gid) : null
+    const lvl = entry ? creatureLevel(entry) : null
+    if (lvl == null) {
+      unknown.push(m)
+      continue
+    }
+    xp += creatureXp(lvl, partyLevel, m.adjustment) * (m.count || 1)
+  }
+  return { xp, unknown }
+}
+
+// gameIdsInEncounter: the distinct entry ids an encounter references (monsters +
+// treasure, skipping derived refs whose base we don't price/level directly and
+// destroyed treasure). Used to batch the entry fetches.
+export function gameIdsInEncounter(enc) {
+  const ids = new Set()
+  for (const m of enc?.monsters || []) {
+    if (!isDerived(m.ref)) {
+      const g = refGameId(m.ref)
+      if (g) ids.add(g)
+    }
+  }
+  for (const t of enc?.treasure || []) {
+    if (t.state === 'destroyed' || isDerived(t.ref)) continue
+    const g = refGameId(t.ref)
+    if (g) ids.add(g)
+  }
+  return [...ids]
+}

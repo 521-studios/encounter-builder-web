@@ -9,6 +9,7 @@ import { resolveParty } from '../party.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
 import PartyFields from './PartyFields.jsx'
+import TreasureBudget from './TreasureBudget.jsx'
 
 const AUTOSAVE_MS = 800
 
@@ -159,6 +160,15 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
   const saveLabel = { saving: 'Saving…', unsaved: 'Unsaved changes…', error: 'Save failed', saved: 'Saved' }[saveState]
 
+  // The encounter's effective party (its own override, else chapter, else
+  // campaign, else app default) — the level/size the treasure + difficulty budget
+  // is measured against.
+  const effectiveParty = resolveParty({
+    encounter: enc,
+    chapter: chapters.find((c) => c.id === enc.chapter_id) || null,
+    campaign: campaignSettings || null,
+  })
+
   return (
     <section className="editor">
       <div className="editor-head">
@@ -279,6 +289,12 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           </button>
         )}
       </fieldset>
+
+      <TreasureBudget
+        encounter={enc}
+        partyLevel={effectiveParty.level}
+        partySize={effectiveParty.size}
+      />
 
       {!released && (
         <div className="actions">
