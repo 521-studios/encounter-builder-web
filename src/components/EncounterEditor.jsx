@@ -1,17 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Markdown } from '@521studios/pfsrd2-display'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
-import { CURRENCIES, emptyMonster, emptyTreasure, keyed, toEncounterInput } from '../model.js'
+import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, keyed } from '../model.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
+
+const AUTOSAVE_MS = 800
 
 export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved }) {
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
+  const [releasing, setReleasing] = useState(false)
   const [chapters, setChapters] = useState([]) // for the Chapter picker (keyboard-accessible move)
+
+  // Refs let the debounced autosave read the latest edit without re-subscribing:
+  // encRef is the current working copy; dirtyRef marks unsaved user edits;
+  // savingRef serializes overlapping PUTs; syncedRef is the last sidebar-visible
+  // signature we told the parent about (so we only refresh the tree on real
+  // name/chapter/status changes, not on every keystroke).
+  const encRef = useRef(null)
+  const dirtyRef = useRef(false)
+  const savingRef = useRef(false)
+  const syncedRef = useRef({ name: null, chapter_id: null, status: null })
+  encRef.current = enc
 
   useEffect(() => {
     let alive = true
@@ -28,64 +42,107 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     let alive = true
     setEnc(null)
     setError(null)
+    dirtyRef.current = false
+    setSaveState('saved')
     encounters
       .get(campaignId, encounterId)
-      .then((e) => alive && setEnc(keyed(e)))
+      .then((e) => {
+        if (!alive) return
+        setEnc(keyed(e))
+        syncedRef.current = { name: e.name, chapter_id: e.chapter_id || '', status: e.status }
+      })
       .catch((e) => alive && setError(errorMessage(e)))
     return () => {
       alive = false
     }
   }, [campaignId, encounterId])
 
+  const released = enc?.status === 'released'
+
+  // Autosave: debounce a PUT whenever there are unsaved user edits. Re-runs on
+  // every edit (enc changes) — the pending timer is cleared, so only the last
+  // edit in a burst fires. The while-loop coalesces edits that arrive mid-save,
+  // reading encRef fresh each pass so overlapping PUTs can't reorder.
+  useEffect(() => {
+    if (!enc || released || !dirtyRef.current) return
+    const t = setTimeout(async () => {
+      if (savingRef.current || !dirtyRef.current) return
+      savingRef.current = true
+      setSaveState('saving')
+      try {
+        while (dirtyRef.current) {
+          dirtyRef.current = false
+          const saved = await encounters.update(campaignId, encounterId, buildInput(encRef.current))
+          setError(null)
+          const sig = { name: saved.name, chapter_id: saved.chapter_id || '', status: saved.status }
+          const prev = syncedRef.current
+          if (prev.name !== sig.name || prev.chapter_id !== sig.chapter_id || prev.status !== sig.status) {
+            syncedRef.current = sig
+            onSaved && onSaved(saved)
+          }
+        }
+        setSaveState('saved')
+      } catch (e) {
+        setError(errorMessage(e))
+        setSaveState('error')
+        dirtyRef.current = true // ponytail: retry on the next edit, not on a timer
+      } finally {
+        savingRef.current = false
+      }
+    }, AUTOSAVE_MS)
+    return () => clearTimeout(t)
+  }, [enc, released, campaignId, encounterId, onSaved])
+
+  // Flush a pending (debounced) autosave when leaving this encounter, so the last
+  // <800ms of edits aren't lost on a quick switch or close. Fire-and-forget: the
+  // editor is going away. Skip if a save is already in flight — its coalescing
+  // loop picks up the dirty edit — to avoid a second concurrent PUT.
+  useEffect(() => {
+    return () => {
+      const leaving = encRef.current
+      if (dirtyRef.current && !savingRef.current && leaving && leaving.status !== 'released') {
+        dirtyRef.current = false
+        encounters.update(campaignId, encounterId, buildInput(leaving)).catch(() => {})
+      }
+    }
+  }, [campaignId, encounterId])
+
   if (error && !enc) return <p className="error" role="alert">{error}</p>
   if (!enc) return <p>Loading encounter…</p>
 
-  const released = enc.status === 'released'
-  const patch = (fields) => setEnc({ ...enc, ...fields })
+  const patch = (fields) => {
+    dirtyRef.current = true
+    setSaveState((s) => (s === 'saving' ? s : 'unsaved'))
+    setEnc({ ...enc, ...fields })
+  }
   const monsters = enc.monsters || []
   const treasure = enc.treasure || []
 
   const setMonster = (i, m) => patch({ monsters: monsters.map((x, j) => (j === i ? m : x)) })
   const setTreasure = (i, t) => patch({ treasure: treasure.map((x, j) => (j === i ? t : x)) })
 
-  function buildInput() {
-    const input = toEncounterInput(enc) // echoes chapter_id/description/monsters/…
-    if (released) delete input.status // release is its own action; don't move status here
-    return input
-  }
-
-  async function save() {
-    setSaving(true)
-    setError(null)
-    try {
-      const saved = await encounters.update(campaignId, encounterId, buildInput())
-      setEnc(keyed(saved))
-      onSaved && onSaved(saved)
-    } catch (e) {
-      setError(errorMessage(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
   // Release hands the loot to the party: it saves current edits first (so the
   // released encounter matches what the GM sees), then flips it to released —
   // after which the editor renders read-only.
   async function release() {
     if (!window.confirm('Release this encounter to the party? It becomes read-only.')) return
-    setSaving(true)
+    dirtyRef.current = false // cancel any pending autosave; we save explicitly here
+    setReleasing(true)
     setError(null)
     try {
-      await encounters.update(campaignId, encounterId, buildInput())
+      await encounters.update(campaignId, encounterId, buildInput(enc))
       const result = await encounters.release(campaignId, encounterId)
       setEnc(keyed(result))
+      setSaveState('saved')
       onSaved && onSaved(result)
     } catch (e) {
       setError(errorMessage(e))
     } finally {
-      setSaving(false)
+      setReleasing(false)
     }
   }
+
+  const saveLabel = { saving: 'Saving…', unsaved: 'Unsaved changes…', error: 'Save failed', saved: 'Saved' }[saveState]
 
   return (
     <section className="editor">
@@ -198,10 +255,16 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
       {!released && (
         <div className="actions">
-          <button className="primary" onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
+          <span
+            className={`save-state${saveState === 'error' ? ' save-state--error' : ''}`}
+            data-testid="save-state"
+            aria-live="polite"
+          >
+            {saveLabel}
+          </span>
+          <button onClick={release} disabled={releasing || saveState === 'saving'}>
+            {releasing ? 'Releasing…' : 'Release to party'}
           </button>
-          <button onClick={release} disabled={saving}>Release to party</button>
         </div>
       )}
     </section>

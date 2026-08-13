@@ -41,12 +41,8 @@ test('apply a template to a monster: highlights, persists, and re-derives on rel
   await expect(block.locator('.Monster__template-title').first()).toBeVisible()
   await expect(block.locator('.Monster__template-title').first()).toContainText('Template')
 
-  // Save, reload, re-open, re-open the stat block — the template re-derives.
-  const savePut = page.waitForResponse(
-    (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
-  )
-  await page.getByRole('button', { name: /^Save/ }).click()
-  expect((await savePut).ok()).toBeTruthy()
+  // Autosave persists the applied template; wait for the indicator, then reload and re-open.
+  await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
   await page.reload()
   await page.locator('button.campaign').first().click()

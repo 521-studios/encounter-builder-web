@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { keyed, withKey, stripKey, emptyMonster, emptyTreasure, toEncounterInput } from './model.js'
+import { keyed, withKey, stripKey, emptyMonster, emptyTreasure, toEncounterInput, hasRef, buildInput } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
   const out = keyed({
@@ -59,6 +59,58 @@ test('toEncounterInput echoes every field for a full PUT, strips _key, keeps cha
   assert.ok(input.monsters.every((m) => !('_key' in m)))
   assert.ok(input.treasure.every((t) => !('_key' in t)))
   assert.equal(input.monsters[0].ref.game_id, 'Monsters:1')
+})
+
+test('hasRef is true only when a line resolves to a game_id (direct or templated base)', () => {
+  assert.equal(hasRef({ ref: { game_id: 'Monsters:1' } }), true)
+  assert.equal(hasRef({ ref: { base: { game_id: 'Monsters:1' } } }), true) // templated
+  assert.equal(hasRef({ ref: { game_id: '' } }), false) // freshly added, unfilled
+  assert.equal(hasRef({ ref: {} }), false)
+  assert.equal(hasRef({}), false)
+  assert.equal(hasRef(undefined), false)
+})
+
+test('toEncounterInput drops half-filled rows (autosave fires mid-edit)', () => {
+  // A GM clicks "+ monster"/"+ treasure" then autosave fires before they pick —
+  // the empty rows must not reach the API (which 400s on an empty ref).
+  const enc = keyed({
+    name: 'WIP',
+    monsters: [
+      { ref: { game_id: 'Monsters:1' }, count: 1 },
+      emptyMonster(), // unfilled — dropped
+    ],
+    treasure: [
+      emptyTreasure(), // unfilled — dropped
+      { ref: { game_id: 'Weapons:1' }, qty: 1 },
+    ],
+  })
+  const input = toEncounterInput(enc)
+  assert.equal(input.monsters.length, 1)
+  assert.equal(input.monsters[0].ref.game_id, 'Monsters:1')
+  assert.equal(input.treasure.length, 1)
+  assert.equal(input.treasure[0].ref.game_id, 'Weapons:1')
+})
+
+test('toEncounterInput keeps a templated (derived) monster whose ref carries base.game_id', () => {
+  const enc = keyed({
+    name: 'Elite',
+    monsters: [{ ref: { base: { game_id: 'Monsters:1' } }, patches: [], count: 1 }],
+  })
+  const input = toEncounterInput(enc)
+  assert.equal(input.monsters.length, 1)
+  assert.equal(input.monsters[0].ref.base.game_id, 'Monsters:1')
+})
+
+test('buildInput keeps status for a draft (a normal save echoes it)', () => {
+  const input = buildInput({ name: 'x', status: 'draft' })
+  assert.equal(input.status, 'draft')
+})
+
+test('buildInput strips status for a released encounter (release is its own endpoint)', () => {
+  // A regular save/move of a released encounter must not carry status, or the
+  // PUT would move it — release owns that transition.
+  const input = buildInput({ name: 'x', status: 'released' })
+  assert.ok(!('status' in input))
 })
 
 test('toEncounterInput defaults chapter_id to "" (Unsorted) and omits absent status', () => {

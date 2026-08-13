@@ -87,11 +87,8 @@ test('move an encounter via the editor Chapter select (no mouse needed)', async 
 
   // Change its Chapter in the editor, then save.
   await page.locator('select[aria-label="chapter"]').selectOption({ label: ch })
-  const savePut = page.waitForResponse(
-    (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
-  )
-  await page.getByRole('button', { name: /^Save/ }).click()
-  expect((await savePut).ok()).toBeTruthy()
+  // Autosave persists the edits — wait for the indicator to settle before reload/assert.
+  await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
   // The sidebar tree now shows it under the chosen chapter.
   await expect(groupOf(ch).locator('button.encounter', { hasText: enc })).toBeVisible()
