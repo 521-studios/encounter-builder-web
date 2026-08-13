@@ -25,12 +25,8 @@ test('treasure: pick an item with ItemSearch, render ItemCard, persist', async (
   await expect(card.locator('.Monster__name')).not.toBeEmpty()
   const itemName = (await card.locator('.Monster__name').innerText()).trim()
 
-  // Save, reload, re-open — the item persisted and re-renders.
-  const savePut = page.waitForResponse(
-    (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
-  )
-  await page.getByRole('button', { name: /^Save/ }).click()
-  expect((await savePut).ok()).toBeTruthy()
+  // Autosave persists the added item; wait for the indicator, then reload and re-open.
+  await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
   await page.reload()
   await page.locator('button.campaign').first().click()

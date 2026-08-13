@@ -26,12 +26,11 @@ test('a chapter-assigned encounter stays in its chapter after save+reload', asyn
   await group.locator('.new-encounter button').click()
   await expect(page.locator('.editor')).toBeVisible()
 
-  // Save (no edits needed — the echo is what's under test), wait for the PUT.
-  const savePut = page.waitForResponse(
-    (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
-  )
-  await page.getByRole('button', { name: /^Save/ }).click()
-  expect((await savePut).ok()).toBeTruthy()
+  // Trigger an autosave with a harmless edit (not the name — assertions match on
+  // it). The autosave PUT echoes chapter_id via buildInput, which is the exact
+  // regression under test. Wait for the indicator to settle before reload.
+  await page.locator('.description-input').fill(`assigned ${stamp}`)
+  await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
   // Reload — the encounter must still be inside its chapter group, not Unsorted.
   await page.reload()

@@ -28,19 +28,28 @@ export function keyed(e) {
   }
 }
 
+// A monster/treasure line is persistable once it resolves to a game_id — either
+// a direct ref or a templated (derived) ref carrying base.game_id. A freshly-
+// added row ({ ref: { game_id: '' } }) is still being filled and is dropped from
+// the PUT body: it has nothing to save yet, and the API rejects an empty ref.
+export function hasRef(line) {
+  return Boolean(line?.ref?.game_id || line?.ref?.base?.game_id)
+}
+
 // Build the PUT body (EncounterInput) from an encounter. Shared by the editor's
-// save and the sidebar's "move to chapter" so both send the exact same shape —
-// PUT replaces the resource, so every field must be echoed (a partial body would
-// blank the omitted fields). Client-only _key/_name are stripped. `status` is
-// included only when present (release is a separate endpoint).
+// autosave and the sidebar's "move to chapter" so both send the exact same shape
+// — PUT replaces the resource, so every field must be echoed (a partial body
+// would blank the omitted fields). Client-only _key/_name are stripped;
+// half-filled rows without a ref are dropped. `status` is included only when
+// present (release is a separate endpoint).
 export function toEncounterInput(enc) {
   const input = {
     name: enc.name,
     chapter_id: enc.chapter_id || '',
     description: enc.description || '',
     notes: enc.notes || '',
-    monsters: (enc.monsters || []).map(stripKey),
-    treasure: (enc.treasure || []).map(stripKey),
+    monsters: (enc.monsters || []).filter(hasRef).map(stripKey),
+    treasure: (enc.treasure || []).filter(hasRef).map(stripKey),
     currency: enc.currency || {},
   }
   if (enc.status) input.status = enc.status
