@@ -69,6 +69,14 @@ export function treasureBudget(level, band, partySize = BASE_PARTY) {
   return Math.round((base * partySize) / BASE_PARTY)
 }
 
+// treasureTotalForLevel: the "Total Treasure per Level" (all encounters combined
+// to advance a level), scaled by party size. A reference figure for the campaign
+// rollup.
+export function treasureTotalForLevel(level, partySize = BASE_PARTY) {
+  const row = TREASURE_BY_LEVEL[clampLevel(level)]
+  return row ? Math.round((row.total * partySize) / BASE_PARTY) : null
+}
+
 // creatureXp: one creature's XP contribution. adjustment shifts its level by
 // elite (+1) / weak (-1) before comparing to the party level. A null level
 // contributes 0 defensively — but callers that must *flag* an unreadable level
