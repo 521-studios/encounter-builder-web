@@ -2,8 +2,10 @@ import { test, expect } from '@playwright/test'
 import { login, trackApiErrors } from './helpers/login.js'
 
 // Slice 4: the encounter's treasure-vs-budget panel — difficulty band from
-// monster XP, treasure value from item prices, shown against the Table 5-3 row.
-test('encounter budget panel shows difficulty band + treasure value + the Table 5-3 chart', async ({ page, baseURL }) => {
+// monster XP, treasure value from coins/item prices, shown against the Table 5-3
+// row with an over/under-target verdict. Driven to a deterministic Extreme band
+// (a level-14 dragon at a party override of level 1) so the marking is asserted.
+test('encounter budget panel: difficulty band, treasure value, and over/under the Table 5-3 target', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
   await page.locator('button.campaign').first().click()
@@ -15,26 +17,34 @@ test('encounter budget panel shows difficulty band + treasure value + the Table 
 
   const budget = page.getByTestId('treasure-budget')
   await expect(budget).toBeVisible()
-  // Empty encounter: Trivial (0 XP), and the Table 5-3 chart row renders.
-  await expect(page.getByTestId('encounter-threat')).toHaveText(/Trivial|Low|Moderate|Severe|Extreme/)
-  await expect(budget.locator('.treasure-chart')).toBeVisible()
   await expect(budget.locator('.treasure-chart thead th')).toHaveCount(5) // label + 4 bands
 
-  // Add a monster → XP rises above 0 (the difficulty reflects the roster).
-  await page.getByRole('button', { name: '+ monster' }).click()
-  await page.locator('.monster-search [data-testid="creature-search"]').first().fill('goblin')
-  await expect(page.locator('.monster-search [data-testid="search-result"]').first()).toBeVisible()
-  await page.locator('.monster-search [data-testid="search-result"]').first().click()
-  await expect(page.locator('.picked')).toBeVisible()
-  await expect(page.getByTestId('encounter-threat')).toContainText(/\w/)
-  // The XP figure in the summary is now non-zero.
-  await expect(budget.getByText(/\([1-9]\d* XP\)/)).toBeVisible()
+  // Pin the effective party to level 1, 4 PCs (deterministic regardless of the
+  // campaign default) via the encounter's own override.
+  await page.locator('.editor').getByLabel('party level').fill('1')
+  await page.locator('.editor').getByLabel('party size').fill('4')
 
-  // Add coin treasure → the treasure value reflects it (no item fetch needed).
-  await page.getByRole('button', { name: '+ treasure' }).click()
-  // The value shows a gp amount (from the item once picked, or coins). Assert the
-  // treasure-value cell is present and formatted as gp.
-  await expect(page.getByTestId('treasure-value')).toHaveText(/gp$/)
+  // A level-14 dragon vs a level-1 party is capped at PL+4 = 160 XP → Extreme.
+  await page.getByRole('button', { name: '+ monster' }).click()
+  const dragon = page.locator('.monster-search [data-testid="search-result"][data-name="Adult Cinder Dragon"]')
+  await page.locator('.monster-search [data-testid="creature-search"]').first().fill('adult cinder dragon')
+  await expect(dragon).toBeVisible()
+  await dragon.click()
+  await expect(page.locator('.picked')).toBeVisible()
+
+  // Difficulty resolves to Extreme once the creature entry loads; treasure (0 gp)
+  // is under the Extreme target (35 gp at level 1) and the Extreme cell marks ▲.
+  await expect(page.getByTestId('encounter-threat')).toHaveText('Extreme')
+  await expect(page.getByTestId('treasure-delta')).toContainText('under the Extreme target')
+  const extremeCell = budget.locator('.treasure-chart td[data-band="extreme"]')
+  await expect(extremeCell).toHaveAttribute('data-active', 'true')
+  await expect(extremeCell).toContainText('▲')
+
+  // Add 40 gp of coin (> the 35 gp Extreme target) → the value flips to over ✓.
+  await page.locator('.editor .coins').getByLabel('gp', { exact: true }).fill('40')
+  await expect(page.getByTestId('treasure-value')).toHaveText('40 gp')
+  await expect(page.getByTestId('treasure-delta')).toContainText('over the Extreme target')
+  await expect(extremeCell).toContainText('✓')
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()

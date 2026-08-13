@@ -1,13 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import {
-  treasureBudget,
-  treasureTotalForLevel,
-  creatureXp,
-  budgetFor,
-  encounterThreat,
-  TREASURE_BY_LEVEL,
-} from './pf2eRules.js'
+import { treasureBudget, creatureXp, budgetFor, encounterThreat, TREASURE_BY_LEVEL } from './pf2eRules.js'
 
 test('treasureBudget returns the Table 5-3 value for a 4-PC party', () => {
   assert.equal(treasureBudget(1, 'moderate'), 18)
@@ -25,11 +18,6 @@ test('treasureBudget clamps out-of-range levels and rejects unknown bands', () =
   assert.equal(treasureBudget(0, 'low'), TREASURE_BY_LEVEL[1].low)
   assert.equal(treasureBudget(99, 'low'), TREASURE_BY_LEVEL[20].low)
   assert.equal(treasureBudget(5, 'trivial'), null) // no Trivial treasure column
-})
-
-test('treasureTotalForLevel scales the per-level total', () => {
-  assert.equal(treasureTotalForLevel(5), 1350)
-  assert.equal(treasureTotalForLevel(5, 6), Math.round((1350 * 6) / 4))
 })
 
 test('creatureXp maps level-relative-to-party via Table 10-2', () => {
@@ -64,6 +52,12 @@ test('encounterThreat classifies the XP sum into a band (4 PCs)', () => {
   assert.equal(encounterThreat(160), 'extreme')
   assert.equal(encounterThreat(300), 'extreme') // above Extreme still Extreme
   assert.equal(encounterThreat(10), 'trivial')
+})
+
+test('encounterThreat: an empty roster (0 XP) is Trivial, even for a small party', () => {
+  assert.equal(encounterThreat(0), 'trivial')
+  assert.equal(encounterThreat(0, 1), 'trivial') // solo: scaled Low budget rounds to 0
+  assert.equal(encounterThreat(0, 6), 'trivial')
 })
 
 test('encounterThreat respects party-size scaling', () => {

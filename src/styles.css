@@ -344,3 +344,4 @@ button.encounter.selected {
 .treasure-chart thead th { color: var(--muted); font-weight: 600; }
 .treasure-chart thead th[data-active], .chart-band--active { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--fg); font-weight: 700; }
 .budget-flags { font-size: 0.82rem; }
+.budget-error { font-size: 0.85rem; margin: 0; }

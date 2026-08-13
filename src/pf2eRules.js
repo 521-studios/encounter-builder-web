@@ -3,29 +3,29 @@
 // (Treasure by Encounter), Table 10-1 (Encounter Budget), Table 10-2 (Creature
 // XP and Role). Used by the treasure-value / difficulty chart.
 
-// Table 5-3 — Treasure by Encounter, per party level 1..20, in gp. Columns:
-// total per level, then the per-encounter budget by threat band, plus "extra".
+// Table 5-3 — Treasure by Encounter, per party level 1..20, in gp: the total per
+// level, then the per-encounter budget by threat band (Low..Extreme).
 export const TREASURE_BY_LEVEL = {
-  1: { total: 175, low: 13, moderate: 18, severe: 26, extreme: 35, extra: 35 },
-  2: { total: 300, low: 23, moderate: 30, severe: 45, extreme: 60, extra: 60 },
-  3: { total: 500, low: 38, moderate: 50, severe: 75, extreme: 100, extra: 100 },
-  4: { total: 850, low: 65, moderate: 85, severe: 130, extreme: 170, extra: 170 },
-  5: { total: 1350, low: 100, moderate: 135, severe: 200, extreme: 270, extra: 270 },
-  6: { total: 2000, low: 150, moderate: 200, severe: 300, extreme: 400, extra: 400 },
-  7: { total: 2900, low: 220, moderate: 290, severe: 440, extreme: 580, extra: 580 },
-  8: { total: 4000, low: 300, moderate: 400, severe: 600, extreme: 800, extra: 800 },
-  9: { total: 5700, low: 430, moderate: 570, severe: 860, extreme: 1140, extra: 1140 },
-  10: { total: 8000, low: 600, moderate: 800, severe: 1200, extreme: 1600, extra: 1600 },
-  11: { total: 11500, low: 865, moderate: 1150, severe: 1725, extreme: 2300, extra: 2300 },
-  12: { total: 16500, low: 1250, moderate: 1650, severe: 2475, extreme: 3300, extra: 3300 },
-  13: { total: 25000, low: 1875, moderate: 2500, severe: 3750, extreme: 5000, extra: 5000 },
-  14: { total: 36500, low: 2750, moderate: 3650, severe: 5500, extreme: 7300, extra: 7300 },
-  15: { total: 54500, low: 4100, moderate: 5450, severe: 8200, extreme: 10900, extra: 10900 },
-  16: { total: 82500, low: 6200, moderate: 8250, severe: 12400, extreme: 16500, extra: 16500 },
-  17: { total: 128000, low: 9600, moderate: 12800, severe: 19200, extreme: 25600, extra: 25600 },
-  18: { total: 208000, low: 15600, moderate: 20800, severe: 31200, extreme: 41600, extra: 41600 },
-  19: { total: 355000, low: 26600, moderate: 35500, severe: 53250, extreme: 71000, extra: 71000 },
-  20: { total: 490000, low: 36800, moderate: 49000, severe: 73500, extreme: 98000, extra: 98000 },
+  1: { total: 175, low: 13, moderate: 18, severe: 26, extreme: 35 },
+  2: { total: 300, low: 23, moderate: 30, severe: 45, extreme: 60 },
+  3: { total: 500, low: 38, moderate: 50, severe: 75, extreme: 100 },
+  4: { total: 850, low: 65, moderate: 85, severe: 130, extreme: 170 },
+  5: { total: 1350, low: 100, moderate: 135, severe: 200, extreme: 270 },
+  6: { total: 2000, low: 150, moderate: 200, severe: 300, extreme: 400 },
+  7: { total: 2900, low: 220, moderate: 290, severe: 440, extreme: 580 },
+  8: { total: 4000, low: 300, moderate: 400, severe: 600, extreme: 800 },
+  9: { total: 5700, low: 430, moderate: 570, severe: 860, extreme: 1140 },
+  10: { total: 8000, low: 600, moderate: 800, severe: 1200, extreme: 1600 },
+  11: { total: 11500, low: 865, moderate: 1150, severe: 1725, extreme: 2300 },
+  12: { total: 16500, low: 1250, moderate: 1650, severe: 2475, extreme: 3300 },
+  13: { total: 25000, low: 1875, moderate: 2500, severe: 3750, extreme: 5000 },
+  14: { total: 36500, low: 2750, moderate: 3650, severe: 5500, extreme: 7300 },
+  15: { total: 54500, low: 4100, moderate: 5450, severe: 8200, extreme: 10900 },
+  16: { total: 82500, low: 6200, moderate: 8250, severe: 12400, extreme: 16500 },
+  17: { total: 128000, low: 9600, moderate: 12800, severe: 19200, extreme: 25600 },
+  18: { total: 208000, low: 15600, moderate: 20800, severe: 31200, extreme: 41600 },
+  19: { total: 355000, low: 26600, moderate: 35500, severe: 53250, extreme: 71000 },
+  20: { total: 490000, low: 36800, moderate: 49000, severe: 73500, extreme: 98000 },
 }
 
 // The threat bands, low→high. "trivial" has no treasure column (Table 5-3 starts
@@ -41,7 +41,6 @@ export const ENCOUNTER_BUDGET = {
   severe: { xp: 120, adjust: 30 },
   extreme: { xp: 160, adjust: 40 },
 }
-export const THREAT_BANDS = ['trivial', 'low', 'moderate', 'severe', 'extreme']
 
 // Table 10-2 — Creature XP by level relative to the party. Outside -4..+4 a
 // single creature is off-table; below -4 it's negligible (0), above +4 it's
@@ -66,15 +65,10 @@ export function treasureBudget(level, band, partySize = BASE_PARTY) {
   return Math.round((base * partySize) / BASE_PARTY)
 }
 
-// treasureTotalForLevel: the "Total Treasure per Level" (all encounters combined
-// for a level), scaled by party size. For the campaign/chapter rollups (Slice 5).
-export function treasureTotalForLevel(level, partySize = BASE_PARTY) {
-  const row = TREASURE_BY_LEVEL[clampLevel(level)]
-  return row ? Math.round((row.total * partySize) / BASE_PARTY) : null
-}
-
 // creatureXp: one creature's XP contribution. adjustment shifts its level by
-// elite (+1) / weak (-1) before comparing to the party level.
+// elite (+1) / weak (-1) before comparing to the party level. A null level
+// contributes 0 defensively — but callers that must *flag* an unreadable level
+// (see budget.js#encounterXp) check for it themselves; this 0 is not that signal.
 export function creatureXp(creatureLevel, partyLevel, adjustment = 'none') {
   if (creatureLevel == null) return 0
   const shift = adjustment === 'elite' ? 1 : adjustment === 'weak' ? -1 : 0
@@ -94,7 +88,10 @@ export function budgetFor(band, partySize = BASE_PARTY) {
 
 // encounterThreat: classify a total XP sum into a threat band for the party
 // size — the highest band whose scaled budget the sum reaches (trivial below Low).
+// An empty roster (0 XP) is always Trivial, even for small parties whose scaled
+// Low budget rounds to 0 or below.
 export function encounterThreat(xpSum, partySize = BASE_PARTY) {
+  if (xpSum <= 0) return 'trivial'
   for (const band of ['extreme', 'severe', 'moderate', 'low']) {
     if (xpSum >= budgetFor(band, partySize)) return band
   }
