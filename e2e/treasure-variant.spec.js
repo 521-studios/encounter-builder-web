@@ -36,11 +36,8 @@ test('treasure item version is locked in by selecting it and persists', async ({
   await expect(card.locator('.Monster__variants')).toHaveCount(0) // collapsed — list gone
   await expect(wrap.locator('.variant-hint')).toHaveCount(0)
 
-  const savePut = page.waitForResponse(
-    (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
-  )
-  await page.getByRole('button', { name: /^Save/ }).click()
-  expect((await savePut).ok()).toBeTruthy()
+  // Autosave persists the edits — wait for the indicator to settle before reload/assert.
+  await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
   // Reload, re-open — the Greater version is still locked in (collapsed), no prompt.
   await page.reload()

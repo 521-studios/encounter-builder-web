@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { login, trackApiErrors } from './helpers/login.js'
 
 // The end-to-end acceptance loop: sign in → pick a campaign → build an encounter
-// (monster search + stat block) → save → persist across reload → release.
+// (monster search + stat block) → autosave → persist across reload → release.
 // This is the spec form of the manual walkthrough that first validated the app.
 test('GM builds and releases an encounter end-to-end', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
@@ -34,14 +34,11 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   await expect(page.getByTestId('description-preview').locator('h1')).toHaveText('The Vault')
   await expect(page.getByTestId('description-preview').locator('strong')).toHaveText('giant')
 
-  // Save — wait for the PUT to actually land. Asserting toHaveCount(0) alone
-  // passes instantly (before the request settles), so the following reload
-  // could abort an in-flight save and mask a broken persist.
-  const savePut = page.waitForResponse(
-    (r) => r.request().method() === 'PUT' && /\/encounters\/[^/]+$/.test(r.url()),
-  )
-  await page.getByRole('button', { name: /^Save/ }).click()
-  expect((await savePut).ok(), 'save PUT should succeed').toBeTruthy()
+  // Autosave — wait for the status indicator to reach "Saved" before reloading.
+  // It flips to "Saved" only after the debounced PUT resolves with no pending
+  // edits, so this guarantees the save landed (a reload here can't abort it) and
+  // that it succeeded (a failed PUT shows "Save failed", not "Saved").
+  await expect(page.getByTestId('save-state')).toHaveText('Saved')
   await expect(page.locator('.editor .error[role="alert"]')).toHaveCount(0)
 
   // Reload and re-open the encounter — confirm the *monster* persisted, not just
