@@ -33,7 +33,7 @@ export default function TreasureRollup({
       >
         <span className="chapter-caret" aria-hidden="true">{collapsed ? '▸' : '▾'}</span> {title}
       </button>
-      {collapsed ? null : loadError ? (
+      {!collapsed && (loadError ? (
         // The encounter list itself failed to load — don't render an empty
         // rollup that reads as "no treasure" (a silent lie); say so and offer a retry.
         <p className="error budget-error" role="alert" data-testid="rollup-load-error">
@@ -84,7 +84,7 @@ export default function TreasureRollup({
             <p className="muted budget-flags">* value is a floor (some items need manual pricing or failed to load).</p>
           )}
         </>
-      )}
+      ))}
       {!collapsed && loading && <p className="muted">Loading entries…</p>}
       {!collapsed && failedCount > 0 && (
         <p className="error budget-error" role="alert">

@@ -160,11 +160,29 @@ test('rollupByChapter: one row per chapter with XP/treasure summed, + a trailing
   assert.deepEqual(s.rows.map((r) => r.name), ['One', 'Two', 'Unsorted'])
   assert.equal(s.rows[0].xp, 120) // c1: 3 PL creatures
   assert.equal(s.rows[0].cp, 1500) // c1: 10 + 5 gp
+  assert.equal(s.rows[0].targetCp, 200 * 100) // c1's Severe encounter → L5 severe = 200 gp
   assert.equal(s.rows[1].xp, 40) // c2: 1 PL creature
+  assert.equal(s.rows[1].targetCp, 0) // c2 is Trivial (no target)
   assert.equal(s.rows[2].name, 'Unsorted')
   assert.equal(s.rows[2].cp, 700) // the dangling-chapter encounter's 7 gp
   assert.equal(s.totalXp, 160) // 120 + 40
   assert.equal(s.totalCp, 2200) // 1500 + 0 + 700
+  assert.equal(s.totalTargetCp, 200 * 100) // summed across chapters
+})
+
+test('rollupByChapter propagates the incomplete/floor flag per chapter', () => {
+  const creatures = { 'M:5': { stat_block: { creature_type: { level: 5 } } } }
+  const entryOf = (id) => creatures[id] || null // an unknown ref never resolves
+  const partyFor = () => ({ level: 5, size: 4 })
+  const chapters = [{ id: 'c1', name: 'Broken' }, { id: 'c2', name: 'Clean' }]
+  const encs = [
+    { id: 'e1', name: 'A', chapter_id: 'c1', monsters: [{ ref: { game_id: 'M:?' }, count: 1 }], treasure: [], currency: {} }, // unresolved monster
+    { id: 'e2', name: 'B', chapter_id: 'c2', monsters: [{ ref: { game_id: 'M:5' }, count: 1 }], treasure: [], currency: { gp: 5 } }, // resolves
+  ]
+  const s = rollupByChapter(chapters, encs, entryOf, partyFor)
+  assert.equal(s.rows[0].incomplete, true) // Broken chapter has an unresolved ref → floor
+  assert.equal(s.rows[1].incomplete, false) // Clean chapter fully resolves
+  assert.equal(s.anyIncomplete, true)
 })
 
 test('rollupByChapter: no Unsorted row when every encounter is in a chapter; empty is tolerated', () => {
