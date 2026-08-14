@@ -27,7 +27,7 @@ test('treasure: pick an item with ItemSearch, render ItemCard, persist', async (
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
   await page.reload()
-  await page.locator('button.campaign').first().click()
+  await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
   await page.locator('button.encounter', { hasText: name }).click()
   await expect(page.locator('.treasure-line-wrap .itemcard .Monster__name')).toHaveText(itemName)
 

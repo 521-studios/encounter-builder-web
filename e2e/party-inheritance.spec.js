@@ -48,7 +48,7 @@ test('party level/size inherits campaign -> chapter -> encounter with per-layer 
 
   // --- Persistence: reload, re-open the encounter, the override sticks ---
   await page.reload()
-  await page.locator('button.campaign').first().click()
+  await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
   await page.locator('button.encounter', { hasText: encName }).first().click()
   await expect(page.locator('.editor')).toBeVisible()
   await expect(page.locator('.editor').getByLabel('party level')).toHaveValue('10')

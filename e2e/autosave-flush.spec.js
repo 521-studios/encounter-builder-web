@@ -30,7 +30,7 @@ test('autosave flushes a pending edit when the editor closes (no explicit save)'
   // Reload and re-open — the description persisted despite never clicking save
   // and never waiting for the indicator.
   await page.reload()
-  await page.locator('button.campaign').first().click()
+  await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
   const encounterBtn = page.locator('button.encounter', { hasText: name })
   await expect(encounterBtn).toBeVisible()
   await encounterBtn.click()

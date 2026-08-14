@@ -55,7 +55,7 @@ test('apply a template to a monster: highlights, persists, and re-derives on rel
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
   await page.reload()
-  await page.locator('button.campaign').first().click()
+  await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
   await page.locator('button.encounter', { hasText: name }).click()
   await page.getByRole('button', { name: 'stat block' }).first().click()
   const block2 = page.locator('.monster-view .statblock')

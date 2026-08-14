@@ -43,7 +43,7 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   // Reload and re-open the encounter — confirm the *monster* persisted, not just
   // the name (a silently-failed save would still show the name in the list).
   await page.reload()
-  await page.locator('button.campaign').first().click()
+  await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
   const encounterBtn = page.locator('button.encounter', { hasText: name })
   await expect(encounterBtn).toBeVisible()
   await encounterBtn.click()
