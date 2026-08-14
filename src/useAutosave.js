@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
+// The autosave indicator's label for each state — shared by the detail pages.
+export const SAVE_LABEL = { saving: 'Saving…', unsaved: 'Unsaved…', error: 'Save failed', saved: 'Saved' }
+
 // Persist-on-change scheduler: the app has no Save button — an edit is scheduled
 // via schedule(value) and committed by save(value) after `delay` ms of quiet.
 // Load doesn't schedule, so the just-fetched state is never re-saved. Overlapping
@@ -24,7 +27,10 @@ export function useAutosave(save, delay = 800) {
         await saveRef.current(v)
       }
       setState('saved')
-    } catch {
+    } catch (err) {
+      // Keep a trace — a bare 'error' state hides which write failed (an expired
+      // token vs a validation reject), unlike the other writes that surface errorMessage.
+      console.error('autosave failed:', err)
       setState('error')
     } finally {
       savingRef.current = false
@@ -43,9 +49,11 @@ export function useAutosave(save, delay = 800) {
     return () => {
       if (timer.current) clearTimeout(timer.current)
       if (!savingRef.current && pendingRef.current !== undefined) {
-        // Fire-and-forget — the component is gone. Swallow a reject (e.g. the
-        // record was just deleted) so it isn't an unhandled rejection.
-        Promise.resolve().then(() => saveRef.current(pendingRef.current)).catch(() => {})
+        // Fire-and-forget — the component is gone. Log a reject (e.g. the record
+        // was just deleted) so it isn't a silent unhandled rejection.
+        Promise.resolve()
+          .then(() => saveRef.current(pendingRef.current))
+          .catch((err) => console.warn('autosave flush-on-unmount failed:', err))
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

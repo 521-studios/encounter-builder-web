@@ -4,11 +4,9 @@ import { chapters as chaptersApi } from '../api/chapters.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { errorMessage } from '../api/errors.js'
 import { resolveParty, partyFields } from '../party.js'
-import { useAutosave } from '../useAutosave.js'
+import { useAutosave, SAVE_LABEL } from '../useAutosave.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
-
-const SAVE_LABEL = { saving: 'Saving…', unsaved: 'Unsaved…', error: 'Save failed', saved: 'Saved' }
 
 // Chapter detail: the chapter's name + expected-party override, and rename/delete.
 // Edits persist on change (no Save button); party fields inherit from campaign

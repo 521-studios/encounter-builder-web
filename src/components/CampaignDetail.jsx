@@ -5,11 +5,9 @@ import { encounters as encountersApi } from '../api/encounters.js'
 import { errorMessage } from '../api/errors.js'
 import { PARTY_DEFAULT, partyFields, resolveParty } from '../party.js'
 import { treasureTotalForLevel } from '../pf2eRules.js'
-import { useAutosave } from '../useAutosave.js'
+import { useAutosave, SAVE_LABEL } from '../useAutosave.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
-
-const SAVE_LABEL = { saving: 'Saving…', unsaved: 'Unsaved…', error: 'Save failed', saved: 'Saved' }
 
 // Campaign detail: the base of the expected-party inheritance chain. Set the
 // campaign-wide default party level + PC count (persisted on change, no Save

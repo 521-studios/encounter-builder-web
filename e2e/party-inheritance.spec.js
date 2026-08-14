@@ -69,6 +69,10 @@ test('party level/size inherits campaign -> chapter -> encounter with per-layer 
   await chapterDetail2.getByLabel('party level').fill('')
   await expect(chapterDetail2.getByTestId('chapter-saved')).toHaveText('Saved')
   await page.locator('button.encounter', { hasText: encName }).first().click()
+  // Re-opening re-fetches the encounter: its own level must still be cleared
+  // (value ''), proving the encounter-level clear-to-inherit persisted — the
+  // placeholder alone resolves from chapter/campaign regardless of the value.
+  await expect(page.locator('.editor').getByLabel('party level')).toHaveValue('')
   await expect(page.locator('.editor').getByLabel('party level')).toHaveAttribute('placeholder', '5')
 
   // --- Cleanup: delete the encounter + chapter, and clear the campaign default ---
