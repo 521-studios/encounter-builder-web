@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter } from './helpers/login.js'
 
 // Regression guard for the buildInput chapter_id echo: a chapter-assigned
 // encounter must NOT jump to Unsorted when saved. Without the echo, the PUT
@@ -8,27 +8,23 @@ import { login, trackApiErrors } from './helpers/login.js'
 test('a chapter-assigned encounter stays in its chapter after save+reload', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
-  await expect(page.getByTestId('chapter-tree')).toBeVisible()
+  await openFirstCampaign(page)
 
   const stamp = Date.now()
   const chapterName = `Assign Ch ${stamp}`
   const encName = `Assigned ${stamp}`
 
-  // Chapter, then an encounter created UNDER it (per-chapter form sets chapter_id).
-  await page.getByTestId('add-chapter').locator('input').fill(chapterName)
-  await page.getByTestId('add-chapter').locator('button').click()
+  // Chapter, then an encounter created UNDER it (per-chapter "+ encounter" sets chapter_id).
+  await createChapter(page, chapterName)
   const group = page.locator('.chapter-group', {
     has: page.locator('.chapter-name', { hasText: chapterName }),
   })
   await expect(group).toBeVisible()
-  await group.locator('.new-encounter input').fill(encName)
-  await group.locator('.new-encounter button').click()
-  await expect(page.locator('.editor')).toBeVisible()
+  await createEncounter(page, encName, group)
 
-  // Trigger an autosave with a harmless edit (not the name — assertions match on
-  // it). The autosave PUT echoes chapter_id via buildInput, which is the exact
-  // regression under test. Wait for the indicator to settle before reload.
+  // Trigger another autosave with a harmless edit. The autosave PUT echoes
+  // chapter_id via buildInput, which is the exact regression under test. Wait for
+  // the indicator to settle before reload.
   await page.locator('.description-input').fill(`assigned ${stamp}`)
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
@@ -45,9 +41,8 @@ test('a chapter-assigned encounter stays in its chapter after save+reload', asyn
   await expect(unsorted.locator('button.encounter', { hasText: encName })).toHaveCount(0)
 
   // Cleanup.
-  await groupAfter.getByRole('button', { name: `Delete ${encName}` }).click()
-  page.once('dialog', (d) => d.accept())
-  await groupAfter.getByRole('button', { name: `Delete chapter ${chapterName}` }).click()
+  await deleteEncounter(page, encName)
+  await deleteChapter(page, chapterName)
   await expect(groupAfter).toHaveCount(0)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])

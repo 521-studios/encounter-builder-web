@@ -5,22 +5,27 @@ import { encounters as encountersApi } from '../api/encounters.js'
 import { errorMessage } from '../api/errors.js'
 import { PARTY_DEFAULT, partyFields, resolveParty } from '../party.js'
 import { treasureTotalForLevel } from '../pf2eRules.js'
+import { useAutosave, SAVE_LABEL } from '../useAutosave.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
 
 // Campaign detail: the base of the expected-party inheritance chain. Set the
-// campaign-wide default party level + PC count; chapters and encounters inherit
-// these unless they override. Empty fields fall back to the app default.
+// campaign-wide default party level + PC count (persisted on change, no Save
+// button); chapters and encounters inherit these unless they override. Empty
+// fields fall back to the app default.
 export default function CampaignDetail({ campaign, onClose, onSaved }) {
   const [value, setValue] = useState(null) // { party_level, party_size } | null while loading
   const [allChapters, setAllChapters] = useState([]) // for per-encounter inheritance in the rollup
   const [allEncounters, setAllEncounters] = useState([]) // every encounter (campaign-wide rollup)
   const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [showRollup, setShowRollup] = useState(false) // rollup fetches on demand — keep page load light
   const [rollupError, setRollupError] = useState(false) // chapters/encounters list failed — rollup can't be trusted
   const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the rollup's lists on retry
+
+  const { state: saveState, schedule } = useAutosave(async (v) => {
+    const s = await settingsApi.put(campaign.id, partyFields(v))
+    onSaved && onSaved(s)
+  })
 
   useEffect(() => {
     let alive = true
@@ -41,19 +46,9 @@ export default function CampaignDetail({ campaign, onClose, onSaved }) {
     }
   }, [campaign.id, reloadKey])
 
-  async function save() {
-    setSaving(true)
-    setError(null)
-    try {
-      const s = await settingsApi.put(campaign.id, partyFields(value))
-      setValue({ party_level: s.party_level ?? null, party_size: s.party_size ?? null })
-      setSaved(true)
-      onSaved && onSaved()
-    } catch (e) {
-      setError(errorMessage(e))
-    } finally {
-      setSaving(false)
-    }
+  function commit(next) {
+    setValue(next)
+    schedule(next)
   }
 
   if (error && !value) return <p className="error" role="alert">{error}</p>
@@ -68,7 +63,8 @@ export default function CampaignDetail({ campaign, onClose, onSaved }) {
   return (
     <section className="detail campaign-detail" data-testid="campaign-detail">
       <div className="detail-head">
-        <h2>{campaign.name} — settings</h2>
+        <h2>{campaign.name}</h2>
+        <span className="save-state muted" data-testid="settings-saved">{SAVE_LABEL[saveState]}</span>
         <button type="button" className="link" onClick={onClose}>Close</button>
       </div>
       <p className="muted">
@@ -79,18 +75,8 @@ export default function CampaignDetail({ campaign, onClose, onSaved }) {
       <PartyFields
         value={value}
         inherited={inherited}
-        disabled={saving}
-        onChange={(next) => {
-          setValue(next)
-          setSaved(false)
-        }}
+        onChange={commit}
       />
-      <div className="actions">
-        <button className="primary" onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        {saved && <span className="save-state muted" data-testid="settings-saved">Saved</span>}
-      </div>
 
       <div className="rollup-toggle">
         <button type="button" className="link" aria-expanded={showRollup} onClick={() => setShowRollup((v) => !v)}>

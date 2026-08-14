@@ -15,7 +15,7 @@ import TreasureBudget from './TreasureBudget.jsx'
 
 const AUTOSAVE_MS = 800
 
-export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved }) {
+export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted }) {
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
   const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
@@ -172,6 +172,17 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
   const saveLabel = { saving: 'Saving…', unsaved: 'Unsaved changes…', error: 'Save failed', saved: 'Saved' }[saveState]
 
+  async function del() {
+    if (!window.confirm(`Delete encounter "${enc.name || 'Untitled encounter'}"? This can't be undone.`)) return
+    dirtyRef.current = false // cancel any pending autosave; the encounter is going away
+    try {
+      await encounters.remove(campaignId, encounterId)
+      onDeleted && onDeleted()
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+
   return (
     <section className="editor">
       <div className="editor-head">
@@ -190,6 +201,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           {BAND_LABELS[budget.threat]} {effectiveParty.level}
         </span>
         <span className="status">{enc.status}</span>
+        <button type="button" className="link danger" aria-label={`Delete ${enc.name || 'Untitled encounter'}`} onClick={del}>Delete</button>
         <button type="button" className="link" onClick={onClose}>Close</button>
       </div>
 

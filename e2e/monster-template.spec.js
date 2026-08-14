@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
 
 // Applying a pfsrd2 template to a monster via the library TemplatePicker:
 // highlights the changed values, stores the derived ref, and — crucially —
@@ -8,12 +8,10 @@ import { login, trackApiErrors } from './helpers/login.js'
 test('apply a template to a monster: highlights, persists, and re-derives on reload', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
+  await openFirstCampaign(page)
 
   const name = `Tpl ${Date.now()}`
-  await page.getByTestId('new-encounter').locator('input').fill(name)
-  await page.getByTestId('new-encounter').locator('button').click()
-  await expect(page.locator('.editor')).toBeVisible()
+  await createEncounter(page, name)
 
   // Add a monster and open its stat block (which hosts the TemplatePicker).
   await page.getByRole('button', { name: '+ monster' }).click()
@@ -55,9 +53,7 @@ test('apply a template to a monster: highlights, persists, and re-derives on rel
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()
-  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
-  await row.getByRole('button', { name: `Delete ${name}` }).click()
-  await expect(row).toHaveCount(0)
+  await deleteEncounter(page, name)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
 })
