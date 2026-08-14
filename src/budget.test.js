@@ -69,6 +69,28 @@ test('encounterXp sums creature XP vs party level, honoring count + elite/weak',
   assert.equal(unknown.length, 0)
 })
 
+test('encounterXp counts a templated monster at its resolved ref.json level, not the base', () => {
+  // hq4t/21ro shared root cause: elite/weak is applied via the TemplatePicker, which
+  // writes a derived ref.json (resolved creature) — NOT the legacy adjustment field.
+  // The budget must read that resolved level. Elite goblin -> Creature 2, vs PL 1 =
+  // PL+1 = 60 XP (base goblin Creature 1 would be PL+0 = 40).
+  const { xp, unknown } = encounterXp(
+    [
+      {
+        ref: {
+          base: { game_id: 'Monsters:goblin' },
+          modifications: [{ template_game_id: 'elite', template_name: 'Elite' }],
+          json: { stat_block: { creature_type: { level: 2 } } },
+        },
+        count: 1,
+      },
+    ],
+    1,
+    entryOf,
+  )
+  assert.equal(xp, 60)
+  assert.equal(unknown.length, 0)
+})
 test('encounterXp flags monsters whose level cannot be read', () => {
   const { xp, unknown } = encounterXp([{ ref: { game_id: 'Monsters:missing' }, count: 1 }], 5, entryOf)
   assert.equal(xp, 0)

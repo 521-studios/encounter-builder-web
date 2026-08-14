@@ -24,6 +24,45 @@ test('creatureHeader shifts level for elite (+1) and weak (-1)', () => {
   assert.equal(creatureHeader(entry, { adjustment: 'weak' }).level, -2)
 })
 
+test('creatureHeader reads a derived ref.json (applied templates), not the base entry', () => {
+  // Elite-templated slurk: the resolved snapshot is Creature 3 with Perception +8;
+  // the header must reflect that, not the base entry's Creature 2 / +6.
+  const monster = {
+    ref: {
+      base: { game_id: 'Monsters:315' },
+      modifications: [{ template_game_id: 'elite', template_name: 'Elite' }],
+      json: {
+        name: 'Slurk',
+        stat_block: {
+          creature_type: { level: 3 },
+          sources: [{ name: 'Monster Core', page: 315 }],
+          senses: { perception: { value: 8 } },
+        },
+      },
+    },
+  }
+  const h = creatureHeader(entry, monster) // base `entry` is Creature -1; ref.json wins
+  assert.equal(h.level, 3)
+  assert.equal(h.source, 'Monster Core 315')
+  assert.equal(h.initiative, 'Perception +8')
+})
+
+test('creatureHeader ignores the legacy adjustment shift when a resolved ref.json is present', () => {
+  // ref.json already bakes in every template, so no manual elite/weak shift on top.
+  const monster = {
+    adjustment: 'elite',
+    ref: { json: { stat_block: { creature_type: { level: 3 } } } },
+  }
+  assert.equal(creatureHeader(entry, monster).level, 3)
+})
+
+test('creatureHeader tolerates a bare-creature ref.json (no stat_block wrapper)', () => {
+  const monster = { ref: { json: { creature_type: { level: 4 }, senses: { perception: { value: 2 } } } } }
+  const h = creatureHeader(null, monster)
+  assert.equal(h.level, 4)
+  assert.equal(h.initiative, 'Perception +2')
+})
+
 test('creatureHeader signs a negative Perception initiative', () => {
   const e = { stat_block: { senses: { perception: { value: -1 } } } }
   assert.equal(creatureHeader(e).initiative, 'Perception -1')
