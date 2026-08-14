@@ -91,6 +91,14 @@ test('encounterXp counts a templated monster at its resolved ref.json level, not
   assert.equal(xp, 60)
   assert.equal(unknown.length, 0)
 })
+test('encounterXp flags a templated monster whose resolved ref.json has no readable level', () => {
+  // The resolved branch must route a null-level snapshot to `unknown` (floors the
+  // budget + drives the UI warning), same as the pristine entry-not-loaded path — not
+  // silently count it as 0.
+  const { xp, unknown } = encounterXp([{ ref: { json: { stat_block: {} } }, count: 1 }], 1, entryOf)
+  assert.equal(xp, 0)
+  assert.equal(unknown.length, 1)
+})
 test('encounterXp flags monsters whose level cannot be read', () => {
   const { xp, unknown } = encounterXp([{ ref: { game_id: 'Monsters:missing' }, count: 1 }], 5, entryOf)
   assert.equal(xp, 0)

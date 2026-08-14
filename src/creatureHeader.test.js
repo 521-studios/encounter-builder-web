@@ -63,6 +63,27 @@ test('creatureHeader tolerates a bare-creature ref.json (no stat_block wrapper)'
   assert.equal(h.initiative, 'Perception +2')
 })
 
+test('creatureHeader falls back to the base entry when a ref.json snapshot yields no readable level', () => {
+  // A partial/stale resolved snapshot (present but no creature_type/level) is unusable
+  // — degrade to the loaded base entry instead of blanking the header, matching how
+  // budget.js routes a null-level monster to `unknown`.
+  const monster = {
+    ref: { json: { sources: [{ name: 'Stale', page: 1 }], senses: { perception: { value: 9 } } } },
+  }
+  const h = creatureHeader(entry, monster) // base entry: Goblin Warrior, Cr -1, Bestiary 192, Perception +5
+  assert.equal(h.level, -1)
+  assert.equal(h.source, 'Bestiary 192')
+  assert.equal(h.initiative, 'Perception +5')
+})
+
+test('creatureHeader returns nulls when a ref.json snapshot is unusable and no base entry loaded', () => {
+  assert.deepEqual(creatureHeader(null, { ref: { json: { name: 'partial' } } }), {
+    level: null,
+    source: null,
+    initiative: null,
+  })
+})
+
 test('creatureHeader signs a negative Perception initiative', () => {
   const e = { stat_block: { senses: { perception: { value: -1 } } } }
   assert.equal(creatureHeader(e).initiative, 'Perception -1')
