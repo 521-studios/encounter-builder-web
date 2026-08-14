@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter } from './helpers/login.js'
 
-// Slice 5: chapter + campaign treasure rollups. Build a chapter with two coin
-// encounters and confirm both the chapter and campaign detail pages sum the loot
-// and show a per-encounter breakdown.
-test('chapter + campaign treasure rollups sum the encounters loot', async ({ page, baseURL }) => {
+// Chapter + campaign treasure rollups (always visible, collapse-by-title). Build a
+// chapter with two coin encounters and confirm the chapter detail sums the loot per
+// encounter, and the campaign summary rolls up BY CHAPTER (one row per chapter).
+test('chapter treasure + campaign-by-chapter summary sum the encounters loot', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
   await openFirstCampaign(page)
@@ -27,22 +27,26 @@ test('chapter + campaign treasure rollups sum the encounters loot', async ({ pag
     await expect(group.locator('button.encounter', { hasText: name })).toBeVisible()
   }
 
-  // Chapter rollup: 30 + 20 = 50 gp total across the two encounters. The rollup
-  // fetches on demand, so expand it first.
+  // Chapter rollup: 30 + 20 = 50 gp total across the two encounters, one row each.
+  // It's always visible now (no Show toggle).
   await page.getByRole('button', { name: `Open chapter ${chapterName}` }).click()
-  await page.getByTestId('chapter-detail').getByRole('button', { name: /Show chapter treasure/ }).click()
   const chapterRollup = page.getByTestId('chapter-detail').getByTestId('treasure-rollup')
   await expect(chapterRollup).toBeVisible()
   await expect(chapterRollup.getByTestId('rollup-total')).toHaveText('50 gp')
-  await expect(chapterRollup.locator('.rollup-table tbody tr')).toHaveCount(2)
+  await expect(chapterRollup.locator('.rollup-table tbody tr')).toHaveCount(2) // per-encounter
+  // Collapse-by-title: clicking the title hides the body; clicking again restores it.
+  await chapterRollup.getByRole('button', { name: /Chapter treasure/ }).click()
+  await expect(chapterRollup.getByTestId('rollup-total')).toHaveCount(0)
+  await chapterRollup.getByRole('button', { name: /Chapter treasure/ }).click()
+  await expect(chapterRollup.getByTestId('rollup-total')).toBeVisible()
   await page.getByRole('button', { name: /^Close/ }).click()
 
-  // Campaign rollup includes these two (≥ 50 gp), with a reference figure.
+  // Campaign summary rolls up BY CHAPTER: our chapter is one row summing its 50 gp
+  // (not the individual encounters), with a reference figure.
   await page.getByTestId('campaign-settings').click()
-  await page.getByTestId('campaign-detail').getByRole('button', { name: /Show campaign treasure/ }).click()
   const campaignRollup = page.getByTestId('campaign-detail').getByTestId('treasure-rollup')
   await expect(campaignRollup).toBeVisible()
-  await expect(campaignRollup.getByTestId('rollup-total')).toContainText('gp')
+  await expect(campaignRollup.getByRole('row', { name: new RegExp(chapterName) })).toContainText('50 gp')
   await expect(campaignRollup.getByText(/a full level.s treasure is/)).toBeVisible()
   await page.getByRole('button', { name: /^Close/ }).click()
 

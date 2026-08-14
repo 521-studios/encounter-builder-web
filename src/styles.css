@@ -350,6 +350,9 @@ button.chapter-name:hover { color: var(--gold); }
 /* Treasure/difficulty budget panel + Table 5-3 chart (Slice 4). */
 .treasure-budget { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.5rem; }
 .budget-title { margin: 0; font-size: 1rem; }
+/* Rollup/summary title doubles as the collapse toggle (click the title). */
+.summary-toggle { display: flex; align-items: center; gap: 0.3rem; width: 100%; border: none; background: none; padding: 0.15rem 0; text-align: left; cursor: pointer; font-weight: 700; }
+.summary-toggle:hover { color: var(--gold); }
 .budget-summary { margin: 0; font-size: 0.95rem; }
 .chart-scroll { overflow-x: auto; }
 .treasure-chart { border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
@@ -369,7 +372,6 @@ button.chapter-name:hover { color: var(--gold); }
 .difficulty-badge--severe, .difficulty-badge--extreme { background: color-mix(in srgb, var(--danger) 28%, transparent); }
 
 /* Chapter/campaign treasure rollup (Slice 5). */
-.rollup-toggle { margin-top: 0.75rem; }
 .treasure-rollup { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.5rem; margin-top: 0.5rem; }
 .rollup-table { width: 100%; }
 .rollup-table td, .rollup-table th { text-align: left; }
