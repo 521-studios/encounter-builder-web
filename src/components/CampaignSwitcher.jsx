@@ -1,28 +1,31 @@
-// The sidebar's campaign switcher: shows the active campaign's name; clicking it
-// returns to the campaign picker to switch. Rendered as the sidebar's <h2> so the
-// heading outline stays h1 (app) → h2 (campaign) → h3 (Encounters). Below it, a
-// link opens the campaign detail page (expected-party defaults).
+// The sidebar's campaign header. Clicking the campaign NAME opens its detail
+// (party defaults + treasure summary) — direct manipulation, no separate
+// "settings" link. A distinct "Switch ▾" control returns to the campaign picker.
+// Rendered as the sidebar's <h2> so the heading outline stays h1 (app) → h2
+// (campaign) → h3 (Encounters).
 export default function CampaignSwitcher({ campaign, onSwitch, onSettings }) {
   return (
     <div className="campaign-switcher-block">
       <h2 className="campaign-switcher-heading">
         <button
-          className="campaign-switcher"
-          data-testid="campaign-switcher"
-          onClick={onSwitch}
-          aria-label={`Switch campaign (current: ${campaign.name})`}
+          type="button"
+          className="campaign-name-open"
+          data-testid="campaign-settings"
+          onClick={onSettings}
+          aria-label={`Open campaign ${campaign.name}`}
         >
-          <span className="campaign-switcher-name">{campaign.name}</span>
-          <span className="campaign-switcher-hint">
-            Switch <span aria-hidden="true">▾</span>
-          </span>
+          {campaign.name}
         </button>
       </h2>
-      {onSettings && (
-        <button type="button" className="link campaign-settings-link" data-testid="campaign-settings" onClick={onSettings}>
-          ⚙ Campaign settings
-        </button>
-      )}
+      <button
+        type="button"
+        className="link campaign-switch"
+        data-testid="campaign-switcher"
+        onClick={onSwitch}
+        aria-label={`Switch campaign (current: ${campaign.name})`}
+      >
+        Switch <span aria-hidden="true">▾</span>
+      </button>
     </div>
   )
 }

@@ -1,17 +1,15 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
 
 // Treasure via the library: pick an item with ItemSearch (no more raw game_ids)
 // and render it with ItemCard; confirm it persists across reload.
 test('treasure: pick an item with ItemSearch, render ItemCard, persist', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
+  await openFirstCampaign(page)
 
   const name = `Treasure ${Date.now()}`
-  await page.getByTestId('new-encounter').locator('input').fill(name)
-  await page.getByTestId('new-encounter').locator('button').click()
-  await expect(page.locator('.editor')).toBeVisible()
+  await createEncounter(page, name)
 
   // Add a treasure line and pick an item by name.
   await page.getByRole('button', { name: '+ treasure' }).click()
@@ -35,9 +33,7 @@ test('treasure: pick an item with ItemSearch, render ItemCard, persist', async (
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()
-  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
-  await row.getByRole('button', { name: `Delete ${name}` }).click()
-  await expect(row).toHaveCount(0)
+  await deleteEncounter(page, name)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
 })

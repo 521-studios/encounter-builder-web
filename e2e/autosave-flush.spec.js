@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
 
 // Autosave must persist an edit even when the GM navigates away WITHOUT waiting
 // for the "Saved" indicator: closing the editor unmounts it, and the flush-on-
@@ -8,16 +8,13 @@ import { login, trackApiErrors } from './helpers/login.js'
 test('autosave flushes a pending edit when the editor closes (no explicit save)', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
-  await expect(page.getByTestId('chapter-tree')).toBeVisible()
+  await openFirstCampaign(page)
 
   const stamp = Date.now()
   const name = `Flush ${stamp}`
   const desc = `flushed at ${stamp}`
 
-  await page.getByTestId('new-encounter').locator('input').fill(name)
-  await page.getByTestId('new-encounter').locator('button').click()
-  await expect(page.locator('.editor')).toBeVisible()
+  await createEncounter(page, name)
 
   // Edit, then immediately Close — without waiting for "Saved". The flush on
   // unmount persists the pending edit; waitForResponse guards that the PUT lands
@@ -41,9 +38,7 @@ test('autosave flushes a pending edit when the editor closes (no explicit save)'
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()
-  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
-  await row.getByRole('button', { name: `Delete ${name}` }).click()
-  await expect(row).toHaveCount(0)
+  await deleteEncounter(page, name)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
 })

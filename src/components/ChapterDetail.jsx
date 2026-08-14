@@ -4,15 +4,17 @@ import { chapters as chaptersApi } from '../api/chapters.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { errorMessage } from '../api/errors.js'
 import { resolveParty, partyFields } from '../party.js'
+import { useAutosave, SAVE_LABEL } from '../useAutosave.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
 
-// Chapter detail: the chapter's expected-party override. Inherits from campaign
-// settings when a field is left empty; encounters in the chapter inherit from
-// here. Saving round-trips name + order (chapter update full-replaces the party
-// fields, so an empty field clears the override back to inherit).
-export default function ChapterDetail({ campaignId, chapter, onClose, onSaved }) {
+// Chapter detail: the chapter's name + expected-party override, and rename/delete.
+// Edits persist on change (no Save button); party fields inherit from campaign
+// settings when left empty. Chapter update full-replaces name + order + party
+// fields, so every save round-trips them via the shared clear-encoding.
+export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted }) {
   const [value, setValue] = useState({
+    name: chapter.name || '',
     party_level: chapter.party_level ?? null,
     party_size: chapter.party_size ?? null,
   })
@@ -21,10 +23,17 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
   const [chapterEncounters, setChapterEncounters] = useState([]) // this chapter's encounters (for the rollup)
   const [encountersError, setEncountersError] = useState(false) // encounters list failed to load (rollup is unreliable)
   const [error, setError] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [showRollup, setShowRollup] = useState(false) // rollup fetches on demand — keep page load light
   const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the encounters list on retry
+
+  const { state: saveState, schedule } = useAutosave(async (v) => {
+    const updated = await chaptersApi.update(campaignId, chapter.id, {
+      name: v.name.trim(),
+      order: chapter.order,
+      ...partyFields(v),
+    })
+    onSaved && onSaved(updated)
+  })
 
   useEffect(() => {
     let alive = true
@@ -53,22 +62,20 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
     }
   }, [campaignId, chapter.id, reloadKey])
 
-  async function save() {
-    setSaving(true)
-    setError(null)
+  // Persist on change — but never PUT an empty name (the API requires one); the
+  // field then shows a "name is required" hint until it's filled back in.
+  function commit(next) {
+    setValue(next)
+    if (next.name.trim()) schedule(next)
+  }
+
+  async function del() {
+    if (!window.confirm(`Delete chapter "${value.name.trim() || 'Untitled chapter'}"? Its encounters move to Unsorted.`)) return
     try {
-      const updated = await chaptersApi.update(campaignId, chapter.id, {
-        name: chapter.name,
-        order: chapter.order,
-        ...partyFields(value),
-      })
-      setValue({ party_level: updated.party_level ?? null, party_size: updated.party_size ?? null })
-      setSaved(true)
-      onSaved && onSaved(updated)
+      await chaptersApi.remove(campaignId, chapter.id)
+      onDeleted && onDeleted()
     } catch (e) {
       setError(errorMessage(e))
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -76,13 +83,23 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
 
   // An empty chapter field inherits from campaign settings (then app default).
   const inherited = resolveParty({ campaign: campaignSettings })
+  const nameMissing = value.name.trim() === ''
 
   return (
     <section className="detail chapter-detail" data-testid="chapter-detail">
       <div className="detail-head">
-        <h2>{chapter.name} — settings</h2>
+        <input
+          className="title-input"
+          aria-label="chapter name"
+          value={value.name}
+          autoFocus
+          onChange={(e) => commit({ ...value, name: e.target.value })}
+        />
+        <span className="save-state muted" data-testid="chapter-saved">{SAVE_LABEL[saveState]}</span>
+        <button type="button" className="link danger" aria-label={`Delete chapter ${value.name.trim() || 'Untitled chapter'}`} onClick={del}>Delete chapter</button>
         <button type="button" className="link" onClick={onClose}>Close</button>
       </div>
+      {nameMissing && <p className="error" role="alert">Name is required.</p>}
       <p className="muted">
         Expected party for this chapter. Its encounters inherit these unless they set their
         own; leave a field empty to inherit from the campaign.
@@ -92,18 +109,8 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved })
         value={value}
         inherited={inherited}
         inheritedError={settingsError}
-        disabled={saving}
-        onChange={(next) => {
-          setValue(next)
-          setSaved(false)
-        }}
+        onChange={(next) => commit({ ...value, ...next })}
       />
-      <div className="actions">
-        <button className="primary" onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-        {saved && <span className="save-state muted" data-testid="chapter-saved">Saved</span>}
-      </div>
 
       <div className="rollup-toggle">
         <button type="button" className="link" aria-expanded={showRollup} onClick={() => setShowRollup((v) => !v)}>

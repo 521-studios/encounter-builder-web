@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, createEncounter, deleteEncounter } from './helpers/login.js'
 
 // The end-to-end acceptance loop: sign in → pick a campaign → build an encounter
 // (monster search + stat block) → autosave → persist across reload → release.
@@ -14,11 +14,10 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   await campaigns.first().click()
   await expect(page.locator('[data-testid="chapter-tree"]')).toBeVisible()
 
-  // Create an (unsorted) encounter via the always-present bottom "+ encounter".
+  // Create an (unsorted) encounter via the always-present bottom "+ encounter"
+  // (creates an untitled encounter + opens the editor; we name it there).
   const name = `E2E ${Date.now()}`
-  await page.getByTestId('new-encounter').locator('input').fill(name)
-  await page.getByTestId('new-encounter').locator('button').click()
-  await expect(page.locator('.editor')).toBeVisible()
+  await createEncounter(page, name)
 
   // Add a monster via the library CreatureSearch and confirm the stat block renders.
   await page.getByRole('button', { name: '+ monster' }).click()
@@ -67,7 +66,5 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   // end rather than afterEach: a failure earlier leaves one row, which is
   // acceptable on throwaway staging and keeps the failure's state inspectable.)
   await page.getByRole('button', { name: /^Close/ }).click()
-  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
-  await row.getByRole('button', { name: `Delete ${name}` }).click()
-  await expect(row).toHaveCount(0)
+  await deleteEncounter(page, name)
 })

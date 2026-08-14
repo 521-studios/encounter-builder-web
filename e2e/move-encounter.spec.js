@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter } from './helpers/login.js'
 
 // HTML5 drag-and-drop: fire the drag events with a shared DataTransfer. (Playwright's
 // mouse-based dragTo can't reliably re-initiate a second consecutive native drag;
@@ -15,8 +15,7 @@ async function dragEncounterTo(page, sourceRow, targetGroup) {
 test('drag an encounter between chapters and to Unsorted', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
-  await expect(page.getByTestId('chapter-tree')).toBeVisible()
+  await openFirstCampaign(page)
 
   const stamp = Date.now()
   const chA = `Move A ${stamp}`
@@ -29,12 +28,10 @@ test('drag an encounter between chapters and to Unsorted', async ({ page, baseUR
 
   // Two chapters (wait for each to land before the next), encounter under A.
   for (const ch of [chA, chB]) {
-    await page.getByTestId('add-chapter').locator('input').fill(ch)
-    await page.getByTestId('add-chapter').locator('button').click()
+    await createChapter(page, ch)
     await expect(groupOf(ch)).toBeVisible()
   }
-  await groupOf(chA).locator('.new-encounter input').fill(enc)
-  await groupOf(chA).locator('.new-encounter button').click()
+  await createEncounter(page, enc, groupOf(chA))
   await expect(encRow(chA)).toBeVisible()
 
   // Drag A -> B.
@@ -53,12 +50,9 @@ test('drag an encounter between chapters and to Unsorted', async ({ page, baseUR
   await expect(groupOf('Unsorted').locator('button.encounter', { hasText: enc })).toBeVisible()
 
   // Cleanup.
-  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: enc }) })
-  await row.getByRole('button', { name: `Delete ${enc}` }).click()
-  await expect(row).toHaveCount(0)
+  await deleteEncounter(page, enc)
   for (const ch of [chA, chB]) {
-    page.once('dialog', (d) => d.accept())
-    await groupOf(ch).getByRole('button', { name: `Delete chapter ${ch}` }).click()
+    await deleteChapter(page, ch)
     await expect(groupOf(ch)).toHaveCount(0)
   }
 
@@ -69,37 +63,29 @@ test('drag an encounter between chapters and to Unsorted', async ({ page, baseUR
 test('move an encounter via the editor Chapter select (no mouse needed)', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
+  await openFirstCampaign(page)
   const stamp = Date.now()
   const ch = `Ed Ch ${stamp}`
   const enc = `Ed Enc ${stamp}`
   const groupOf = (name) =>
     page.locator('.chapter-group', { has: page.locator('.chapter-name', { hasText: name }) })
 
-  await page.getByTestId('add-chapter').locator('input').fill(ch)
-  await page.getByTestId('add-chapter').locator('button').click()
+  await createChapter(page, ch)
   await expect(groupOf(ch)).toBeVisible()
 
   // Create an Unsorted encounter (opens the editor).
-  await page.getByTestId('new-encounter').locator('input').fill(enc)
-  await page.getByTestId('new-encounter').locator('button').click()
-  await expect(page.locator('.editor')).toBeVisible()
+  await createEncounter(page, enc)
 
-  // Change its Chapter in the editor, then save.
+  // Change its Chapter in the editor; autosave persists it.
   await page.locator('select[aria-label="chapter"]').selectOption({ label: ch })
-  // Autosave persists the edits — wait for the indicator to settle before reload/assert.
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
   // The sidebar tree now shows it under the chosen chapter.
   await expect(groupOf(ch).locator('button.encounter', { hasText: enc })).toBeVisible()
 
   // Cleanup.
-  await page.locator('button.encounter', { hasText: enc }).first().click() // ensure it's in the list
-  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: enc }) })
-  await row.getByRole('button', { name: `Delete ${enc}` }).click()
-  await expect(row).toHaveCount(0)
-  page.once('dialog', (d) => d.accept())
-  await groupOf(ch).getByRole('button', { name: `Delete chapter ${ch}` }).click()
+  await deleteEncounter(page, enc)
+  await deleteChapter(page, ch)
   await expect(groupOf(ch)).toHaveCount(0)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])

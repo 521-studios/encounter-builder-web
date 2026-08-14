@@ -95,6 +95,10 @@ export default function App() {
                   setReloadKey((k) => k + 1)
                 }}
                 onSaved={() => setReloadKey((k) => k + 1)}
+                onDeleted={() => {
+                  backToEmpty()
+                  setReloadKey((k) => k + 1)
+                }}
               />
             )}
             {view.kind === 'campaign' && (
@@ -114,6 +118,10 @@ export default function App() {
                   setReloadKey((k) => k + 1)
                 }}
                 onSaved={() => setReloadKey((k) => k + 1)}
+                onDeleted={() => {
+                  backToEmpty()
+                  setReloadKey((k) => k + 1)
+                }}
               />
             )}
             {view.kind === 'empty' && (

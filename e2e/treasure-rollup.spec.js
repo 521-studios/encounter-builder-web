@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter } from './helpers/login.js'
 
 // Slice 5: chapter + campaign treasure rollups. Build a chapter with two coin
 // encounters and confirm both the chapter and campaign detail pages sum the loot
@@ -7,8 +7,7 @@ import { login, trackApiErrors } from './helpers/login.js'
 test('chapter + campaign treasure rollups sum the encounters loot', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
-  await expect(page.getByTestId('chapter-tree')).toBeVisible()
+  await openFirstCampaign(page)
 
   const stamp = Date.now()
   const chapterName = `Rollup Ch ${stamp}`
@@ -16,27 +15,21 @@ test('chapter + campaign treasure rollups sum the encounters loot', async ({ pag
   const encB = `Loot B ${stamp}`
 
   // Chapter with two encounters, each carrying some coin treasure.
-  await page.getByTestId('add-chapter').locator('input').fill(chapterName)
-  await page.getByTestId('add-chapter').locator('button').click()
+  await createChapter(page, chapterName)
   const group = page.locator('.chapter-group', { has: page.locator('.chapter-name', { hasText: chapterName }) })
   await expect(group).toBeVisible()
 
   for (const [name, gp] of [[encA, '30'], [encB, '20']]) {
-    await group.locator('.new-encounter input').fill(name)
-    await group.locator('.new-encounter button').click()
-    await expect(page.locator('.editor')).toBeVisible()
+    await createEncounter(page, name, group)
     await page.locator('.editor .coins').getByLabel('gp', { exact: true }).fill(gp)
     await expect(page.getByTestId('save-state')).toHaveText('Saved')
     await page.getByRole('button', { name: /^Close/ }).click()
-    // Wait for the tree reload to settle (the new encounter shows in the group)
-    // before creating the next one — otherwise the reload can land mid-fill and
-    // wipe the next name, leaving the disabled "Add" button unclickable.
     await expect(group.locator('button.encounter', { hasText: name })).toBeVisible()
   }
 
   // Chapter rollup: 30 + 20 = 50 gp total across the two encounters. The rollup
   // fetches on demand, so expand it first.
-  await page.getByRole('button', { name: `Chapter settings ${chapterName}` }).click()
+  await page.getByRole('button', { name: `Open chapter ${chapterName}` }).click()
   await page.getByTestId('chapter-detail').getByRole('button', { name: /Show chapter treasure/ }).click()
   const chapterRollup = page.getByTestId('chapter-detail').getByTestId('treasure-rollup')
   await expect(chapterRollup).toBeVisible()
@@ -55,12 +48,9 @@ test('chapter + campaign treasure rollups sum the encounters loot', async ({ pag
 
   // Cleanup.
   for (const name of [encA, encB]) {
-    const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
-    await row.getByRole('button', { name: `Delete ${name}` }).click()
-    await expect(row).toHaveCount(0)
+    await deleteEncounter(page, name)
   }
-  page.once('dialog', (d) => d.accept())
-  await group.getByRole('button', { name: `Delete chapter ${chapterName}` }).click()
+  await deleteChapter(page, chapterName)
   await expect(group).toHaveCount(0)
 
   // The campaign rollup fetches every encounter's entries, incl. pre-existing

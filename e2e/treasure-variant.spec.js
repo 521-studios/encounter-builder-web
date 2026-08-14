@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
 
 // Pick an item with versions (a Striking rune). It reads like the book — every
 // version stacked, nothing selected until the GM locks one in — and the chosen
@@ -7,12 +7,10 @@ import { login, trackApiErrors } from './helpers/login.js'
 test('treasure item version is locked in by selecting it and persists', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
-  await page.locator('button.campaign').first().click()
+  await openFirstCampaign(page)
 
   const name = `TVar ${Date.now()}`
-  await page.getByTestId('new-encounter').locator('input').fill(name)
-  await page.getByTestId('new-encounter').locator('button').click()
-  await expect(page.locator('.editor')).toBeVisible()
+  await createEncounter(page, name)
 
   // Add a treasure line and pick the Striking rune (has versions).
   await page.getByRole('button', { name: '+ treasure' }).click()
@@ -51,9 +49,7 @@ test('treasure item version is locked in by selecting it and persists', async ({
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()
-  const row = page.locator('li', { has: page.locator('button.encounter', { hasText: name }) })
-  await row.getByRole('button', { name: `Delete ${name}` }).click()
-  await expect(row).toHaveCount(0)
+  await deleteEncounter(page, name)
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
 })
