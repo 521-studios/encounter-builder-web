@@ -76,6 +76,18 @@ test('creatureHeader falls back to the base entry when a ref.json snapshot yield
   assert.equal(h.initiative, 'Perception +5')
 })
 
+test('creatureHeader honors a level-0 resolved snapshot (0 is a valid level, not a falsy fallback)', () => {
+  // A weak template on a level-1 creature resolves to Creature 0. `snapLevel != null`
+  // must keep useSnapshot true — guards against a refactor to a truthiness check that
+  // would silently fall back to the base entry for level 0.
+  const monster = {
+    ref: { json: { stat_block: { creature_type: { level: 0 }, senses: { perception: { value: 3 } } } } },
+  }
+  const h = creatureHeader(entry, monster) // base entry is Cr -1; the snapshot's 0 wins
+  assert.equal(h.level, 0)
+  assert.equal(h.initiative, 'Perception +3')
+})
+
 test('creatureHeader returns nulls when a ref.json snapshot is unusable and no base entry loaded', () => {
   assert.deepEqual(creatureHeader(null, { ref: { json: { name: 'partial' } } }), {
     level: null,

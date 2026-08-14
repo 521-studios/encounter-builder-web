@@ -99,6 +99,17 @@ test('encounterXp flags a templated monster whose resolved ref.json has no reada
   assert.equal(xp, 0)
   assert.equal(unknown.length, 1)
 })
+test('encounterXp honors a level-0 resolved snapshot (counts it, not routed to unknown)', () => {
+  // Weak-templated Creature 0 vs PL 1 = PL-1 = 30 XP; `lvl == null` must be false for
+  // level 0 so it counts rather than falling into `unknown`.
+  const { xp, unknown } = encounterXp(
+    [{ ref: { json: { stat_block: { creature_type: { level: 0 } } } }, count: 1 }],
+    1,
+    entryOf,
+  )
+  assert.equal(xp, 30)
+  assert.equal(unknown.length, 0)
+})
 test('encounterXp flags monsters whose level cannot be read', () => {
   const { xp, unknown } = encounterXp([{ ref: { game_id: 'Monsters:missing' }, count: 1 }], 5, entryOf)
   assert.equal(xp, 0)
