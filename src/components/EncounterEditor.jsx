@@ -4,12 +4,12 @@ import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { settings as settingsApi } from '../api/settings.js'
-import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, keyed } from '../model.js'
+import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, emptyPool, keyed } from '../model.js'
 import { resolveParty } from '../party.js'
 import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
 import MonsterLine from './MonsterLine.jsx'
-import TreasureLine from './TreasureLine.jsx'
+import TreasurePoolSection from './TreasurePoolSection.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
 
@@ -152,6 +152,34 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
   const setMonster = (i, m) => patch({ monsters: monsters.map((x, j) => (j === i ? m : x)) })
   const setTreasure = (i, t) => patch({ treasure: treasure.map((x, j) => (j === i ? t : x)) })
+
+  // Treasure pools: loot grouped by where it's found. Every encounter with treasure
+  // keeps at least a default pool (materialized on the first add); lines carry a
+  // pool_id. keyed() adopts orphaned lines into the default on load.
+  const pools = enc.treasure_pools || []
+  const setPool = (id, fields) =>
+    patch({ treasure_pools: pools.map((p) => (p.id === id ? { ...p, ...fields } : p)) })
+  const addPool = () => patch({ treasure_pools: [...pools, emptyPool()] })
+  const removePool = (id) => {
+    const remaining = pools.filter((p) => p.id !== id)
+    const fallback = remaining[0]?.id // orphaned lines fall to the first remaining pool
+    patch({
+      treasure_pools: remaining,
+      treasure: treasure.map((t) => (t.pool_id === id ? { ...t, pool_id: fallback } : t)),
+    })
+  }
+  // "+ treasure" adds a line to the default pool, materializing one if none exists
+  // yet — both writes in a single patch so the line's pool_id is stable (no
+  // intermediate render sees an orphan).
+  const addTreasure = () => {
+    const def = pools[0] || emptyPool()
+    patch({
+      treasure_pools: pools.length ? pools : [def],
+      treasure: [...treasure, { ...emptyTreasure(), pool_id: def.id }],
+    })
+  }
+  const addLineToPool = (poolId) =>
+    patch({ treasure: [...treasure, { ...emptyTreasure(), pool_id: poolId }] })
 
   // Release hands the loot to the party: it saves current edits first (so the
   // released encounter matches what the GM sees), then flips it to released —
@@ -306,19 +334,25 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
       <fieldset>
         <legend>Treasure</legend>
-        {treasure.map((t, i) => (
-          <TreasureLine
-            key={t._key}
-            treasure={t}
+        {pools.map((pool) => (
+          <TreasurePoolSection
+            key={pool.id}
+            pool={pool}
+            lines={treasure.map((t, i) => ({ t, i })).filter(({ t }) => t.pool_id === pool.id)}
             disabled={released}
-            onChange={(t2) => setTreasure(i, t2)}
-            onRemove={() => patch({ treasure: treasure.filter((_, j) => j !== i) })}
+            canRemove={pools.length > 1}
+            onPoolChange={(fields) => setPool(pool.id, fields)}
+            onPoolRemove={() => removePool(pool.id)}
+            onLineChange={setTreasure}
+            onLineRemove={(i) => patch({ treasure: treasure.filter((_, j) => j !== i) })}
+            onAddLine={() => addLineToPool(pool.id)}
           />
         ))}
         {!released && (
-          <button type="button" onClick={() => patch({ treasure: [...treasure, emptyTreasure()] })}>
-            + treasure
-          </button>
+          <div className="treasure-actions">
+            <button type="button" onClick={addTreasure}>+ treasure</button>
+            <button type="button" className="link add-pool" onClick={addPool}>+ pool</button>
+          </div>
         )}
       </fieldset>
 

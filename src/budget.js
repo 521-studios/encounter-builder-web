@@ -28,6 +28,16 @@ export function treasureValueCp(treasure, currency, entryOf) {
   const unpriced = []
   for (const line of treasure || []) {
     if (line.state === 'destroyed') continue
+    // A degree-of-success line overrides the item price; the builder budgets the
+    // Success tier — the reliable outcome, not the higher crit-success — falling
+    // back to another set tier.
+    if (line.value_tiers) {
+      const v = line.value_tiers
+      const best = [v.success, v.crit_success, v.failure, v.crit_failure].find((n) => typeof n === 'number')
+      if (typeof best === 'number' && Number.isFinite(best)) cp += best * (line.qty || 1)
+      else unpriced.push(line)
+      continue
+    }
     if (isCustomTreasure(line)) {
       // A freeform item carries its own gp value (in copper); a line left unvalued
       // (null) floors the total like any unpriced item.

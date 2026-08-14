@@ -70,6 +70,27 @@ test('treasureValueCp flags a custom item with no entered value as unpriced (flo
   assert.equal(unpriced.length, 1)
 })
 
+test('treasureValueCp budgets a value_tiers line at the Success tier × qty (best case)', () => {
+  const { cp, unpriced } = treasureValueCp(
+    [
+      // B9 harvested gear: success 40 gp, failure 20, crit-fail 0 → budget the 40.
+      { ref: { json: { name: 'intricate gear' } }, qty: 1, value_tiers: { success: 4000, failure: 2000, crit_failure: 0 } },
+      // Only crit_success set → falls back to it (no success tier).
+      { ref: { game_id: 'Weapons:1' }, qty: 2, value_tiers: { crit_success: 100 } },
+    ],
+    {},
+    entryOf,
+  )
+  assert.equal(cp, 4000 + 100 * 2)
+  assert.equal(unpriced.length, 0)
+})
+
+test('treasureValueCp flags a value_tiers line with no numeric tier as unpriced', () => {
+  const { cp, unpriced } = treasureValueCp([{ ref: { game_id: 'Weapons:1' }, qty: 1, value_tiers: {} }], {}, entryOf)
+  assert.equal(cp, 0)
+  assert.equal(unpriced.length, 1)
+})
+
 test('treasureValueCp skips destroyed loot', () => {
   const { cp } = treasureValueCp(
     [{ ref: { game_id: 'Weapons:1' }, qty: 1, state: 'destroyed' }],
