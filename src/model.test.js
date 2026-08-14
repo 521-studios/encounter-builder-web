@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { keyed, withKey, stripKey, emptyMonster, emptyTreasure, toEncounterInput, hasRef, buildInput } from './model.js'
+import { keyed, withKey, stripKey, emptyMonster, emptyTreasure, toEncounterInput, hasRef, gameIdOf, buildInput } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
   const out = keyed({
@@ -61,7 +61,18 @@ test('toEncounterInput echoes every field for a full PUT, strips _key, keeps cha
   assert.equal(input.monsters[0].ref.game_id, 'Monsters:1')
 })
 
+test('gameIdOf resolves a line to its game_id — direct, or a templated ref base', () => {
+  assert.equal(gameIdOf({ ref: { game_id: 'Monsters:1' } }), 'Monsters:1')
+  assert.equal(gameIdOf({ ref: { base: { game_id: 'Weapons:5' } } }), 'Weapons:5') // derived/templated
+  assert.equal(gameIdOf({ ref: { game_id: 'Weapons:5', base: { game_id: 'other' } } }), 'Weapons:5') // direct wins
+  assert.equal(gameIdOf({ ref: { game_id: '' } }), '') // freshly added, unfilled
+  assert.equal(gameIdOf({ ref: {} }), '')
+  assert.equal(gameIdOf({}), '')
+  assert.equal(gameIdOf(undefined), '')
+})
+
 test('hasRef is true only when a line resolves to a game_id (direct or templated base)', () => {
+  // hasRef is defined in terms of gameIdOf so persistence and rendering can't drift.
   assert.equal(hasRef({ ref: { game_id: 'Monsters:1' } }), true)
   assert.equal(hasRef({ ref: { base: { game_id: 'Monsters:1' } } }), true) // templated
   assert.equal(hasRef({ ref: { game_id: '' } }), false) // freshly added, unfilled

@@ -1,5 +1,5 @@
 import { ItemSearch } from '@521studios/pfsrd2-display'
-import { SALE_CLASSES, TREASURE_STATES } from '../model.js'
+import { SALE_CLASSES, TREASURE_STATES, gameIdOf } from '../model.js'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import ItemView from './ItemView.jsx'
 
@@ -9,7 +9,7 @@ import ItemView from './ItemView.jsx'
 // post-encounter state.
 export default function TreasureLine({ treasure, disabled, onChange, onRemove }) {
   const set = (fields) => onChange({ ...treasure, ...fields })
-  const gameId = treasure.ref?.game_id || ''
+  const gameId = gameIdOf(treasure) // now also resolves a derived treasure's base.game_id (was dropped)
 
   const controls = (
     <div className="line treasure-controls">
