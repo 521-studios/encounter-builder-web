@@ -22,10 +22,12 @@ export function useEncounterBudget(encounter, partyLevel, partySize) {
   //     thresholds: this roster's difficulty BAND for a 4-PC party, directly
   //     comparable to a module's printed band. Roster-fixed.
   //   xpPer4 — the raw XP rescaled to a 4-PC budget ("4-PC-equivalent" award), the
-  //     number GMs track by hand. Difficulty-preserving, so its own implied band
-  //     tracks the AS-CONFIGURED band, not canonicalThreat.
-  // They answer different questions and their implied bands can differ; only shown
-  // when the table isn't already 4 PCs.
+  //     number GMs track by hand. A linear rescale (the band budget is instead
+  //     additive per PC), so its own implied band roughly follows the as-configured
+  //     band but diverges at the Low/Trivial edge — it's shown only as an XP figure,
+  //     never re-classified into a band.
+  // The two answer different questions and their implied bands can differ; only
+  // shown when the table isn't already 4 PCs.
   const canonicalThreat = encounterThreat(xp, BASE_PARTY)
   const xpPer4 = partySize ? Math.round((xp * BASE_PARTY) / partySize) : xp
 
