@@ -1,11 +1,7 @@
 import { ItemSearch } from '@521studios/pfsrd2-display'
-import { SALE_CLASSES, TREASURE_STATES, gameIdOf, customTreasureRef, isCustomTreasure } from '../model.js'
+import { SALE_CLASSES, TREASURE_STATES, gameIdOf, customTreasureRef, isCustomTreasure, gpToCp, cpToGp } from '../model.js'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import ItemView from './ItemView.jsx'
-
-// Custom-item value is stored in copper (matching the budget); the input is gp.
-const cpToGp = (cp) => (cp == null ? '' : cp / 100)
-const gpToCp = (str) => (str === '' ? null : Math.round(Number(str) * 100))
 
 // One treasure row. Before an item is chosen, the library ItemSearch picks it by
 // name (no more typing raw game_ids). Once chosen: the ItemCard preview (masked-

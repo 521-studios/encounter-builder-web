@@ -13,6 +13,8 @@ import {
   customTreasureRef,
   isCustomTreasure,
   hasTreasureContent,
+  gpToCp,
+  cpToGp,
 } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
@@ -128,6 +130,30 @@ test('custom treasure: ref/detector/content helpers', () => {
   assert.equal(hasTreasureContent({ ref }), true)
   assert.equal(hasTreasureContent({ ref: { game_id: 'Weapons:1' } }), true) // catalog
   assert.equal(hasTreasureContent({ ref: { game_id: '' } }), false) // unfilled → dropped
+})
+
+test('gpToCp/cpToGp: empty is null (unvalued), not 0 — the floor-vs-valued distinction', () => {
+  // The crux of the floor logic: Number('') === 0, so '' must stay null (unvalued),
+  // distinct from '0' (a valued 0-gp trophy).
+  assert.equal(gpToCp(''), null) // cleared → unvalued (floors the total)
+  assert.equal(gpToCp('0'), 0) // explicit zero → valued 0
+  assert.equal(gpToCp('2'), 200)
+  assert.equal(gpToCp('2.5'), 250)
+  assert.ok(Number.isNaN(gpToCp('abc'))) // garbage → NaN (budget routes to unpriced)
+  assert.equal(cpToGp(null), '') // unvalued → blank input
+  assert.equal(cpToGp(0), 0) // valued 0 → shows 0, not blank
+  assert.equal(cpToGp(200), 2)
+})
+
+test('hasTreasureContent drops a BLANK custom row but keeps one with a name or value', () => {
+  // A freshly-added "+ custom item" (empty name, null value) must not persist as a
+  // ghost row; content in either field keeps it.
+  assert.equal(hasTreasureContent({ ref: customTreasureRef('', null) }), false) // blank → dropped
+  assert.equal(hasTreasureContent({ ref: customTreasureRef('peridot', null) }), true) // name only
+  assert.equal(hasTreasureContent({ ref: customTreasureRef('', 0) }), true) // value 0 (trophy)
+  assert.equal(hasTreasureContent({ ref: customTreasureRef('  ', null) }), false) // whitespace name → dropped
+  // isCustomTreasure still matches the blank row so it renders while being edited.
+  assert.equal(isCustomTreasure({ ref: customTreasureRef('', null) }), true)
 })
 
 test('toEncounterInput keeps a custom (freeform) treasure line and strips _key', () => {

@@ -55,14 +55,26 @@ export function hasRef(line) {
 export function customTreasureRef(name = '', valueCp = null) {
   return { json: { name, value_cp: valueCp } }
 }
+// Custom-item value is stored in copper (matching the budget); the UI edits gp.
+// An empty field is `null` (unvalued), NOT 0 — the two are distinct (a 0-gp trophy
+// counts as 0; an unvalued item floors the total). Number('') === 0, so the empty
+// case must be handled before coercing.
+export const gpToCp = (str) => (str === '' ? null : Math.round(Number(str) * 100))
+export const cpToGp = (cp) => (cp == null ? '' : cp / 100)
 export function isCustomTreasure(line) {
   const r = line?.ref
   return Boolean(r?.json) && !r.game_id && !r.base
 }
 // A treasure line references content (kept by the save filter) when it has a
-// catalog game_id, a derived base, or custom json.
+// catalog game_id, a derived base, or a custom item with ACTUAL content — a name or
+// a value. A freshly-added blank custom row (autosave caught mid-add, before the GM
+// types anything) is dropped like an empty catalog row, so it doesn't persist and
+// reload as a permanently-unvalued ghost line.
 export function hasTreasureContent(line) {
-  return hasRef(line) || isCustomTreasure(line)
+  if (hasRef(line)) return true
+  if (!isCustomTreasure(line)) return false
+  const j = line.ref.json
+  return Boolean(j?.name?.trim()) || j?.value_cp != null
 }
 
 // Build the PUT body (EncounterInput) from an encounter. Shared by the editor's
