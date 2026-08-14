@@ -44,8 +44,22 @@ test('TreasureBudget shows the canonical 4-PC band + normalized XP when the tabl
   assert.equal(screen.getByTestId('encounter-threat').textContent, 'Trivial') // as-configured (6 PCs)
   const canon = screen.getByTestId('budget-canonical')
   assert.match(canon.textContent, /At 4 PCs \(book standard\)/)
-  assert.equal(screen.getByTestId('canonical-threat').textContent, 'Low') // book-standard band
-  assert.match(canon.textContent, /~40 XP for a 4-PC party/) // party-size–normalized XP
+  assert.equal(screen.getByTestId('canonical-threat').textContent, 'Low') // book-standard difficulty band
+  assert.match(canon.textContent, /~40 XP award/) // party-size–normalized award (distinct from the band)
+  assert.doesNotMatch(canon.textContent, /\(floor\)/) // complete → not a floor
+})
+
+test('TreasureBudget marks the canonical band a floor when monster XP is incomplete', () => {
+  // An unreadable monster level floors the XP → the canonical band could understate,
+  // so the lens must say so rather than present it as authoritative "book standard".
+  render(
+    <TreasureBudget
+      budget={budget({ xp: 60, threat: 'trivial', canonicalThreat: 'low', xpPer4: 40, unknownCount: 1 })}
+      partyLevel={1}
+      partySize={6}
+    />,
+  )
+  assert.match(screen.getByTestId('budget-canonical').textContent, /Low \(floor\)/)
 })
 
 test('TreasureBudget hides the canonical lens when the table IS 4 PCs (no redundancy)', () => {

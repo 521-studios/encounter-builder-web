@@ -29,8 +29,9 @@ test('budget shows the canonical 4-PC band + normalized XP for a larger table', 
   await expect(page.getByTestId('encounter-threat')).toHaveText('Moderate') // as-configured (6 PCs)
   const canon = page.getByTestId('budget-canonical')
   await expect(canon).toBeVisible()
-  await expect(page.getByTestId('canonical-threat')).toHaveText('Extreme') // 4-PC book standard
-  await expect(canon).toContainText(/~\d+ XP for a 4-PC party/)
+  await expect(page.getByTestId('canonical-threat')).toHaveText('Extreme') // 4-PC book-standard difficulty
+  // Normalized award (a distinct metric from the band): 160 XP · 4/6 = ~107.
+  await expect(canon).toContainText('~107 XP award (party-size–normalized)')
   // The title badge's tooltip carries the same canonical note.
   await expect(page.getByTestId('difficulty-badge')).toHaveAttribute('title', /Extreme at 4 PCs \(book standard\)/)
 

@@ -15,11 +15,17 @@ export function useEncounterBudget(encounter, partyLevel, partySize) {
   const { xp, unknown } = encounterXp(encounter.monsters, partyLevel, entryOf)
   const threat = encounterThreat(xp, partySize)
 
-  // Canonical lens for comparing against a published module, whose printed band
-  // assumes the 4-PC standard: the same roster's band read at 4 PCs, plus the
-  // party-size–normalized ("4-PC-equivalent") XP that GMs track by hand. Only
-  // meaningful when the table isn't already 4 (the panel/badge show them then), and
-  // they let a GM tell "under-tuned for my larger table" from "the book's own band".
+  // Canonical lens for comparing against a published module (whose printed band
+  // assumes the 4-PC standard). TWO DISTINCT normalizations — the panel shows them
+  // as separate metrics, not one figure:
+  //   canonicalThreat — the same (size-independent) raw XP classified at 4-PC
+  //     thresholds: this roster's difficulty BAND for a 4-PC party, directly
+  //     comparable to a module's printed band. Roster-fixed.
+  //   xpPer4 — the raw XP rescaled to a 4-PC budget ("4-PC-equivalent" award), the
+  //     number GMs track by hand. Difficulty-preserving, so its own implied band
+  //     tracks the AS-CONFIGURED band, not canonicalThreat.
+  // They answer different questions and their implied bands can differ; only shown
+  // when the table isn't already 4 PCs.
   const canonicalThreat = encounterThreat(xp, BASE_PARTY)
   const xpPer4 = partySize ? Math.round((xp * BASE_PARTY) / partySize) : xp
 

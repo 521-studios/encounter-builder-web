@@ -9,9 +9,12 @@ import { treasureBudget, TREASURE_BANDS, BAND_LABELS, BASE_PARTY } from '../pf2e
 export default function TreasureBudget({ budget, partyLevel, partySize }) {
   const { cp, xp, threat, canonicalThreat, xpPer4, loading, unpricedCount, unknownCount, failedCount, onRetry } = budget
 
-  // The total is a floor whenever some lines couldn't be valued (still loading, a
-  // failed fetch, or a genuinely unpriceable derived/"Varies" item).
+  // The treasure total is a floor whenever some lines couldn't be valued (still
+  // loading, a failed fetch, or a genuinely unpriceable derived/"Varies" item).
   const incomplete = loading || failedCount > 0 || unpricedCount > 0 || unknownCount > 0
+  // The XP (and thus both bands + the normalized figure) is a floor only when
+  // monster XP itself is incomplete — an unpriced treasure line doesn't affect it.
+  const xpIncomplete = loading || failedCount > 0 || unknownCount > 0
 
   const target = treasureBudget(partyLevel, threat, partySize) // null for a Trivial encounter
   // "Over" is safe on a floor (true value ≥ the shown floor); "under" is only
@@ -38,15 +41,19 @@ export default function TreasureBudget({ budget, partyLevel, partySize }) {
         )}
       </p>
 
-      {/* Canonical lens (only when the table isn't the 4-PC standard): the same
-          roster's band at 4 PCs — directly comparable to a module's printed band —
-          plus the party-size–normalized XP. Lets a GM see whether a fight that reads
-          e.g. Trivial for their 6 is a Low the book intended for 4. */}
+      {/* Canonical lens (only when the table isn't the 4-PC standard). Two DIFFERENT
+          normalizations, deliberately shown as distinct metrics (not one figure):
+          the difficulty BAND is the same roster read at 4-PC thresholds — directly
+          comparable to a module's printed band (e.g. a fight that's Trivial for your
+          6 is a Low the book intended for 4); the XP AWARD is the raw XP rescaled to
+          a 4-PC budget (difficulty-preserving), the number GMs track by hand. Their
+          implied bands can differ — they answer different questions. */}
       {partySize !== BASE_PARTY && (
         <p className="budget-canonical" data-testid="budget-canonical">
-          At {BASE_PARTY} PCs (book standard):{' '}
+          At {BASE_PARTY} PCs (book standard): difficulty{' '}
           <strong data-testid="canonical-threat">{BAND_LABELS[canonicalThreat]}</strong>
-          {' · '}~{xpPer4} XP for a {BASE_PARTY}-PC party
+          {xpIncomplete && xp > 0 ? ' (floor)' : ''}
+          {' · '}~{xpPer4} XP award (party-size–normalized)
         </p>
       )}
 
