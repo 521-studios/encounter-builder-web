@@ -58,6 +58,14 @@ button.primary:hover { filter: brightness(1.05); }
 }
 
 .error { color: var(--danger); }
+/* App-level durable warning for a background save that failed after its editor closed. */
+.save-error-banner {
+  background: color-mix(in srgb, var(--danger) 16%, var(--panel));
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  margin: 0.5rem 0;
+}
 .muted { opacity: 0.7; }
 
 .topbar {

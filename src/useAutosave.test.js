@@ -50,6 +50,38 @@ test('useAutosave surfaces a failed save as error state', async () => {
   }
 })
 
+test('useAutosave calls onError when a mounted save fails (feeds the app banner)', async () => {
+  const origErr = console.error
+  console.error = () => {}
+  try {
+    const errors = []
+    const { result } = renderHook(() => useAutosave(async () => { throw new Error('boom') }, 5, (e) => errors.push(e)))
+    act(() => result.current.schedule('x'))
+    await tick(15)
+    assert.equal(result.current.state, 'error')
+    assert.equal(errors.length, 1)
+    assert.match(errors[0].message, /boom/)
+  } finally {
+    console.error = origErr
+  }
+})
+
+test('useAutosave calls onError when the flush-on-unmount save fails (durable surface)', async () => {
+  const origWarn = console.warn
+  console.warn = () => {}
+  try {
+    const errors = []
+    const { result, unmount } = renderHook(() => useAutosave(async () => { throw new Error('gone') }, 1000, (e) => errors.push(e)))
+    act(() => result.current.schedule('x')) // pending; long delay so only the unmount flush fires it
+    await act(async () => { unmount() })
+    await tick(0)
+    assert.equal(errors.length, 1)
+    assert.match(errors[0].message, /gone/)
+  } finally {
+    console.warn = origWarn
+  }
+})
+
 test('useAutosave flushes a still-pending edit on unmount (nav-away durability)', async () => {
   const calls = []
   // Long delay so the debounce can't fire on its own — only the unmount flush can.

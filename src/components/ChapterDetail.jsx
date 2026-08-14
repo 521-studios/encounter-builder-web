@@ -14,7 +14,7 @@ import TreasureRollup from './TreasureRollup.jsx'
 // Edits persist on change (no Save button); party fields inherit from campaign
 // settings when left empty. Chapter update full-replaces name + order + party
 // fields, so every save round-trips them via the shared clear-encoding.
-export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted }) {
+export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted, onSaveError }) {
   const [value, setValue] = useState({
     name: chapter.name || '',
     party_level: chapter.party_level ?? null,
@@ -27,14 +27,18 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
   const [error, setError] = useState(null)
   const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the encounters list on retry
 
-  const { state: saveState, schedule } = useAutosave(async (v) => {
-    const updated = await chaptersApi.update(campaignId, chapter.id, {
-      name: v.name.trim(),
-      order: chapter.order,
-      ...partyFields(v),
-    })
-    onSaved && onSaved(updated)
-  })
+  const { state: saveState, schedule } = useAutosave(
+    async (v) => {
+      const updated = await chaptersApi.update(campaignId, chapter.id, {
+        name: v.name.trim(),
+        order: chapter.order,
+        ...partyFields(v),
+      })
+      onSaved && onSaved(updated)
+    },
+    800,
+    () => onSaveError && onSaveError(`chapter “${value.name.trim() || 'Untitled chapter'}”`),
+  )
 
   // Always-visible chapter treasure rollup (per encounter). Called unconditionally
   // before the early return (rules of hooks); tolerates the still-loading state.

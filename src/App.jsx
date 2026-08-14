@@ -19,8 +19,14 @@ export default function App() {
   // pages, or nothing. { kind: 'empty' | 'encounter' | 'campaign' | 'chapter', … }
   const [view, setView] = useState({ kind: 'empty' })
   const [reloadKey, setReloadKey] = useState(0) // bump to refresh the sidebar tree
+  // A failed BACKGROUND autosave (a flush after the editor/detail already closed)
+  // has no on-screen indicator left, so it surfaces here at the app level. `what`
+  // names the record; cleared on dismiss or the next successful save (recovery).
+  const [saveError, setSaveError] = useState(null)
   const booted = useRef(false)
   const backToEmpty = () => setView({ kind: 'empty' })
+  const onSaved = () => { setReloadKey((k) => k + 1); setSaveError(null) }
+  const onSaveError = (what) => setSaveError(what)
 
   useEffect(() => {
     if (booted.current) return // once, even under StrictMode (the auth code is single-use)
@@ -48,6 +54,13 @@ export default function App() {
           <button className="link" onClick={() => logout()}>Sign out</button>
         )}
       </header>
+
+      {saveError && (
+        <div className="save-error-banner" role="alert" data-testid="save-error-banner">
+          A background save failed — your last change to {saveError} may not have been saved. Re-open it and check.{' '}
+          <button type="button" className="link" onClick={() => setSaveError(null)}>Dismiss</button>
+        </div>
+      )}
 
       {status === 'loading' && <p>Loading…</p>}
       {status === 'anon' && (
@@ -94,7 +107,8 @@ export default function App() {
                   backToEmpty()
                   setReloadKey((k) => k + 1)
                 }}
-                onSaved={() => setReloadKey((k) => k + 1)}
+                onSaved={onSaved}
+                onSaveError={onSaveError}
                 onDeleted={() => {
                   backToEmpty()
                   setReloadKey((k) => k + 1)
@@ -105,7 +119,8 @@ export default function App() {
               <CampaignDetail
                 campaign={campaign}
                 onClose={backToEmpty}
-                onSaved={() => setReloadKey((k) => k + 1)}
+                onSaved={onSaved}
+                onSaveError={onSaveError}
               />
             )}
             {view.kind === 'chapter' && (
@@ -117,7 +132,8 @@ export default function App() {
                   backToEmpty()
                   setReloadKey((k) => k + 1)
                 }}
-                onSaved={() => setReloadKey((k) => k + 1)}
+                onSaved={onSaved}
+                onSaveError={onSaveError}
                 onDeleted={() => {
                   backToEmpty()
                   setReloadKey((k) => k + 1)
