@@ -30,7 +30,7 @@ test('a chapter-assigned encounter stays in its chapter after save+reload', asyn
 
   // Reload — the encounter must still be inside its chapter group, not Unsorted.
   await page.reload()
-  await page.locator('button.campaign').first().click()
+  await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
   const groupAfter = page.locator('.chapter-group', {
     has: page.locator('.chapter-name', { hasText: chapterName }),
   })
