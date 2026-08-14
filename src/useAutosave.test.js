@@ -61,16 +61,21 @@ test('useAutosave flushes a still-pending edit on unmount (nav-away durability)'
   assert.deepEqual(calls, ['x'])
 })
 
-test('useAutosave does NOT re-fire on unmount while a save is already in flight', async () => {
+test('useAutosave does NOT double-fire on unmount while a save is in flight (savingRef guard)', async () => {
   const calls = []
   let release
-  const save = async (v) => { calls.push(v); await new Promise((r) => { release = r }) } // block in-flight
+  const save = async (v) => { calls.push(v); if (v === 'x') await new Promise((r) => { release = r }) } // block on 'x'
   const { result, unmount } = renderHook(() => useAutosave(save, 5))
   act(() => result.current.schedule('x'))
-  await tick(10) // save('x') has started and is blocking (savingRef true, pending drained)
+  await tick(10) // save('x') is in flight and blocking
   assert.deepEqual(calls, ['x'])
-  await act(async () => { unmount() }) // in-flight → the unmount flush must NOT re-send
-  await act(async () => { release() })
+  act(() => result.current.schedule('y')) // a new edit lands WHILE 'x' saves → pendingRef = 'y'
+  await act(async () => { unmount() })
+  await tick(0)
+  // The unmount flush must NOT fire 'y' — a save is in flight, so its own drain
+  // loop owns the pending value. (Without the !savingRef guard, 'y' fires here.)
+  assert.deepEqual(calls, ['x'])
+  await act(async () => { release() }) // 'x' resolves → the in-flight flush drains 'y' exactly once
   await tick(5)
-  assert.deepEqual(calls, ['x']) // not re-fired
+  assert.deepEqual(calls, ['x', 'y']) // 'y' sent once, not twice
 })
