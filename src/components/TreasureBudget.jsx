@@ -1,5 +1,5 @@
 import { formatGp } from '@521studios/pfsrd2-display'
-import { treasureBudget, TREASURE_BANDS, BAND_LABELS } from '../pf2eRules.js'
+import { treasureBudget, TREASURE_BANDS, BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 
 // The encounter's treasure-vs-budget panel: presents the computed budget (from
 // useEncounterBudget — treasure value + difficulty band) against the Table 5-3
@@ -7,7 +7,7 @@ import { treasureBudget, TREASURE_BANDS, BAND_LABELS } from '../pf2eRules.js'
 // loot marked over/under its target. Fetching lives in the hook so the difficulty
 // badge on the title can share it.
 export default function TreasureBudget({ budget, partyLevel, partySize }) {
-  const { cp, xp, threat, loading, unpricedCount, unknownCount, failedCount, onRetry } = budget
+  const { cp, xp, threat, canonicalThreat, xpPer4, loading, unpricedCount, unknownCount, failedCount, onRetry } = budget
 
   // The total is a floor whenever some lines couldn't be valued (still loading, a
   // failed fetch, or a genuinely unpriceable derived/"Varies" item).
@@ -37,6 +37,18 @@ export default function TreasureBudget({ budget, partyLevel, partySize }) {
           </span>
         )}
       </p>
+
+      {/* Canonical lens (only when the table isn't the 4-PC standard): the same
+          roster's band at 4 PCs — directly comparable to a module's printed band —
+          plus the party-size–normalized XP. Lets a GM see whether a fight that reads
+          e.g. Trivial for their 6 is a Low the book intended for 4. */}
+      {partySize !== BASE_PARTY && (
+        <p className="budget-canonical" data-testid="budget-canonical">
+          At {BASE_PARTY} PCs (book standard):{' '}
+          <strong data-testid="canonical-threat">{BAND_LABELS[canonicalThreat]}</strong>
+          {' · '}~{xpPer4} XP for a {BASE_PARTY}-PC party
+        </p>
+      )}
 
       <div className="chart-scroll">
         <table className="treasure-chart">

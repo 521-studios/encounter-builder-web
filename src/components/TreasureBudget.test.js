@@ -32,6 +32,33 @@ test('TreasureBudget flags a floor when a line is unpriced and never claims "und
   assert.match(screen.getByTestId('budget-flags').textContent, /not valued/)
 })
 
+test('TreasureBudget shows the canonical 4-PC band + normalized XP when the table is not 4 PCs', () => {
+  // A1 scenario: 60 XP reads Trivial for a 6-PC table but Low at the 4-PC book standard.
+  render(
+    <TreasureBudget
+      budget={budget({ xp: 60, threat: 'trivial', canonicalThreat: 'low', xpPer4: 40 })}
+      partyLevel={1}
+      partySize={6}
+    />,
+  )
+  assert.equal(screen.getByTestId('encounter-threat').textContent, 'Trivial') // as-configured (6 PCs)
+  const canon = screen.getByTestId('budget-canonical')
+  assert.match(canon.textContent, /At 4 PCs \(book standard\)/)
+  assert.equal(screen.getByTestId('canonical-threat').textContent, 'Low') // book-standard band
+  assert.match(canon.textContent, /~40 XP for a 4-PC party/) // party-size–normalized XP
+})
+
+test('TreasureBudget hides the canonical lens when the table IS 4 PCs (no redundancy)', () => {
+  render(
+    <TreasureBudget
+      budget={budget({ xp: 60, threat: 'trivial', canonicalThreat: 'trivial', xpPer4: 60 })}
+      partyLevel={1}
+      partySize={4}
+    />,
+  )
+  assert.equal(screen.queryByTestId('budget-canonical'), null)
+})
+
 test('TreasureBudget surfaces a load failure with Retry', () => {
   render(<TreasureBudget budget={budget({ cp: 1000, failedCount: 2 })} partyLevel={5} partySize={4} />)
   assert.match(screen.getByTestId('budget-error').textContent, /failed to load/)
