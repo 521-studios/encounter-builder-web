@@ -76,3 +76,17 @@ test('a stale deep-link (unknown campaign) degrades to the campaign list', async
   await expect(page.locator('button.campaign').first()).toBeVisible()
   await expect(page.locator('.two-pane')).toHaveCount(0)
 })
+
+// A deep-link to a MISSING chapter within a real campaign keeps the campaign (its
+// empty pane), rather than dropping all the way to the campaign list.
+test('a deep-link to a missing chapter keeps the campaign (empty pane, not the list)', async ({ page, baseURL }) => {
+  await login(page, baseURL)
+  await openFirstCampaign(page)
+  const campaignId = new URL(page.url()).searchParams.get('campaign')
+  expect(campaignId).toBeTruthy()
+
+  await page.goto(`/?campaign=${campaignId}&chapter=99999999`)
+  await expect(page.locator('.two-pane')).toBeVisible() // stayed inside the campaign
+  await expect(page.getByTestId('empty-main')).toBeVisible()
+  await expect(page.getByTestId('chapter-detail')).toHaveCount(0)
+})

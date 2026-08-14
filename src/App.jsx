@@ -38,9 +38,11 @@ export default function App() {
   // Restore the campaign + main view from the query string (deep-link, reload, and
   // back/forward). The campaign object comes from the games list; a chapter view
   // needs its full record (ChapterDetail reads name/party/order), so we fetch the
-  // campaign's chapters and match by id. An encounter view needs only the id. Any
-  // failure (stale link, network) degrades to the campaign list rather than a broken
-  // pane. Stable (only setters + module imports), so effects can depend on it.
+  // campaign's chapters and match by id. An encounter view needs only the id. A
+  // failure that can't resolve the campaign at all (stale/unknown campaign, or a
+  // failed games fetch) degrades to the campaign list; a failure to resolve a chapter
+  // within a loaded campaign keeps the campaign and shows its empty pane. Stable
+  // (only setters + module imports), so effects can depend on it.
   const restoreFromSearch = useCallback(async (search) => {
     const toCampaignList = () => {
       setCampaign(null)
