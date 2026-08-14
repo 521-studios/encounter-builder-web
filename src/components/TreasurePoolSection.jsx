@@ -3,9 +3,9 @@ import TreasureLine from './TreasureLine.jsx'
 
 // One treasure pool: where a group of loot is found. Carries an editable name, a
 // GM markdown description, and an optional discovery gate (skill + DC — informational
-// in the builder; the budget counts every pool at best case). Its treasure lines
-// render beneath. `lines` are {t, i} pairs carrying each line's index in the flat
-// encounter.treasure array so edits/removals map back.
+// in the builder; the budget counts every pool at its Success tier). Its treasure
+// lines render beneath. `lines` are {t, i} pairs carrying each line's index in the
+// flat encounter.treasure array so edits/removals map back.
 export default function TreasurePoolSection({
   pool,
   lines,
@@ -77,6 +77,11 @@ export default function TreasurePoolSection({
               onChange={(e) => onPoolChange({ gate: { ...gate, dc: Number(e.target.value) } })}
             />
           </>
+        )}
+        {gate && (!gate.skill?.trim() || !(gate.dc >= 1)) && (
+          <span className="muted gate-hint" data-testid="gate-hint">
+            enter a skill and DC ≥ 1 — an incomplete gate isn’t saved
+          </span>
         )}
       </div>
 

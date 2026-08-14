@@ -196,6 +196,23 @@ test('toEncounterInput persists referenced/described pools, drops empty unused o
   )
 })
 
+test('toEncounterInput drops an incomplete gate but keeps the pool on its other content', () => {
+  const enc = keyed({
+    name: 'x',
+    treasure_pools: [
+      { id: 'p1', name: 'altar', gate: { skill: 'Perception', dc: 0 } }, // dc<1 → gate dropped, pool kept (name)
+      { id: 'p2', name: '', description: '', gate: { skill: '', dc: 5 } }, // only an incomplete gate → dropped
+      { id: 'p3', name: '', description: '', gate: { skill: 'Perception', dc: 18 } }, // complete gate → kept
+    ],
+    treasure: [],
+  })
+  const pools = toEncounterInput(enc).treasure_pools
+  const p1 = pools.find((p) => p.id === 'p1')
+  assert.ok(p1 && p1.gate === undefined) // incomplete gate dropped, pool survives on its name
+  assert.ok(!pools.some((p) => p.id === 'p2')) // pool whose only content is an incomplete gate → dropped
+  assert.deepEqual(pools.find((p) => p.id === 'p3')?.gate, { skill: 'Perception', dc: 18 })
+})
+
 test('gpToCp/cpToGp: empty is null (unvalued), not 0 — the floor-vs-valued distinction', () => {
   // The crux of the floor logic: Number('') === 0, so '' must stay null (unvalued),
   // distinct from '0' (a valued 0-gp trophy).

@@ -169,14 +169,14 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     })
   }
   // "+ treasure" adds a line to the default pool, materializing one if none exists
-  // yet (both writes in a single patch so the line's pool_id is stable).
+  // yet — both writes in a single patch so the line's pool_id is stable (no
+  // intermediate render sees an orphan).
   const addTreasure = () => {
-    if (pools.length) {
-      patch({ treasure: [...treasure, { ...emptyTreasure(), pool_id: pools[0].id }] })
-    } else {
-      const def = emptyPool()
-      patch({ treasure_pools: [def], treasure: [...treasure, { ...emptyTreasure(), pool_id: def.id }] })
-    }
+    const def = pools[0] || emptyPool()
+    patch({
+      treasure_pools: pools.length ? pools : [def],
+      treasure: [...treasure, { ...emptyTreasure(), pool_id: def.id }],
+    })
   }
   const addLineToPool = (poolId) =>
     patch({ treasure: [...treasure, { ...emptyTreasure(), pool_id: poolId }] })

@@ -29,7 +29,8 @@ export function treasureValueCp(treasure, currency, entryOf) {
   for (const line of treasure || []) {
     if (line.state === 'destroyed') continue
     // A degree-of-success line overrides the item price; the builder budgets the
-    // best case — the Success tier (falling back to another set tier).
+    // Success tier — the reliable outcome, not the higher crit-success — falling
+    // back to another set tier.
     if (line.value_tiers) {
       const v = line.value_tiers
       const best = [v.success, v.crit_success, v.failure, v.crit_failure].find((n) => typeof n === 'number')
