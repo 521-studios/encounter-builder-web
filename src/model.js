@@ -22,12 +22,31 @@ export function stripKey({ _key, ...rest }) {
 
 // Stamp a server encounter's lines with stable client keys (the server has no
 // per-line ids); the keys are stripped again before save.
+// A treasure pool groups loot by where it's found (a first-class entity so it can
+// carry its own GM markdown description + an optional discovery gate). Every
+// encounter with treasure keeps at least a default pool; `id` is the stable,
+// persisted handle lines reference via pool_id.
+export function emptyPool(name = '') {
+  return { id: crypto.randomUUID(), name, description: '', gate: null }
+}
+
 export function keyed(e) {
-  return {
-    ...e,
-    monsters: (e.monsters || []).map(withKey),
-    treasure: (e.treasure || []).map(withKey),
+  const treasure = (e.treasure || []).map(withKey)
+  let pools = e.treasure_pools || []
+  // Ensure a home for treasure: if there are lines but no pool holds them (none
+  // exist, or a line's pool_id is empty/dangling), materialize a default pool and
+  // adopt the orphans — like a dangling chapter_id renders under "Unsorted". A
+  // treasureless encounter stays pool-less until the GM adds loot.
+  if (treasure.length) {
+    const ids = new Set(pools.map((p) => p.id))
+    const orphaned = (t) => !t.pool_id || !ids.has(t.pool_id)
+    if (!pools.length || treasure.some(orphaned)) {
+      const def = pools[0] || emptyPool()
+      if (!pools.length) pools = [def]
+      for (const t of treasure) if (orphaned(t)) t.pool_id = def.id
+    }
   }
+  return { ...e, monsters: (e.monsters || []).map(withKey), treasure, treasure_pools: pools }
 }
 
 // gameIdOf resolves a monster/treasure line's content game_id — the single rule
@@ -83,6 +102,44 @@ export function hasTreasureContent(line) {
 // would blank the omitted fields). Client-only _key/_name are stripped;
 // half-filled rows without a ref are dropped. `status` is included only when
 // present (release is a separate endpoint).
+// Serialize a treasure line for the API: drop the client-only _key and an empty
+// value_tiers (all tiers null) — the API rejects value_tiers with no tier set, so an
+// in-progress "variable value" toggle isn't sent until the GM enters a number.
+export function treasureLineInput(line) {
+  const { _key, value_tiers, ...rest } = line
+  const hasTier =
+    value_tiers &&
+    [value_tiers.crit_success, value_tiers.success, value_tiers.failure, value_tiers.crit_failure].some(
+      (n) => typeof n === 'number',
+    )
+  return hasTier ? { ...rest, value_tiers } : rest
+}
+
+// A gate only counts once it's complete (skill + dc >= 1) — the API rejects an
+// empty {}, so an in-progress "gated" toggle isn't sent until the GM fills it in.
+function poolGateInput(gate) {
+  if (gate && gate.skill?.trim() && gate.dc >= 1) return { skill: gate.skill.trim(), dc: gate.dc }
+  return undefined
+}
+
+// Pools to persist: those referenced by a kept treasure line, or carrying their
+// own content (name / description / a complete gate). An empty, unused default pool
+// is dropped so it doesn't linger as a ghost — the client re-materializes one when
+// loot returns.
+function treasurePoolsInput(enc) {
+  const kept = (enc.treasure || []).filter(hasTreasureContent)
+  const usedIds = new Set(kept.map((t) => t.pool_id).filter(Boolean))
+  const out = []
+  for (const p of enc.treasure_pools || []) {
+    if (!p.id) continue
+    const gate = poolGateInput(p.gate)
+    if (usedIds.has(p.id) || p.name?.trim() || p.description?.trim() || gate) {
+      out.push({ id: p.id, name: p.name || '', description: p.description || '', gate })
+    }
+  }
+  return out
+}
+
 export function toEncounterInput(enc) {
   const input = {
     name: enc.name,
@@ -90,7 +147,8 @@ export function toEncounterInput(enc) {
     description: enc.description || '',
     notes: enc.notes || '',
     monsters: (enc.monsters || []).filter(hasRef).map(stripKey),
-    treasure: (enc.treasure || []).filter(hasTreasureContent).map(stripKey),
+    treasure: (enc.treasure || []).filter(hasTreasureContent).map(treasureLineInput),
+    treasure_pools: treasurePoolsInput(enc),
     currency: enc.currency || {},
   }
   // Party overrides use the shared clear-encoding: set when overridden, omitted

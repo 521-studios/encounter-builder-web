@@ -77,6 +77,38 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
           <option key={s} value={s}>{s}</option>
         ))}
       </select>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={Boolean(treasure.value_tiers)}
+          disabled={disabled}
+          onChange={(e) => set({ value_tiers: e.target.checked ? {} : undefined })}
+        />
+        variable value
+      </label>
+      {treasure.value_tiers && (
+        <span className="value-tiers" data-testid="value-tiers" title="gp by degree of success — the budget counts Success">
+          {[
+            ['success', 'success'],
+            ['failure', 'failure'],
+            ['crit_failure', 'crit fail'],
+            ['crit_success', 'crit success'],
+          ].map(([k, label]) => (
+            <label key={k} className="tier">
+              {label}
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                aria-label={`${label} (gp)`}
+                value={cpToGp(treasure.value_tiers[k])}
+                disabled={disabled}
+                onChange={(e) => set({ value_tiers: { ...treasure.value_tiers, [k]: gpToCp(e.target.value) } })}
+              />
+            </label>
+          ))}
+        </span>
+      )}
       {!disabled && (
         <button type="button" className="link danger" onClick={onRemove}>Remove</button>
       )}
