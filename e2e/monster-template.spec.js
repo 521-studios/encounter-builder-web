@@ -22,17 +22,29 @@ test('apply a template to a monster: highlights, persists, and re-derives on rel
   await expect(block.locator('.Monster')).toBeVisible()
   await expect(block.locator('.Monster__changed')).toHaveCount(0) // nothing applied yet
 
+  // 21ro: capture the collapsed header level before templating so we can assert it
+  // tracks the applied template (not just the expanded stat block).
+  const headerLevel = page.getByTestId('monster-header-level').first()
+  const beforeN = parseInt((await headerLevel.textContent()).match(/-?\d+/)[0], 10)
+
   // Apply a template (wait for the picker's options to load first).
   const select = page.getByTestId('template-select')
   const realOptions = select.locator('option:not([disabled])')
   await expect(realOptions.first()).toBeAttached()
   const labels = await realOptions.allTextContents()
-  const choice = labels.find((l) => /elite/i.test(l)) || labels[0]
+  // Require Elite specifically: it is a deterministic, level-changing template (+1),
+  // so the header assertions below always exercise the PR's headline behavior instead
+  // of silently no-opping on a non-level-changing fallback template.
+  const choice = labels.find((l) => /elite/i.test(l))
+  expect(choice, 'the template picker should offer an Elite template for a goblin').toBeTruthy()
   await select.selectOption({ label: choice })
 
   // Highlighting appears, and a template tag is shown.
   await expect(block.locator('.Monster__changed').first()).toBeVisible()
   await expect(page.getByTestId('template-tag')).toContainText(choice)
+
+  // 21ro: the collapsed header level reflects the applied template (Elite is +1).
+  await expect(headerLevel).toHaveText(`CREATURE ${beforeN + 1}`)
 
   // The library renders the applied template's OWN section (the app now passes
   // appliedTemplates; the gathering lives in the library).
@@ -50,6 +62,9 @@ test('apply a template to a monster: highlights, persists, and re-derives on rel
   await expect(block2.locator('.Monster__changed').first()).toBeVisible() // re-derived highlighting
   await expect(block2.locator('.Monster__template-title').first()).toBeVisible() // section re-derives too
   await expect(page.getByTestId('template-tag')).toContainText(choice)
+
+  // 21ro: the templated header level survives reload (read from the persisted ref.json).
+  await expect(page.getByTestId('monster-header-level').first()).toHaveText(`CREATURE ${beforeN + 1}`)
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()

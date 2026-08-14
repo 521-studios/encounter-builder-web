@@ -69,6 +69,47 @@ test('encounterXp sums creature XP vs party level, honoring count + elite/weak',
   assert.equal(unknown.length, 0)
 })
 
+test('encounterXp counts a templated monster at its resolved ref.json level, not the base', () => {
+  // hq4t/21ro shared root cause: elite/weak is applied via the TemplatePicker, which
+  // writes a derived ref.json (resolved creature) — NOT the legacy adjustment field.
+  // The budget must read that resolved level. Elite goblin -> Creature 2, vs PL 1 =
+  // PL+1 = 60 XP (base goblin Creature 1 would be PL+0 = 40).
+  const { xp, unknown } = encounterXp(
+    [
+      {
+        ref: {
+          base: { game_id: 'Monsters:goblin' },
+          modifications: [{ template_game_id: 'elite', template_name: 'Elite' }],
+          json: { stat_block: { creature_type: { level: 2 } } },
+        },
+        count: 1,
+      },
+    ],
+    1,
+    entryOf,
+  )
+  assert.equal(xp, 60)
+  assert.equal(unknown.length, 0)
+})
+test('encounterXp flags a templated monster whose resolved ref.json has no readable level', () => {
+  // The resolved branch must route a null-level snapshot to `unknown` (floors the
+  // budget + drives the UI warning), same as the pristine entry-not-loaded path — not
+  // silently count it as 0.
+  const { xp, unknown } = encounterXp([{ ref: { json: { stat_block: {} } }, count: 1 }], 1, entryOf)
+  assert.equal(xp, 0)
+  assert.equal(unknown.length, 1)
+})
+test('encounterXp honors a level-0 resolved snapshot (counts it, not routed to unknown)', () => {
+  // Weak-templated Creature 0 vs PL 1 = PL-1 = 30 XP; `lvl == null` must be false for
+  // level 0 so it counts rather than falling into `unknown`.
+  const { xp, unknown } = encounterXp(
+    [{ ref: { json: { stat_block: { creature_type: { level: 0 } } } }, count: 1 }],
+    1,
+    entryOf,
+  )
+  assert.equal(xp, 30)
+  assert.equal(unknown.length, 0)
+})
 test('encounterXp flags monsters whose level cannot be read', () => {
   const { xp, unknown } = encounterXp([{ ref: { game_id: 'Monsters:missing' }, count: 1 }], 5, entryOf)
   assert.equal(xp, 0)
