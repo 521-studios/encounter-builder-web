@@ -57,10 +57,13 @@ test('treasure pools: default + added gated pool, value tiers, best-case budget,
   await expect(altar2.getByLabel('gate DC')).toHaveValue('18')
   await expect(page.getByTestId('treasure-value')).toHaveText('50 gp')
 
-  // Removing a pool reassigns its loot to the remaining pool — the total is
-  // unchanged (the scroll is adopted by Main, not lost).
+  // Removing a pool reassigns its loot INTO the remaining pool — the scroll must
+  // now render under Main (a broken reassignment would leave it with a dead pool_id
+  // and vanish from every rendered pool). The total staying 50 gp alone wouldn't
+  // catch that (the budget sums all lines regardless of pool), so assert it renders.
   await altar2.getByRole('button', { name: 'remove pool' }).click()
   await expect(pools2).toHaveCount(1)
+  await expect(pools2.first().getByLabel('custom item name')).toHaveCount(2) // gear + scroll, both under Main
   await expect(page.getByTestId('treasure-value')).toHaveText('50 gp')
 
   await page.getByRole('button', { name: /^Close/ }).click()
