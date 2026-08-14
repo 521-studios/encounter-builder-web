@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CreatureSearch } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
+import { gameIdOf } from '../model.js'
 import { creatureHeader } from '../creatureHeader.js'
 import MonsterView from './MonsterView.jsx'
 
@@ -10,8 +11,7 @@ import MonsterView from './MonsterView.jsx'
 // page, Perception-based initiative — over the count/nickname/stat-block controls.
 export default function MonsterLine({ monster, entryOf, disabled, onChange, onRemove }) {
   const set = (fields) => onChange({ ...monster, ...fields })
-  // Pristine refs carry game_id; a templated (derived) ref carries base.game_id.
-  const gameId = monster.ref?.game_id || monster.ref?.base?.game_id || ''
+  const gameId = gameIdOf(monster) // pristine game_id, or a templated ref's base.game_id
   const [showBlock, setShowBlock] = useState(false)
 
   if (!gameId) {
