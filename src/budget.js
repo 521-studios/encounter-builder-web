@@ -4,6 +4,7 @@
 // without fetching; the TreasureBudget component wires the real fetched entries.
 import { itemPriceCp, creatureLevel, coinsToCp } from '@521studios/pfsrd2-display'
 import { creatureXp, encounterThreat, treasureBudget } from './pf2eRules.js'
+import { isCustomTreasure } from './model.js'
 
 // refGameId: the game_id a monster/treasure ref resolves to — a pristine ref, or
 // a derived (templated/runed) ref's base.game_id.
@@ -27,6 +28,14 @@ export function treasureValueCp(treasure, currency, entryOf) {
   const unpriced = []
   for (const line of treasure || []) {
     if (line.state === 'destroyed') continue
+    if (isCustomTreasure(line)) {
+      // A freeform item carries its own gp value (in copper); a line left unvalued
+      // (null) floors the total like any unpriced item.
+      const v = line.ref.json.value_cp
+      if (typeof v === 'number' && Number.isFinite(v)) cp += v * (line.qty || 1)
+      else unpriced.push(line)
+      continue
+    }
     if (isDerived(line.ref)) {
       unpriced.push(line)
       continue
