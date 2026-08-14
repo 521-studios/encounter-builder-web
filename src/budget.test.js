@@ -47,6 +47,29 @@ test('treasureValueCp flags Varies / derived / missing lines as unpriced (not 0)
   assert.equal(unpriced.length, 3)
 })
 
+test('treasureValueCp values a custom (freeform) item by its gp value × qty', () => {
+  const { cp, unpriced } = treasureValueCp(
+    [
+      { ref: { json: { name: 'peridot bead', value_cp: 200 } }, qty: 2 }, // 2 × 2 gp = 400 cp
+      { ref: { json: { name: 'chipped tooth', value_cp: 0 } }, qty: 1 }, // worthless trophy — valued 0, not unpriced
+    ],
+    { gp: 1 }, // 100 cp
+    entryOf,
+  )
+  assert.equal(cp, 400 + 0 + 100)
+  assert.equal(unpriced.length, 0)
+})
+
+test('treasureValueCp flags a custom item with no entered value as unpriced (floor)', () => {
+  const { cp, unpriced } = treasureValueCp(
+    [{ ref: { json: { name: 'mysterious gem', value_cp: null } }, qty: 1 }],
+    {},
+    entryOf,
+  )
+  assert.equal(cp, 0)
+  assert.equal(unpriced.length, 1)
+})
+
 test('treasureValueCp skips destroyed loot', () => {
   const { cp } = treasureValueCp(
     [{ ref: { game_id: 'Weapons:1' }, qty: 1, state: 'destroyed' }],

@@ -1,6 +1,21 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { keyed, withKey, stripKey, emptyMonster, emptyTreasure, toEncounterInput, hasRef, gameIdOf, buildInput } from './model.js'
+import {
+  keyed,
+  withKey,
+  stripKey,
+  emptyMonster,
+  emptyTreasure,
+  toEncounterInput,
+  hasRef,
+  gameIdOf,
+  buildInput,
+  customTreasureRef,
+  isCustomTreasure,
+  hasTreasureContent,
+  gpToCp,
+  cpToGp,
+} from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
   const out = keyed({
@@ -100,6 +115,59 @@ test('toEncounterInput drops half-filled rows (autosave fires mid-edit)', () => 
   assert.equal(input.monsters[0].ref.game_id, 'Monsters:1')
   assert.equal(input.treasure.length, 1)
   assert.equal(input.treasure[0].ref.game_id, 'Weapons:1')
+})
+
+test('custom treasure: ref/detector/content helpers', () => {
+  const ref = customTreasureRef('peridot bead', 200) // 2 gp
+  assert.deepEqual(ref, { json: { name: 'peridot bead', value_cp: 200 } })
+  assert.equal(isCustomTreasure({ ref }), true)
+  assert.equal(isCustomTreasure({ ref: { game_id: 'Weapons:1' } }), false) // catalog
+  assert.equal(isCustomTreasure({ ref: { base: { game_id: 'W:1' }, json: {} } }), false) // derived, not custom
+  assert.equal(isCustomTreasure({ ref: { game_id: '' } }), false) // unfilled
+  // gameIdOf/hasRef stay false for a custom line, but hasTreasureContent keeps it.
+  assert.equal(gameIdOf({ ref }), '')
+  assert.equal(hasRef({ ref }), false)
+  assert.equal(hasTreasureContent({ ref }), true)
+  assert.equal(hasTreasureContent({ ref: { game_id: 'Weapons:1' } }), true) // catalog
+  assert.equal(hasTreasureContent({ ref: { game_id: '' } }), false) // unfilled → dropped
+})
+
+test('gpToCp/cpToGp: empty is null (unvalued), not 0 — the floor-vs-valued distinction', () => {
+  // The crux of the floor logic: Number('') === 0, so '' must stay null (unvalued),
+  // distinct from '0' (a valued 0-gp trophy).
+  assert.equal(gpToCp(''), null) // cleared → unvalued (floors the total)
+  assert.equal(gpToCp('0'), 0) // explicit zero → valued 0
+  assert.equal(gpToCp('2'), 200)
+  assert.equal(gpToCp('2.5'), 250)
+  assert.ok(Number.isNaN(gpToCp('abc'))) // garbage → NaN (budget routes to unpriced)
+  assert.equal(cpToGp(null), '') // unvalued → blank input
+  assert.equal(cpToGp(0), 0) // valued 0 → shows 0, not blank
+  assert.equal(cpToGp(200), 2)
+})
+
+test('hasTreasureContent drops a BLANK custom row but keeps one with a name or value', () => {
+  // A freshly-added "+ custom item" (empty name, null value) must not persist as a
+  // ghost row; content in either field keeps it.
+  assert.equal(hasTreasureContent({ ref: customTreasureRef('', null) }), false) // blank → dropped
+  assert.equal(hasTreasureContent({ ref: customTreasureRef('peridot', null) }), true) // name only
+  assert.equal(hasTreasureContent({ ref: customTreasureRef('', 0) }), true) // value 0 (trophy)
+  assert.equal(hasTreasureContent({ ref: customTreasureRef('  ', null) }), false) // whitespace name → dropped
+  // isCustomTreasure still matches the blank row so it renders while being edited.
+  assert.equal(isCustomTreasure({ ref: customTreasureRef('', null) }), true)
+})
+
+test('toEncounterInput keeps a custom (freeform) treasure line and strips _key', () => {
+  const enc = keyed({
+    name: 'Loot',
+    treasure: [
+      withKey({ ref: customTreasureRef('gold tooth', 400), qty: 1 }),
+      emptyTreasure(), // unfilled → dropped
+    ],
+  })
+  const input = toEncounterInput(enc)
+  assert.equal(input.treasure.length, 1)
+  assert.deepEqual(input.treasure[0].ref, { json: { name: 'gold tooth', value_cp: 400 } })
+  assert.ok(!('_key' in input.treasure[0]))
 })
 
 test('toEncounterInput keeps a templated (derived) monster whose ref carries base.game_id', () => {
