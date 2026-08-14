@@ -1,6 +1,6 @@
 import { useEntries } from './useEntries.js'
 import { treasureValueCp, encounterXp, gameIdsInEncounter } from './budget.js'
-import { encounterThreat } from './pf2eRules.js'
+import { encounterThreat, BASE_PARTY } from './pf2eRules.js'
 
 // useEncounterBudget computes an encounter's treasure value (copper) + difficulty
 // (XP → threat band) against a party level/size, fetching the referenced entries
@@ -15,11 +15,29 @@ export function useEncounterBudget(encounter, partyLevel, partySize) {
   const { xp, unknown } = encounterXp(encounter.monsters, partyLevel, entryOf)
   const threat = encounterThreat(xp, partySize)
 
+  // Canonical lens for comparing against a published module (whose printed band
+  // assumes the 4-PC standard). TWO DISTINCT normalizations — the panel shows them
+  // as separate metrics, not one figure:
+  //   canonicalThreat — the same (size-independent) raw XP classified at 4-PC
+  //     thresholds: this roster's difficulty BAND for a 4-PC party, directly
+  //     comparable to a module's printed band. Roster-fixed.
+  //   xpPer4 — the raw XP rescaled to a 4-PC budget ("4-PC-equivalent" award), the
+  //     number GMs track by hand. A linear rescale (the band budget is instead
+  //     additive per PC), so its own implied band roughly follows the as-configured
+  //     band but diverges at the Low/Trivial edge — it's shown only as an XP figure,
+  //     never re-classified into a band.
+  // The two answer different questions and their implied bands can differ; only
+  // shown when the table isn't already 4 PCs.
+  const canonicalThreat = encounterThreat(xp, BASE_PARTY)
+  const xpPer4 = partySize ? Math.round((xp * BASE_PARTY) / partySize) : xp
+
   return {
     entryOf, // shared with the monster lines so each creature's entry is fetched once
     cp,
     xp,
     threat,
+    canonicalThreat,
+    xpPer4,
     loading,
     unpricedCount: unpriced.length,
     unknownCount: unknown.length,
