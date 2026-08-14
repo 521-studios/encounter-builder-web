@@ -39,7 +39,7 @@ test('treasure item version is locked in by selecting it and persists', async ({
 
   // Reload, re-open — the Greater version is still locked in (collapsed), no prompt.
   await page.reload()
-  await page.locator('button.campaign').first().click()
+  await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
   await page.locator('button.encounter', { hasText: name }).click()
   const wrap2 = page.locator('.treasure-line-wrap')
   const card2 = wrap2.locator('.itemcard')

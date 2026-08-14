@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getUser, getAccessToken, login, logout, completeLogin, onUserChange } from './auth/oidc.js'
 import { setTokenProvider } from './api/token.js'
+import { fetchGames } from './api/letsroll.js'
+import { chapters as chaptersApi } from './api/chapters.js'
+import { parseLocation, urlFor } from './router.js'
 import CampaignList from './components/CampaignList.jsx'
 import CampaignSwitcher from './components/CampaignSwitcher.jsx'
 import ChapterTree from './components/ChapterTree.jsx'
@@ -32,6 +35,46 @@ export default function App() {
   const onSaved = () => setReloadKey((k) => k + 1)
   const onSaveError = (what) => setSaveError(what)
 
+  // Restore the campaign + main view from the query string (deep-link, reload, and
+  // back/forward). The campaign object comes from the games list; a chapter view
+  // needs its full record (ChapterDetail reads name/party/order), so we fetch the
+  // campaign's chapters and match by id. An encounter view needs only the id. Any
+  // failure (stale link, network) degrades to the campaign list rather than a broken
+  // pane. Stable (only setters + module imports), so effects can depend on it.
+  const restoreFromSearch = useCallback(async (search) => {
+    const { campaignId, view: target } = parseLocation(search)
+    if (!campaignId) {
+      setCampaign(null)
+      setView({ kind: 'empty' })
+      return
+    }
+    try {
+      const games = await fetchGames()
+      // lets-roll game ids are numeric; the URL param is a string — compare as strings.
+      const c = games.find((g) => String(g.id) === campaignId && g.am_gm)
+      if (!c) {
+        setCampaign(null)
+        setView({ kind: 'empty' })
+        return
+      }
+      setCampaign(c)
+      if (target.kind === 'encounter') {
+        setView({ kind: 'encounter', enc: { id: target.encounterId } })
+      } else if (target.kind === 'chapter') {
+        const all = await chaptersApi.list(c.id)
+        const ch = all.find((x) => String(x.id) === target.chapterId)
+        setView(ch ? { kind: 'chapter', chapter: ch } : { kind: 'empty' })
+      } else if (target.kind === 'campaign') {
+        setView({ kind: 'campaign' })
+      } else {
+        setView({ kind: 'empty' })
+      }
+    } catch {
+      setCampaign(null)
+      setView({ kind: 'empty' })
+    }
+  }, [])
+
   useEffect(() => {
     if (booted.current) return // once, even under StrictMode (the auth code is single-use)
     booted.current = true
@@ -45,10 +88,37 @@ export default function App() {
         window.history.replaceState({}, '', '/') // drop code/state from the URL
       }
       const user = await getUser()
-      setStatus(user ? 'authed' : 'anon')
+      if (!user) {
+        setStatus('anon')
+        return
+      }
+      // Restore the deep-linked view before revealing the app, so a reload lands back
+      // on the same encounter/chapter instead of flashing the campaign list.
+      await restoreFromSearch(window.location.search)
+      setStatus('authed')
     })()
     return onUserChange((u) => setStatus(u ? 'authed' : 'anon'))
-  }, [])
+  }, [restoreFromSearch])
+
+  // Reflect the current nav state in the URL so reload/back/forward and shareable
+  // deep-links work. Guarded on a real change so restore (which sets state to match
+  // the URL) doesn't push a redundant entry — and so back/forward, which change the
+  // URL first, don't get a spurious push when restore re-syncs the state.
+  useEffect(() => {
+    if (status !== 'authed') return
+    const target = urlFor(campaign?.id, view)
+    if (target !== window.location.pathname + window.location.search) {
+      window.history.pushState({}, '', target)
+    }
+  }, [campaign, view, status])
+
+  // Back/forward: re-derive the view from the (already-updated) URL.
+  useEffect(() => {
+    if (status !== 'authed') return
+    const onPop = () => restoreFromSearch(window.location.search)
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [status, restoreFromSearch])
 
   return (
     <main className="app">

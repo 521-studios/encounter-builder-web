@@ -46,7 +46,7 @@ test('drag an encounter between chapters and to Unsorted', async ({ page, baseUR
 
   // The move persisted: survives a reload.
   await page.reload()
-  await page.locator('button.campaign').first().click()
+  await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
   await expect(groupOf('Unsorted').locator('button.encounter', { hasText: enc })).toBeVisible()
 
   // Cleanup.
