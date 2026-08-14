@@ -1,9 +1,10 @@
 // Query-string routing for the SPA. We encode navigation in the query string
 // (`/?campaign=…&encounter=…`) rather than the path so the CloudFront edge always
 // serves index.html at `/` — no SPA path-rewrite/fallback needed at the edge (this
-// app must not own edge config; see CLAUDE.md). Two pure helpers the App wires to
-// the History API: parse the current location into {campaignId, view}, and build
-// the query string for a given nav state. Kept pure so they're unit-testable.
+// app must not own edge config; see CLAUDE.md). Three pure, unit-testable helpers:
+// parseLocation reads the current location into {campaignId, view}; locationFor
+// builds the bare query string for a nav state; urlFor wraps it into the path+query
+// the App pushes to the History API.
 
 // parseLocation(search) → { campaignId, view } where view is one of:
 //   { kind: 'empty' } | { kind: 'campaign' }

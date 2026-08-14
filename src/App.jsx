@@ -42,36 +42,48 @@ export default function App() {
   // failure (stale link, network) degrades to the campaign list rather than a broken
   // pane. Stable (only setters + module imports), so effects can depend on it.
   const restoreFromSearch = useCallback(async (search) => {
-    const { campaignId, view: target } = parseLocation(search)
-    if (!campaignId) {
+    const toCampaignList = () => {
       setCampaign(null)
       setView({ kind: 'empty' })
-      return
     }
+    const { campaignId, view: target } = parseLocation(search)
+    if (!campaignId) return toCampaignList()
     try {
       const games = await fetchGames()
       // lets-roll game ids are numeric; the URL param is a string — compare as strings.
       const c = games.find((g) => String(g.id) === campaignId && g.am_gm)
-      if (!c) {
-        setCampaign(null)
-        setView({ kind: 'empty' })
-        return
+      if (!c) return toCampaignList()
+
+      // Resolve the view (including any awaited fetch) BEFORE committing state, so
+      // campaign + view land in a single render. If setCampaign committed before an
+      // awaited chapter fetch, the URL-sync effect could fire on the intermediate
+      // campaign-only state and clobber the more-specific chapter URL on back/forward.
+      let nextView
+      if (target.kind === 'encounter') {
+        nextView = { kind: 'encounter', enc: { id: target.encounterId } }
+      } else if (target.kind === 'chapter') {
+        try {
+          const all = await chaptersApi.list(c.id)
+          const ch = all.find((x) => String(x.id) === target.chapterId)
+          nextView = ch ? { kind: 'chapter', chapter: ch } : { kind: 'empty' }
+        } catch (e) {
+          // A chapter-fetch failure degrades to the loaded campaign's empty pane —
+          // not all the way back to the campaign list, which would drop the campaign.
+          console.error('Encounter Builder: could not load the deep-linked chapter:', e)
+          nextView = { kind: 'empty' }
+        }
+      } else if (target.kind === 'campaign') {
+        nextView = { kind: 'campaign' }
+      } else {
+        nextView = { kind: 'empty' }
       }
       setCampaign(c)
-      if (target.kind === 'encounter') {
-        setView({ kind: 'encounter', enc: { id: target.encounterId } })
-      } else if (target.kind === 'chapter') {
-        const all = await chaptersApi.list(c.id)
-        const ch = all.find((x) => String(x.id) === target.chapterId)
-        setView(ch ? { kind: 'chapter', chapter: ch } : { kind: 'empty' })
-      } else if (target.kind === 'campaign') {
-        setView({ kind: 'campaign' })
-      } else {
-        setView({ kind: 'empty' })
-      }
-    } catch {
-      setCampaign(null)
-      setView({ kind: 'empty' })
+      setView(nextView)
+    } catch (e) {
+      // Stale link / games fetch failed: degrade to the campaign list (which surfaces
+      // its own load error), logging so the failure isn't silent.
+      console.error('Encounter Builder: could not restore navigation from the URL:', e)
+      toCampaignList()
     }
   }, [])
 
