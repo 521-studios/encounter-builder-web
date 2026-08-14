@@ -50,14 +50,26 @@ export function encounterXp(monsters, partyLevel, entryOf) {
   let xp = 0
   const unknown = []
   for (const m of monsters || []) {
-    const gid = refGameId(m.ref)
-    const entry = gid ? entryOf(gid) : null
-    const lvl = entry ? creatureLevel(entry) : null
+    // A derived (templated) ref carries the resolved creature in ref.json — its
+    // level already reflects every applied template (elite/weak is applied this way,
+    // not via the legacy `adjustment` field), so read it directly and don't
+    // double-shift. Pristine refs use the base entry level + the adjustment shift.
+    const resolved = m.ref?.json || null
+    let lvl, adjustment
+    if (resolved) {
+      lvl = creatureLevel(resolved)
+      adjustment = 'none'
+    } else {
+      const gid = refGameId(m.ref)
+      const entry = gid ? entryOf(gid) : null
+      lvl = entry ? creatureLevel(entry) : null
+      adjustment = m.adjustment
+    }
     if (lvl == null) {
       unknown.push(m)
       continue
     }
-    xp += creatureXp(lvl, partyLevel, m.adjustment) * (m.count || 1)
+    xp += creatureXp(lvl, partyLevel, adjustment) * (m.count || 1)
   }
   return { xp, unknown }
 }
