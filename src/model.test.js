@@ -15,6 +15,8 @@ import {
   hasTreasureContent,
   gpToCp,
   cpToGp,
+  emptyPool,
+  treasureLineInput,
 } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
@@ -130,6 +132,68 @@ test('custom treasure: ref/detector/content helpers', () => {
   assert.equal(hasTreasureContent({ ref }), true)
   assert.equal(hasTreasureContent({ ref: { game_id: 'Weapons:1' } }), true) // catalog
   assert.equal(hasTreasureContent({ ref: { game_id: '' } }), false) // unfilled → dropped
+})
+
+test('keyed materializes a default pool for treasure and adopts orphan lines', () => {
+  const out = keyed({ treasure: [{ ref: { game_id: 't1' }, qty: 1 }, { ref: { game_id: 't2' }, qty: 1, pool_id: 'gone' }] })
+  assert.equal(out.treasure_pools.length, 1) // one default pool
+  const def = out.treasure_pools[0].id
+  assert.ok(def) // has a stable id
+  assert.equal(out.treasure[0].pool_id, def) // no pool_id → default
+  assert.equal(out.treasure[1].pool_id, def) // dangling pool_id → default
+})
+
+test('keyed keeps existing pools and only adopts truly-orphaned lines', () => {
+  const out = keyed({
+    treasure_pools: [{ id: 'p1', name: 'altar' }],
+    treasure: [{ ref: { game_id: 't1' }, qty: 1, pool_id: 'p1' }, { ref: { game_id: 't2' }, qty: 1 }],
+  })
+  assert.equal(out.treasure_pools.length, 1)
+  assert.equal(out.treasure[0].pool_id, 'p1') // already assigned → unchanged
+  assert.equal(out.treasure[1].pool_id, 'p1') // orphan adopts the (first/default) pool
+})
+
+test('keyed leaves a treasureless encounter pool-less', () => {
+  assert.deepEqual(keyed({ treasure: [] }).treasure_pools, [])
+})
+
+test('treasureLineInput strips _key and drops an empty value_tiers, keeps a set one', () => {
+  // Empty tiers (all null) — the API rejects it, so it must not be sent.
+  const empty = treasureLineInput({ _key: 'k', ref: { game_id: 'g' }, qty: 1, value_tiers: {} })
+  assert.ok(!('_key' in empty))
+  assert.ok(!('value_tiers' in empty))
+  // One tier set → kept (with the pool_id and ref intact).
+  const set = treasureLineInput({ _key: 'k', ref: { game_id: 'g' }, qty: 1, pool_id: 'p1', value_tiers: { success: 4000 } })
+  assert.deepEqual(set, { ref: { game_id: 'g' }, qty: 1, pool_id: 'p1', value_tiers: { success: 4000 } })
+})
+
+test('emptyPool has a stable id and empty content', () => {
+  const p = emptyPool('altar')
+  assert.ok(typeof p.id === 'string' && p.id.length > 0)
+  assert.equal(p.name, 'altar')
+  assert.equal(p.description, '')
+  assert.equal(p.gate, null)
+})
+
+test('toEncounterInput persists referenced/described pools, drops empty unused ones', () => {
+  const enc = keyed({
+    name: 'Loot',
+    treasure_pools: [
+      { id: 'p1', name: 'altar', description: '# hidden', gate: { skill: 'Perception', dc: 18 } },
+      { id: 'p2', name: '', description: '', gate: null }, // empty + unused → dropped
+      { id: 'p3', name: 'thief', description: '', gate: null }, // named → kept
+    ],
+    treasure: [{ ref: { game_id: 'Weapons:1' }, qty: 1, pool_id: 'p1' }],
+  })
+  const pools = toEncounterInput(enc).treasure_pools
+  const ids = pools.map((p) => p.id)
+  assert.ok(ids.includes('p1')) // referenced by a line
+  assert.ok(ids.includes('p3')) // has a name
+  assert.ok(!ids.includes('p2')) // empty + unused → dropped
+  assert.deepEqual(
+    pools.find((p) => p.id === 'p1').gate,
+    { skill: 'Perception', dc: 18 },
+  )
 })
 
 test('gpToCp/cpToGp: empty is null (unvalued), not 0 — the floor-vs-valued distinction', () => {
