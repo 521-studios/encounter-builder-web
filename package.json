@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --import ./test/support/setup-dom.mjs --test",
+    "test": "node --import ./test/support/setup-dom.mjs --test 'src/**/*.test.js'",
     "e2e": "playwright test -c e2e/playwright.config.js",
     "e2e:install": "playwright install --with-deps chromium"
   },

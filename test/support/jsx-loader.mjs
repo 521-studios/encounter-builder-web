@@ -20,7 +20,14 @@ export async function resolve(specifier, context, nextResolve) {
 }
 
 export async function load(url, context, nextLoad) {
-  if (url.startsWith('file:') && url.includes('/src/') && (url.endsWith('.js') || url.endsWith('.jsx'))) {
+  // Only app source — never a dep (some ship a `src/` dir, e.g. debug/src/*.js,
+  // which is CommonJS and must NOT be forced to ESM).
+  if (
+    url.startsWith('file:') &&
+    url.includes('/src/') &&
+    !url.includes('/node_modules/') &&
+    (url.endsWith('.js') || url.endsWith('.jsx'))
+  ) {
     const source = await readFile(fileURLToPath(url), 'utf8')
     const { code } = await transform(source, {
       loader: 'jsx',

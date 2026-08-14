@@ -49,3 +49,28 @@ test('useAutosave surfaces a failed save as error state', async () => {
     console.error = origErr
   }
 })
+
+test('useAutosave flushes a still-pending edit on unmount (nav-away durability)', async () => {
+  const calls = []
+  // Long delay so the debounce can't fire on its own — only the unmount flush can.
+  const { result, unmount } = renderHook(() => useAutosave(async (v) => { calls.push(v) }, 1000))
+  act(() => result.current.schedule('x'))
+  assert.deepEqual(calls, []) // not saved yet (debounce hasn't elapsed)
+  await act(async () => { unmount() }) // leaving → the pending edit is flushed
+  await tick(0) // let the fire-and-forget flush promise settle
+  assert.deepEqual(calls, ['x'])
+})
+
+test('useAutosave does NOT re-fire on unmount while a save is already in flight', async () => {
+  const calls = []
+  let release
+  const save = async (v) => { calls.push(v); await new Promise((r) => { release = r }) } // block in-flight
+  const { result, unmount } = renderHook(() => useAutosave(save, 5))
+  act(() => result.current.schedule('x'))
+  await tick(10) // save('x') has started and is blocking (savingRef true, pending drained)
+  assert.deepEqual(calls, ['x'])
+  await act(async () => { unmount() }) // in-flight → the unmount flush must NOT re-send
+  await act(async () => { release() })
+  await tick(5)
+  assert.deepEqual(calls, ['x']) // not re-fired
+})

@@ -37,9 +37,8 @@ encounter-builder-web/
 npm install
 npm run dev     # http://localhost:5173 — auths against staging lets-roll,
                 # proxies /api to the staging edge (vite.config.js)
-npm test        # node --test — pure logic AND React component/hook tests
-                # (jsdom + @testing-library/react via test/support/setup-dom.mjs;
-                #  *.test.js may render components / renderHook — no Jest/Vitest)
+npm test        # node --test — pure logic AND React component/hook tests (no Jest/Vitest;
+                # jsdom + @testing-library/react via test/support/setup-dom.mjs)
 npm run build   # dist/ (needs VITE_OIDC_AUTHORITY)
 ```
 
