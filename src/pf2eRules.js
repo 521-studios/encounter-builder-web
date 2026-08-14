@@ -53,7 +53,7 @@ const CREATURE_XP_BY_REL = { '-4': 10, '-3': 15, '-2': 20, '-1': 30, 0: 40, 1: 6
 
 const MIN_LEVEL = 1
 const MAX_LEVEL = 20
-const BASE_PARTY = 4
+export const BASE_PARTY = 4
 
 function clampLevel(level) {
   return Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level))

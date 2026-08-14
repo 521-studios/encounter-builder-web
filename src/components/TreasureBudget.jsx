@@ -1,5 +1,5 @@
 import { formatGp } from '@521studios/pfsrd2-display'
-import { treasureBudget, TREASURE_BANDS, BAND_LABELS } from '../pf2eRules.js'
+import { treasureBudget, TREASURE_BANDS, BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 
 // The encounter's treasure-vs-budget panel: presents the computed budget (from
 // useEncounterBudget — treasure value + difficulty band) against the Table 5-3
@@ -7,11 +7,14 @@ import { treasureBudget, TREASURE_BANDS, BAND_LABELS } from '../pf2eRules.js'
 // loot marked over/under its target. Fetching lives in the hook so the difficulty
 // badge on the title can share it.
 export default function TreasureBudget({ budget, partyLevel, partySize }) {
-  const { cp, xp, threat, loading, unpricedCount, unknownCount, failedCount, onRetry } = budget
+  const { cp, xp, threat, canonicalThreat, xpPer4, loading, unpricedCount, unknownCount, failedCount, onRetry } = budget
 
-  // The total is a floor whenever some lines couldn't be valued (still loading, a
-  // failed fetch, or a genuinely unpriceable derived/"Varies" item).
+  // The treasure total is a floor whenever some lines couldn't be valued (still
+  // loading, a failed fetch, or a genuinely unpriceable derived/"Varies" item).
   const incomplete = loading || failedCount > 0 || unpricedCount > 0 || unknownCount > 0
+  // The XP (and thus both bands + the normalized figure) is a floor only when
+  // monster XP itself is incomplete — an unpriced treasure line doesn't affect it.
+  const xpIncomplete = loading || failedCount > 0 || unknownCount > 0
 
   const target = treasureBudget(partyLevel, threat, partySize) // null for a Trivial encounter
   // "Over" is safe on a floor (true value ≥ the shown floor); "under" is only
@@ -37,6 +40,22 @@ export default function TreasureBudget({ budget, partyLevel, partySize }) {
           </span>
         )}
       </p>
+
+      {/* Canonical lens (only when the table isn't the 4-PC standard). Two DIFFERENT
+          normalizations, deliberately shown as distinct metrics (not one figure):
+          the difficulty BAND is the same roster read at 4-PC thresholds — directly
+          comparable to a module's printed band (e.g. a fight that's Trivial for your
+          6 is a Low the book intended for 4); the XP AWARD is the raw XP rescaled to
+          a 4-PC budget (difficulty-preserving), the number GMs track by hand. Their
+          implied bands can differ — they answer different questions. */}
+      {partySize !== BASE_PARTY && (
+        <p className="budget-canonical" data-testid="budget-canonical">
+          At {BASE_PARTY} PCs (book standard): difficulty{' '}
+          <strong data-testid="canonical-threat">{BAND_LABELS[canonicalThreat]}</strong>
+          {xpIncomplete && xp > 0 ? ' (floor)' : ''}
+          {' · '}~{xpPer4} XP award (party-size–normalized)
+        </p>
+      )}
 
       <div className="chart-scroll">
         <table className="treasure-chart">

@@ -6,7 +6,7 @@ import { chapters as chaptersApi } from '../api/chapters.js'
 import { settings as settingsApi } from '../api/settings.js'
 import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, keyed } from '../model.js'
 import { resolveParty } from '../party.js'
-import { BAND_LABELS } from '../pf2eRules.js'
+import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
 import MonsterLine from './MonsterLine.jsx'
 import TreasureLine from './TreasureLine.jsx'
@@ -200,7 +200,12 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         <span
           className={`difficulty-badge difficulty-badge--${budget.threat}`}
           data-testid="difficulty-badge"
-          title={`${BAND_LABELS[budget.threat]} encounter for a level-${effectiveParty.level} party (from monster XP)`}
+          title={
+            `${BAND_LABELS[budget.threat]} encounter for a level-${effectiveParty.level} party (from monster XP)` +
+            (effectiveParty.size !== BASE_PARTY
+              ? ` · ${BAND_LABELS[budget.canonicalThreat]} at ${BASE_PARTY} PCs (book standard)`
+              : '')
+          }
         >
           {BAND_LABELS[budget.threat]} {effectiveParty.level}
         </span>
