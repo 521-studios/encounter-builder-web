@@ -91,5 +91,10 @@ test('party level/size inherits campaign -> chapter -> encounter with per-layer 
   await page.getByTestId('campaign-settings').click()
   await expect(page.getByTestId('campaign-detail').getByLabel('party level')).toHaveValue('')
 
-  expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
+  // The campaign summary (now always visible) eagerly fetches every campaign
+  // encounter's entries, incl. pre-existing ones with stale content refs that 404 —
+  // handled gracefully (flagged as a floor). Ignore pfsrd2 entry 404s; still fail on
+  // any /api/app or other 4xx/5xx.
+  const realErrors = apiErrors.filter((e) => !/^404 GET .*\/api\/pfsrd2\/entries\/.*\/full$/.test(e))
+  expect(realErrors, 'no app API request should return 4xx/5xx').toEqual([])
 })

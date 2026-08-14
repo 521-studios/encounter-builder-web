@@ -4,7 +4,9 @@ import { chapters as chaptersApi } from '../api/chapters.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { errorMessage } from '../api/errors.js'
 import { resolveParty, partyFields } from '../party.js'
+import { BAND_LABELS } from '../pf2eRules.js'
 import { useAutosave, SAVE_LABEL } from '../useAutosave.js'
+import { useRollup } from '../useRollup.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
 
@@ -23,7 +25,6 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
   const [chapterEncounters, setChapterEncounters] = useState([]) // this chapter's encounters (for the rollup)
   const [encountersError, setEncountersError] = useState(false) // encounters list failed to load (rollup is unreliable)
   const [error, setError] = useState(null)
-  const [showRollup, setShowRollup] = useState(false) // rollup fetches on demand — keep page load light
   const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the encounters list on retry
 
   const { state: saveState, schedule } = useAutosave(async (v) => {
@@ -34,6 +35,10 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
     })
     onSaved && onSaved(updated)
   })
+
+  // Always-visible chapter treasure rollup (per encounter). Called unconditionally
+  // before the early return (rules of hooks); tolerates the still-loading state.
+  const rollup = useRollup(chapterEncounters, (enc) => resolveParty({ encounter: enc, chapter, campaign: campaignSettings }))
 
   useEffect(() => {
     let alive = true
@@ -112,21 +117,16 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
         onChange={(next) => commit({ ...value, ...next })}
       />
 
-      <div className="rollup-toggle">
-        <button type="button" className="link" aria-expanded={showRollup} onClick={() => setShowRollup((v) => !v)}>
-          {showRollup ? 'Hide' : 'Show'} chapter treasure
-        </button>
-      </div>
-      {showRollup && (
-        <TreasureRollup
-          encounters={chapterEncounters}
-          partyFor={(enc) => resolveParty({ encounter: enc, chapter, campaign: campaignSettings })}
-          title="Chapter treasure"
-          emptyLabel="No encounters in this chapter yet."
-          loadError={encountersError}
-          onReload={() => setReloadKey((k) => k + 1)}
-        />
-      )}
+      <TreasureRollup
+        rollup={rollup}
+        title="Chapter treasure"
+        rowLabel="Encounter"
+        secondaryLabel="Difficulty"
+        secondaryOf={(r) => BAND_LABELS[r.threat]}
+        emptyLabel="No encounters in this chapter yet."
+        loadError={encountersError}
+        onReload={() => setReloadKey((k) => k + 1)}
+      />
     </section>
   )
 }

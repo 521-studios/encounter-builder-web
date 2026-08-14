@@ -72,6 +72,7 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
   const rows = []
   let totalCp = 0
   let totalTargetCp = 0
+  let totalXp = 0
   for (const enc of encounters || []) {
     const { level, size } = partyFor(enc)
     const { cp, unpriced } = treasureValueCp(enc.treasure, enc.currency, entryOf)
@@ -79,11 +80,47 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
     const threat = encounterThreat(xp, size)
     const targetGp = treasureBudget(level, threat, size) // null for a Trivial encounter
     const targetCp = targetGp == null ? 0 : targetGp * 100
-    rows.push({ id: enc.id, name: enc.name, cp, threat, targetCp, incomplete: unpriced.length > 0 || unknown.length > 0 })
+    rows.push({ id: enc.id, name: enc.name, cp, xp, threat, targetCp, incomplete: unpriced.length > 0 || unknown.length > 0 })
     totalCp += cp
     totalTargetCp += targetCp
+    totalXp += xp
   }
-  return { totalCp, totalTargetCp, rows, anyIncomplete: rows.some((r) => r.incomplete) }
+  return { totalCp, totalTargetCp, totalXp, rows, anyIncomplete: rows.some((r) => r.incomplete) }
+}
+
+// rollupByChapter summarizes a whole campaign one row PER CHAPTER (not per
+// encounter): each chapter's encounters are aggregated via rollupEncounters and
+// its treasure / target / XP summed. Chapters render in order; encounters with no
+// chapter (or a dangling chapter_id) collect into a trailing "Unsorted" row only
+// when non-empty. Difficulty sums as XP (a number) — bands don't add.
+export function rollupByChapter(chapters, encounters, entryOf, partyFor) {
+  const list = encounters || []
+  const byChapter = new Map()
+  for (const enc of list) {
+    const k = enc.chapter_id || ''
+    if (!byChapter.has(k)) byChapter.set(k, [])
+    byChapter.get(k).push(enc)
+  }
+  const chapterIds = new Set((chapters || []).map((c) => c.id))
+
+  const rows = []
+  let totalCp = 0
+  let totalTargetCp = 0
+  let totalXp = 0
+  const pushRow = (id, name, encs) => {
+    const r = rollupEncounters(encs, entryOf, partyFor)
+    rows.push({ id, name, xp: r.totalXp, cp: r.totalCp, targetCp: r.totalTargetCp, incomplete: r.anyIncomplete })
+    totalCp += r.totalCp
+    totalTargetCp += r.totalTargetCp
+    totalXp += r.totalXp
+  }
+
+  for (const ch of chapters || []) pushRow(ch.id, ch.name, byChapter.get(ch.id) || [])
+  // Chapterless + dangling-chapter encounters → one Unsorted row (only if any).
+  const unsorted = list.filter((e) => !e.chapter_id || !chapterIds.has(e.chapter_id))
+  if (unsorted.length) pushRow('', 'Unsorted', unsorted)
+
+  return { totalCp, totalTargetCp, totalXp, rows, anyIncomplete: rows.some((r) => r.incomplete) }
 }
 
 // gameIdsInEncounter: the distinct entry ids an encounter references (monsters +
