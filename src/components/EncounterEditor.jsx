@@ -15,7 +15,7 @@ import TreasureBudget from './TreasureBudget.jsx'
 
 const AUTOSAVE_MS = 800
 
-export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted }) {
+export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError }) {
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
   const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
@@ -120,7 +120,11 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       const leaving = encRef.current
       if (dirtyRef.current && !savingRef.current && leaving && leaving.status !== 'released') {
         dirtyRef.current = false
-        encounters.update(campaignId, encounterId, buildInput(leaving)).catch(() => {})
+        // The editor is unmounting, so its "Save failed" indicator is gone — a
+        // failed flush must surface at the app level or the edit is lost silently.
+        encounters
+          .update(campaignId, encounterId, buildInput(leaving))
+          .catch(() => onSaveError && onSaveError(`encounter “${leaving.name || 'Untitled encounter'}”`))
       }
     }
   }, [campaignId, encounterId])

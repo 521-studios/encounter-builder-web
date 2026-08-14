@@ -7,11 +7,16 @@ export const SAVE_LABEL = { saving: 'Saving…', unsaved: 'Unsaved…', error: '
 // via schedule(value) and committed by save(value) after `delay` ms of quiet.
 // Load doesn't schedule, so the just-fetched state is never re-saved. Overlapping
 // edits coalesce (the newest pending value wins); a pending edit is flushed on
-// unmount so the last <delay> ms aren't lost when navigating away.
-export function useAutosave(save, delay = 800) {
+// unmount so the last <delay> ms aren't lost when navigating away. `onError(err)`
+// (optional) fires on any failed save — including the fire-and-forget flush after
+// unmount, whose 'error' state has already gone with the component — so a caller
+// can surface it durably (e.g. an app-level banner).
+export function useAutosave(save, delay = 800, onError) {
   const [state, setState] = useState('saved') // saved | unsaved | saving | error
   const saveRef = useRef(save)
   saveRef.current = save
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
   const timer = useRef(null)
   const savingRef = useRef(false)
   const pendingRef = useRef(undefined) // undefined = nothing pending
@@ -32,6 +37,7 @@ export function useAutosave(save, delay = 800) {
       // token vs a validation reject), unlike the other writes that surface errorMessage.
       console.error('autosave failed:', err)
       setState('error')
+      onErrorRef.current && onErrorRef.current(err)
     } finally {
       savingRef.current = false
     }
@@ -53,7 +59,10 @@ export function useAutosave(save, delay = 800) {
         // was just deleted) so it isn't a silent unhandled rejection.
         Promise.resolve()
           .then(() => saveRef.current(pendingRef.current))
-          .catch((err) => console.warn('autosave flush-on-unmount failed:', err))
+          .catch((err) => {
+            console.warn('autosave flush-on-unmount failed:', err)
+            onErrorRef.current && onErrorRef.current(err)
+          })
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

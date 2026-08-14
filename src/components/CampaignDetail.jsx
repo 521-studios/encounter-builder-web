@@ -14,7 +14,7 @@ import TreasureRollup from './TreasureRollup.jsx'
 // campaign-wide default party level + PC count (persisted on change, no Save
 // button); chapters and encounters inherit these unless they override. Empty
 // fields fall back to the app default.
-export default function CampaignDetail({ campaign, onClose, onSaved }) {
+export default function CampaignDetail({ campaign, onClose, onSaved, onSaveError }) {
   const [value, setValue] = useState(null) // { party_level, party_size } | null while loading
   const [allChapters, setAllChapters] = useState([]) // for per-encounter inheritance in the rollup
   const [allEncounters, setAllEncounters] = useState([]) // every encounter (campaign-wide rollup)
@@ -22,10 +22,14 @@ export default function CampaignDetail({ campaign, onClose, onSaved }) {
   const [rollupError, setRollupError] = useState(false) // chapters/encounters list failed — rollup can't be trusted
   const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the rollup's lists on retry
 
-  const { state: saveState, schedule } = useAutosave(async (v) => {
-    const s = await settingsApi.put(campaign.id, partyFields(v))
-    onSaved && onSaved(s)
-  })
+  const { state: saveState, schedule } = useAutosave(
+    async (v) => {
+      const s = await settingsApi.put(campaign.id, partyFields(v))
+      onSaved && onSaved(s)
+    },
+    800,
+    () => onSaveError && onSaveError('campaign settings'),
+  )
 
   // Campaign summary rolled up BY CHAPTER (one row per chapter, XP/treasure/target
   // summed). Called unconditionally before the early return (rules of hooks).
