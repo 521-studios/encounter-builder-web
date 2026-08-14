@@ -45,6 +45,26 @@ export function hasRef(line) {
   return Boolean(gameIdOf(line))
 }
 
+// A freeform/custom treasure item — one not in the pfsrd2 catalog (a gem, art
+// object, trophy, quest item like AV's "peridot bead, 2 gp"). It rides in the
+// ContentRef's opaque `json` field, which the API stores as-is and validates as
+// non-empty content, so this needs no data/API change. Shape:
+//   ref: { json: { name, value_cp } }   — value_cp null = unvalued (a worthless
+//   trophy is 0); distinguished from a derived ref (which carries a base) and a
+//   catalog ref (a game_id).
+export function customTreasureRef(name = '', valueCp = null) {
+  return { json: { name, value_cp: valueCp } }
+}
+export function isCustomTreasure(line) {
+  const r = line?.ref
+  return Boolean(r?.json) && !r.game_id && !r.base
+}
+// A treasure line references content (kept by the save filter) when it has a
+// catalog game_id, a derived base, or custom json.
+export function hasTreasureContent(line) {
+  return hasRef(line) || isCustomTreasure(line)
+}
+
 // Build the PUT body (EncounterInput) from an encounter. Shared by the editor's
 // autosave and the sidebar's "move to chapter" so both send the exact same shape
 // — PUT replaces the resource, so every field must be echoed (a partial body
@@ -58,7 +78,7 @@ export function toEncounterInput(enc) {
     description: enc.description || '',
     notes: enc.notes || '',
     monsters: (enc.monsters || []).filter(hasRef).map(stripKey),
-    treasure: (enc.treasure || []).filter(hasRef).map(stripKey),
+    treasure: (enc.treasure || []).filter(hasTreasureContent).map(stripKey),
     currency: enc.currency || {},
   }
   // Party overrides use the shared clear-encoding: set when overridden, omitted
