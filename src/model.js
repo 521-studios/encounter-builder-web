@@ -30,12 +30,19 @@ export function keyed(e) {
   }
 }
 
-// A monster/treasure line is persistable once it resolves to a game_id — either
-// a direct ref or a templated (derived) ref carrying base.game_id. A freshly-
+// gameIdOf resolves a monster/treasure line's content game_id — the single rule
+// both persistence (hasRef) and rendering (MonsterLine/TreasureLine) share, so
+// they can't drift. A pristine ref carries game_id; a templated (derived) ref
+// carries base.game_id. '' when the row is still being filled.
+export function gameIdOf(line) {
+  return line?.ref?.game_id || line?.ref?.base?.game_id || ''
+}
+
+// A monster/treasure line is persistable once it resolves to a game_id. A freshly-
 // added row ({ ref: { game_id: '' } }) is still being filled and is dropped from
 // the PUT body: it has nothing to save yet, and the API rejects an empty ref.
 export function hasRef(line) {
-  return Boolean(line?.ref?.game_id || line?.ref?.base?.game_id)
+  return Boolean(gameIdOf(line))
 }
 
 // Build the PUT body (EncounterInput) from an encounter. Shared by the editor's
