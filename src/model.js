@@ -46,7 +46,13 @@ export function keyed(e) {
       for (const t of treasure) if (orphaned(t)) t.pool_id = def.id
     }
   }
-  return { ...e, monsters: (e.monsters || []).map(withKey), treasure, treasure_pools: pools }
+  return {
+    ...e,
+    monsters: (e.monsters || []).map(withKey),
+    treasure,
+    treasure_pools: pools,
+    xp_awards: (e.xp_awards || []).map(withKey),
+  }
 }
 
 // gameIdOf resolves a monster/treasure line's content game_id — the single rule
@@ -149,6 +155,7 @@ export function toEncounterInput(enc) {
     monsters: (enc.monsters || []).filter(hasRef).map(stripKey),
     treasure: (enc.treasure || []).filter(hasTreasureContent).map(treasureLineInput),
     treasure_pools: treasurePoolsInput(enc),
+    xp_awards: (enc.xp_awards || []).map(awardInput).filter((a) => a.amount > 0),
     currency: enc.currency || {},
   }
   // Party overrides use the shared clear-encoding: set when overridden, omitted
@@ -171,6 +178,22 @@ export function buildInput(enc) {
 
 export function emptyMonster() {
   return withKey({ ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '' })
+}
+
+// A non-combat XP award line (story/exploration/quest milestone, ally recruited).
+// amount is XP; reason is the GM's label. _key is the client-only React key.
+export function emptyAward() {
+  return withKey({ amount: 0, reason: '' })
+}
+
+// Serialize an XP award for the API: drop the client _key, coerce amount to a
+// whole number, trim the reason. Empty/zero-amount lines are filtered out by the
+// caller (the API rejects amount < 1). amount is rounded to an integer because the
+// API's Go `int` rejects a fractional JSON number outright — which would fail the
+// whole PUT and surface only as an opaque "Save failed" (XP is always whole anyway).
+export function awardInput(a) {
+  const { _key, ...rest } = a
+  return { amount: Math.round(Number(rest.amount) || 0), reason: (rest.reason || '').trim() }
 }
 
 export function emptyTreasure() {

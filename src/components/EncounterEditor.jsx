@@ -4,7 +4,7 @@ import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { settings as settingsApi } from '../api/settings.js'
-import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, emptyPool, keyed } from '../model.js'
+import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, emptyPool, emptyAward, keyed } from '../model.js'
 import { resolveParty } from '../party.js'
 import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
@@ -181,6 +181,14 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const addLineToPool = (poolId) =>
     patch({ treasure: [...treasure, { ...emptyTreasure(), pool_id: poolId }] })
 
+  // Non-combat XP awards. Blank/zero-amount lines are dropped on save (model.js);
+  // the on-screen helper text explains the rest.
+  const awards = enc.xp_awards || []
+  const setAward = (i, fields) =>
+    patch({ xp_awards: awards.map((a, j) => (j === i ? { ...a, ...fields } : a)) })
+  const addAward = () => patch({ xp_awards: [...awards, emptyAward()] })
+  const removeAward = (i) => patch({ xp_awards: awards.filter((_, j) => j !== i) })
+
   // Release hands the loot to the party: it saves current edits first (so the
   // released encounter matches what the GM sees), then flips it to released —
   // after which the editor renders read-only.
@@ -353,6 +361,47 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
             <button type="button" onClick={addTreasure}>+ treasure</button>
             <button type="button" className="link add-pool" onClick={addPool}>+ pool</button>
           </div>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>XP awards</legend>
+        <p className="muted">
+          Flat XP for non-combat accomplishments — story milestones, exploration, a
+          recruited ally. Counts toward the party’s XP, not the encounter’s combat difficulty.
+        </p>
+        {awards.map((a, i) => (
+          <div className="xp-award" data-testid="xp-award" key={a._key}>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              className="award-amount"
+              aria-label="XP amount"
+              placeholder="XP"
+              value={a.amount || ''}
+              disabled={released}
+              onChange={(e) => setAward(i, { amount: Number(e.target.value) })}
+            />
+            <input
+              className="award-reason"
+              aria-label="award reason"
+              placeholder="Reason (e.g. gained Augrael as an ally)"
+              value={a.reason || ''}
+              disabled={released}
+              onChange={(e) => setAward(i, { reason: e.target.value })}
+            />
+            {!released && (
+              <button type="button" className="link danger" onClick={() => removeAward(i)}>
+                remove
+              </button>
+            )}
+          </div>
+        ))}
+        {!released && (
+          <button type="button" className="add-award" onClick={addAward}>
+            + XP award
+          </button>
         )}
       </fieldset>
 
