@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { Markdown } from '@521studios/pfsrd2-display'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
@@ -26,13 +25,14 @@ import { resolveParty } from '../party.js'
 import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
 import MonsterLine from './MonsterLine.jsx'
+import WikiMarkdown from './WikiMarkdown.jsx'
 import TreasurePoolSection from './TreasurePoolSection.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
 
 const AUTOSAVE_MS = 800
 
-export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError }) {
+export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onOpenEncounter }) {
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
   const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
@@ -363,7 +363,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       </label>
       {enc.description && (
         <div className="description-preview" data-testid="description-preview">
-          <Markdown block text={enc.description} />
+          <WikiMarkdown text={enc.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
         </div>
       )}
 
@@ -518,7 +518,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
                 onChange={(e) => setReward(i, { description: e.target.value })}
               />
             ) : r.description ? (
-              <Markdown block text={r.description} />
+              <WikiMarkdown text={r.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
             ) : null}
           </div>
         ))}
@@ -572,7 +572,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
                 onChange={(e) => setCheck(i, { description: e.target.value })}
               />
             ) : s.description ? (
-              <Markdown block text={s.description} />
+              <WikiMarkdown text={s.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
             ) : null}
           </div>
         ))}
