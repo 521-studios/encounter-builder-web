@@ -24,6 +24,8 @@ import {
   isCombatRoom,
   emptySkillCheck,
   skillCheckInput,
+  emptyExit,
+  exitInput,
 } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
@@ -245,6 +247,35 @@ test('toEncounterInput sends complete skill checks, drops rows missing skill or 
   })
   const input = toEncounterInput(enc)
   assert.deepEqual(input.skill_checks, [{ skill: 'Perception', dc: 12, description: 'spot the planks' }])
+})
+
+test('keyed stamps a _key on every exit; emptyExit strips cleanly', () => {
+  const out = keyed({ exits: [{ to_encounter_id: 'a2', label: 'north' }] })
+  assert.ok(out.exits[0]._key)
+  assert.deepEqual(stripKey(emptyExit()), { to_encounter_id: '', label: '' })
+})
+
+test('exitInput keeps the target, trims the label, drops _key', () => {
+  assert.deepEqual(exitInput({ _key: 'k', to_encounter_id: 'a2', label: '  north door ' }), {
+    to_encounter_id: 'a2',
+    label: 'north door',
+  })
+})
+
+test('toEncounterInput sends exits with a target or label, drops fully-empty rows', () => {
+  const enc = keyed({
+    name: 'x',
+    exits: [
+      { to_encounter_id: 'a2', label: 'north door' }, // internal
+      { to_encounter_id: '', label: 'Exterior' }, // external
+      { to_encounter_id: '', label: '  ' }, // empty → dropped
+    ],
+  })
+  const input = toEncounterInput(enc)
+  assert.deepEqual(input.exits, [
+    { to_encounter_id: 'a2', label: 'north door' },
+    { to_encounter_id: '', label: 'Exterior' },
+  ])
 })
 
 test('toEncounterInput sends valued XP awards and drops blank/zero-amount ones', () => {
