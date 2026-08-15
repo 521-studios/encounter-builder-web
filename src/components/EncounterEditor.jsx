@@ -9,6 +9,7 @@ import {
   ROOM_TYPES,
   ROOM_TYPE_LABELS,
   isCombatRoom,
+  roomTypeLabel,
   REWARD_KINDS,
   REWARD_KIND_LABELS,
   buildInput,
@@ -272,9 +273,9 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           <span
             className="difficulty-badge difficulty-badge--noncombat"
             data-testid="difficulty-badge"
-            title={`${ROOM_TYPE_LABELS[budget.roomType] || budget.roomType} room — no combat difficulty`}
+            title={`${roomTypeLabel(budget.roomType)} room — no combat difficulty`}
           >
-            {ROOM_TYPE_LABELS[budget.roomType] || budget.roomType}
+            {roomTypeLabel(budget.roomType)}
           </span>
         )}
         <span className="status">{enc.status}</span>

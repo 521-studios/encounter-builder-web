@@ -24,6 +24,11 @@ export const ROOM_TYPE_LABELS = {
 export function isCombatRoom(roomType) {
   return !roomType || roomType === 'combat'
 }
+// Display label for a room type, falling back to the raw value for an unknown one
+// (e.g. a type added server-side the client doesn't know yet).
+export function roomTypeLabel(roomType) {
+  return ROOM_TYPE_LABELS[roomType] || roomType
+}
 
 // Non-treasure reward kinds (informational — no gp/XP effect, unlike treasure/XP awards).
 export const REWARD_KINDS = ['information', 'ritual', 'ally', 'item']

@@ -1,6 +1,6 @@
 import { formatGp } from '@521studios/pfsrd2-display'
 import { treasureBudget, TREASURE_BANDS, BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
-import { isCombatRoom, ROOM_TYPE_LABELS } from '../model.js'
+import { isCombatRoom, roomTypeLabel } from '../model.js'
 
 // The encounter's treasure-vs-budget panel: presents the computed budget (from
 // useEncounterBudget — treasure value + difficulty band) against the Table 5-3
@@ -39,7 +39,7 @@ export default function TreasureBudget({ budget, partyLevel, partySize }) {
           </>
         ) : (
           <>
-            Room <strong data-testid="room-type">{ROOM_TYPE_LABELS[roomType] || roomType}</strong>
+            Room <strong data-testid="room-type">{roomTypeLabel(roomType)}</strong>
             {totalXp > 0 ? ` (${totalXp} XP)` : ''}
           </>
         )}
