@@ -19,6 +19,9 @@ test('exits: link to a sibling encounter + an external exit, persist', async ({ 
   await page.getByRole('button', { name: '+ exit' }).click()
   const exit = page.getByTestId('exit')
   await expect(exit).toHaveCount(1)
+  // Self-exclusion: A never offers itself as an exit target; B is offered.
+  await expect(exit.locator('.exit-target option', { hasText: roomA })).toHaveCount(0)
+  await expect(exit.locator('.exit-target option', { hasText: roomB })).toHaveCount(1)
   await exit.getByLabel('exit target').selectOption({ label: roomB })
   await exit.getByLabel('exit label').fill('north door')
 

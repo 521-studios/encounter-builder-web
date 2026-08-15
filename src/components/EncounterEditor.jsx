@@ -602,6 +602,11 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               {exitTargets.map((t) => (
                 <option key={t.id} value={t.id}>{t.name || 'Untitled'}</option>
               ))}
+              {/* A soft reference to a since-deleted encounter shows honestly as broken
+                  (not silently as "— External —") so the GM can re-point or remove it. */}
+              {ex.to_encounter_id && !exitTargets.some((t) => String(t.id) === String(ex.to_encounter_id)) && (
+                <option value={ex.to_encounter_id}>(deleted encounter)</option>
+              )}
             </select>
             <input
               className="exit-label"
