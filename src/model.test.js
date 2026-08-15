@@ -19,6 +19,9 @@ import {
   treasureLineInput,
   emptyAward,
   awardInput,
+  emptyReward,
+  rewardInput,
+  isCombatRoom,
 } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
@@ -170,6 +173,46 @@ test('awardInput coerces amount to a whole number, trims reason, drops _key', ()
   // Fractional input is rounded — the API's Go int rejects a non-integer JSON number
   // outright, which would fail the whole PUT as an opaque "Save failed".
   assert.deepEqual(awardInput({ amount: 2.5 }), { amount: 3, reason: '' })
+})
+
+test('isCombatRoom: unset/combat are combat; other room types are not', () => {
+  assert.equal(isCombatRoom(undefined), true)
+  assert.equal(isCombatRoom(''), true)
+  assert.equal(isCombatRoom('combat'), true)
+  assert.equal(isCombatRoom('knowledge'), false)
+  assert.equal(isCombatRoom('social'), false)
+})
+
+test('keyed stamps a _key on every reward; emptyReward strips cleanly', () => {
+  const out = keyed({ rewards: [{ kind: 'item', label: 'book' }] })
+  assert.ok(out.rewards[0]._key)
+  assert.deepEqual(stripKey(emptyReward()), { kind: 'information', label: '', description: '' })
+})
+
+test('rewardInput trims the label, keeps kind/description, drops _key', () => {
+  assert.deepEqual(rewardInput({ _key: 'k', kind: 'ally', label: '  Augrael  ', description: 'd' }), {
+    kind: 'ally',
+    label: 'Augrael',
+    description: 'd',
+  })
+})
+
+test('toEncounterInput sends room_type + labelled rewards, drops empty-label rows', () => {
+  const enc = keyed({
+    name: 'x',
+    room_type: 'knowledge',
+    rewards: [
+      { kind: 'information', label: "Belcorra's history", description: '# lore' },
+      { kind: 'item', label: '  ', description: 'blank label' }, // dropped
+    ],
+  })
+  const input = toEncounterInput(enc)
+  assert.equal(input.room_type, 'knowledge')
+  assert.deepEqual(input.rewards, [{ kind: 'information', label: "Belcorra's history", description: '# lore' }])
+})
+
+test('toEncounterInput defaults room_type to combat when unset', () => {
+  assert.equal(toEncounterInput(keyed({ name: 'x' })).room_type, 'combat')
 })
 
 test('toEncounterInput sends valued XP awards and drops blank/zero-amount ones', () => {

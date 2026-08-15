@@ -17,6 +17,13 @@ test('useEncounterBudget exposes awardXp + totalXp; combat xp/threat ignore awar
   assert.equal(result.current.awardXp, 45) // 30 + 15 non-combat
   assert.equal(result.current.totalXp, 45) // combat + awards
   assert.equal(result.current.threat, 'trivial') // 0 combat XP → Trivial; awards don't shift it
+  assert.equal(result.current.roomType, 'combat') // default when unset
+})
+
+test('useEncounterBudget surfaces a non-combat room_type', () => {
+  const enc = { monsters: [], treasure: [], currency: {}, room_type: 'knowledge' }
+  const { result } = renderHook(() => useEncounterBudget(enc, 5, 4))
+  assert.equal(result.current.roomType, 'knowledge')
 })
 
 test('useEncounterBudget: awardXp is 0 (and totalXp == xp) when there are no awards', () => {

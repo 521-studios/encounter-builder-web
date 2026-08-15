@@ -40,6 +40,7 @@ export function useEncounterBudget(encounter, partyLevel, partySize) {
     xp,
     awardXp: award,
     totalXp: xp + award, // advancement XP: combat + non-combat awards
+    roomType: encounter.room_type || 'combat', // non-combat rooms suppress the band below
     threat,
     canonicalThreat,
     xpPer4,

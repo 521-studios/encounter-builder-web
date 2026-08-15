@@ -85,6 +85,21 @@ test('TreasureBudget hides the award line when there are no awards (default awar
   assert.equal(screen.queryByTestId('award-xp'), null)
 })
 
+test('TreasureBudget: a non-combat room shows its type, hides the band/target/chart', () => {
+  render(
+    <TreasureBudget
+      budget={budget({ roomType: 'knowledge', threat: null, cp: 5000, xp: 0, awardXp: 40, totalXp: 40 })}
+      partyLevel={5}
+      partySize={4}
+    />,
+  )
+  assert.equal(screen.getByTestId('room-type').textContent, 'Knowledge')
+  assert.equal(screen.queryByTestId('encounter-threat'), null) // no difficulty band
+  assert.equal(screen.queryByTestId('treasure-delta'), null) // no target comparison
+  assert.equal(document.querySelector('.treasure-chart'), null) // no Table 5-3 chart
+  assert.equal(screen.getByTestId('treasure-value').textContent, '50 gp') // loot still shown
+})
+
 test('TreasureBudget surfaces a load failure with Retry', () => {
   render(<TreasureBudget budget={budget({ cp: 1000, failedCount: 2 })} partyLevel={5} partySize={4} />)
   assert.match(screen.getByTestId('budget-error').textContent, /failed to load/)
