@@ -63,6 +63,7 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
           })
           rebuilt.push({
             effect: { game_id: m.effect_game_id, name: m.effect_name || m.effect_game_id },
+            applied: res.applied || m.effect_name || m.effect_game_id, // label for the picker tag + patch attribution
             grade: m.grade ?? null,
             item: res.item,
             patches: res.patches,
@@ -117,7 +118,16 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
         effectGameId,
         grade,
       })
-      const next = [...stack, { effect: { game_id: effectGameId, name: effectName }, grade: grade ?? null, item: res.item, patches: res.patches }]
+      const next = [
+        ...stack,
+        {
+          effect: { game_id: effectGameId, name: effectName },
+          applied: res.applied || effectName, // the resolved label (e.g. "Weapon Potency (+1)")
+          grade: grade ?? null,
+          item: res.item,
+          patches: res.patches,
+        },
+      ]
       setStack(next)
       persist(next, name)
     } catch (e) {
@@ -127,14 +137,20 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
     setBusy(false)
   }
 
+  // The custom name belongs to the COMPOSED item (buildItemRef only persists it with
+  // a modification). So when the composition empties, clear the name too — otherwise
+  // the field would show a name that silently won't survive reload.
   function onRemoveLast() {
     const next = stack.slice(0, -1)
+    const nextName = next.length ? name : ''
     setStack(next)
-    persist(next, name)
+    if (!next.length) setName('')
+    persist(next, nextName)
   }
   function onClearAll() {
     setStack([])
-    persist([], name)
+    setName('')
+    persist([], '')
   }
   function onNameChange(v) {
     setName(v)
@@ -157,7 +173,7 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
           eligibility={eligibility}
           name={name}
           onNameChange={onNameChange}
-          stack={stack.map((s) => ({ applied: s.effect.name }))}
+          stack={stack}
           loading={busy}
           onApply={(candidate, { grade }) => applyEffect(candidate.game_id, candidate.name, grade)}
           onApplySpell={(spell) => applyEffect(spell.game_id, spell.name, undefined)}
