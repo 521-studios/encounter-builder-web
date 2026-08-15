@@ -134,7 +134,8 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
 // encounter): each chapter's encounters are aggregated via rollupEncounters and
 // its treasure / target / XP summed. Chapters render in order; encounters with no
 // chapter (or a dangling chapter_id) collect into a trailing "Unsorted" row only
-// when non-empty. Difficulty sums as XP (a number) — bands don't add.
+// when non-empty. XP sums as a number (advancement XP — combat + non-combat awards);
+// difficulty bands don't add.
 export function rollupByChapter(chapters, encounters, entryOf, partyFor) {
   const list = encounters || []
   const byChapter = new Map()

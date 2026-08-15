@@ -165,8 +165,11 @@ test('keyed stamps a _key on every XP award; emptyAward strips cleanly', () => {
   assert.deepEqual(stripKey(emptyAward()), { amount: 0, reason: '' })
 })
 
-test('awardInput coerces amount to a number, trims reason, drops _key', () => {
+test('awardInput coerces amount to a whole number, trims reason, drops _key', () => {
   assert.deepEqual(awardInput({ _key: 'k', amount: '30', reason: '  ally  ' }), { amount: 30, reason: 'ally' })
+  // Fractional input is rounded — the API's Go int rejects a non-integer JSON number
+  // outright, which would fail the whole PUT as an opaque "Save failed".
+  assert.deepEqual(awardInput({ amount: 2.5 }), { amount: 3, reason: '' })
 })
 
 test('toEncounterInput sends valued XP awards and drops blank/zero-amount ones', () => {

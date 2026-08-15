@@ -181,9 +181,8 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const addLineToPool = (poolId) =>
     patch({ treasure: [...treasure, { ...emptyTreasure(), pool_id: poolId }] })
 
-  // Non-combat XP awards: flat XP for story/exploration/ally accomplishments. They
-  // count toward the party's advancement (the budget adds them to total XP) but not
-  // toward combat difficulty. Blank/zero-amount lines are dropped on save (model.js).
+  // Non-combat XP awards. Blank/zero-amount lines are dropped on save (model.js);
+  // the on-screen helper text explains the rest.
   const awards = enc.xp_awards || []
   const setAward = (i, fields) =>
     patch({ xp_awards: awards.map((a, j) => (j === i ? { ...a, ...fields } : a)) })
@@ -376,6 +375,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
             <input
               type="number"
               min="1"
+              step="1"
               className="award-amount"
               aria-label="XP amount"
               placeholder="XP"
@@ -399,7 +399,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           </div>
         ))}
         {!released && (
-          <button type="button" className="link add-award" onClick={addAward}>
+          <button type="button" className="add-award" onClick={addAward}>
             + XP award
           </button>
         )}

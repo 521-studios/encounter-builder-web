@@ -187,11 +187,13 @@ export function emptyAward() {
 }
 
 // Serialize an XP award for the API: drop the client _key, coerce amount to a
-// number, trim the reason. Empty/zero-amount lines are filtered out by the caller
-// (the API rejects amount < 1).
+// whole number, trim the reason. Empty/zero-amount lines are filtered out by the
+// caller (the API rejects amount < 1). amount is rounded to an integer because the
+// API's Go `int` rejects a fractional JSON number outright — which would fail the
+// whole PUT and surface only as an opaque "Save failed" (XP is always whole anyway).
 export function awardInput(a) {
   const { _key, ...rest } = a
-  return { amount: Number(rest.amount) || 0, reason: (rest.reason || '').trim() }
+  return { amount: Math.round(Number(rest.amount) || 0), reason: (rest.reason || '').trim() }
 }
 
 export function emptyTreasure() {
