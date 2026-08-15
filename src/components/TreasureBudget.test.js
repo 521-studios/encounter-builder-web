@@ -73,6 +73,18 @@ test('TreasureBudget hides the canonical lens when the table IS 4 PCs (no redund
   assert.equal(screen.queryByTestId('budget-canonical'), null)
 })
 
+test('TreasureBudget surfaces non-combat awards as advancement XP without moving the band', () => {
+  // Combat XP 120 → Severe; a 30 XP non-combat award reads as advancement, not a bump.
+  render(<TreasureBudget budget={budget({ awardXp: 30, totalXp: 150 })} partyLevel={5} partySize={4} />)
+  assert.equal(screen.getByTestId('encounter-threat').textContent, 'Severe') // band still from combat XP
+  assert.equal(screen.getByTestId('award-xp').textContent, ' + 30 non-combat = 150 XP total')
+})
+
+test('TreasureBudget hides the award line when there are no awards (default awardXp 0)', () => {
+  render(<TreasureBudget budget={budget()} partyLevel={5} partySize={4} />)
+  assert.equal(screen.queryByTestId('award-xp'), null)
+})
+
 test('TreasureBudget surfaces a load failure with Retry', () => {
   render(<TreasureBudget budget={budget({ cp: 1000, failedCount: 2 })} partyLevel={5} partySize={4} />)
   assert.match(screen.getByTestId('budget-error').textContent, /failed to load/)
