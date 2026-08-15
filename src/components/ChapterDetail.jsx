@@ -10,12 +10,13 @@ import { useAutosave, SAVE_LABEL } from '../useAutosave.js'
 import { useRollup } from '../useRollup.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
+import ChapterMap from './ChapterMap.jsx'
 
 // Chapter detail: the chapter's name + expected-party override, and rename/delete.
 // Edits persist on change (no Save button); party fields inherit from campaign
 // settings when left empty. Chapter update full-replaces name + order + party
 // fields, so every save round-trips them via the shared clear-encoding.
-export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted, onSaveError }) {
+export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted, onSaveError, onOpenEncounter }) {
   const [value, setValue] = useState({
     name: chapter.name || '',
     party_level: chapter.party_level ?? null,
@@ -132,6 +133,8 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
         loadError={encountersError}
         onReload={() => setReloadKey((k) => k + 1)}
       />
+
+      <ChapterMap encounters={chapterEncounters} onOpenEncounter={onOpenEncounter} />
     </section>
   )
 }
