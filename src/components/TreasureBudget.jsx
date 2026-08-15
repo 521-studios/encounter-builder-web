@@ -7,7 +7,7 @@ import { treasureBudget, TREASURE_BANDS, BAND_LABELS, BASE_PARTY } from '../pf2e
 // loot marked over/under its target. Fetching lives in the hook so the difficulty
 // badge on the title can share it.
 export default function TreasureBudget({ budget, partyLevel, partySize }) {
-  const { cp, xp, threat, canonicalThreat, xpPer4, loading, unpricedCount, unknownCount, failedCount, onRetry } = budget
+  const { cp, xp, awardXp = 0, totalXp = xp, threat, canonicalThreat, xpPer4, loading, unpricedCount, unknownCount, failedCount, onRetry } = budget
 
   // The treasure total is a floor whenever some lines couldn't be valued (still
   // loading, a failed fetch, or a genuinely unpriceable derived/"Varies" item).
@@ -27,7 +27,11 @@ export default function TreasureBudget({ budget, partyLevel, partySize }) {
       <h3 className="budget-title">Budget — party level {partyLevel}, {partySize} PCs</h3>
       <p className="budget-summary">
         Difficulty <strong data-testid="encounter-threat">{BAND_LABELS[threat]}</strong>
-        {' '}({xp} XP) · Treasure <strong data-testid="treasure-value">{formatGp(cp)}</strong>
+        {' '}({xp} XP)
+        {awardXp > 0 && (
+          <span data-testid="award-xp"> + {awardXp} non-combat = {totalXp} XP total</span>
+        )}
+        {' · '}Treasure <strong data-testid="treasure-value">{formatGp(cp)}</strong>
         {incomplete && cp > 0 ? ' (floor)' : ''}
         {target != null && (
           <span data-testid="treasure-delta">

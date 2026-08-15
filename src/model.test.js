@@ -17,6 +17,8 @@ import {
   cpToGp,
   emptyPool,
   treasureLineInput,
+  emptyAward,
+  awardInput,
 } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
@@ -155,6 +157,29 @@ test('keyed keeps existing pools and only adopts truly-orphaned lines', () => {
 
 test('keyed leaves a treasureless encounter pool-less', () => {
   assert.deepEqual(keyed({ treasure: [] }).treasure_pools, [])
+})
+
+test('keyed stamps a _key on every XP award; emptyAward strips cleanly', () => {
+  const out = keyed({ xp_awards: [{ amount: 30, reason: 'ally' }] })
+  assert.ok(out.xp_awards[0]._key)
+  assert.deepEqual(stripKey(emptyAward()), { amount: 0, reason: '' })
+})
+
+test('awardInput coerces amount to a number, trims reason, drops _key', () => {
+  assert.deepEqual(awardInput({ _key: 'k', amount: '30', reason: '  ally  ' }), { amount: 30, reason: 'ally' })
+})
+
+test('toEncounterInput sends valued XP awards and drops blank/zero-amount ones', () => {
+  const enc = keyed({
+    name: 'x',
+    xp_awards: [
+      { amount: 30, reason: 'gained Augrael' },
+      { amount: 0, reason: 'typed then cleared' }, // no XP → dropped
+      { amount: '', reason: '' }, // blank → dropped
+    ],
+  })
+  const input = toEncounterInput(enc)
+  assert.deepEqual(input.xp_awards, [{ amount: 30, reason: 'gained Augrael' }])
 })
 
 test('treasureLineInput strips _key and drops an empty value_tiers, keeps a set one', () => {

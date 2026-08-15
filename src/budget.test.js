@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { treasureValueCp, encounterXp, refGameId, gameIdsInEncounter } from './budget.js'
+import { treasureValueCp, encounterXp, awardXp, refGameId, gameIdsInEncounter } from './budget.js'
 
 // Minimal fake entries keyed by game_id.
 const ITEMS = {
@@ -215,6 +215,29 @@ test('rollupEncounters sums XP per row and in total (difficulty as a number)', (
   assert.equal(r.rows[0].xp, 40)
   assert.equal(r.rows[1].xp, 120)
   assert.equal(r.totalXp, 160)
+})
+
+test('awardXp sums non-combat XP awards (coercing/ignoring blanks)', () => {
+  assert.equal(awardXp({ xp_awards: [{ amount: 30 }, { amount: 15 }] }), 45)
+  assert.equal(awardXp({ xp_awards: [{ amount: '20' }, { amount: '' }, {}] }), 20) // string coerced, blanks -> 0
+  assert.equal(awardXp({}), 0)
+  assert.equal(awardXp(null), 0)
+})
+
+test('rollupEncounters: awards add to XP total/row but never to combat threat or treasure target', () => {
+  const creatures = { 'M:1': { stat_block: { creature_type: { level: 5 } } } } // PL at party 5
+  const entryOf = (id) => creatures[id] || null
+  const partyFor = () => ({ level: 5, size: 4 })
+  // 1 PL creature = 40 XP (Trivial, no treasure target) + a 30 XP non-combat award.
+  const r = rollupEncounters(
+    [{ id: 'e1', name: 'A', monsters: [{ ref: { game_id: 'M:1' }, count: 1 }], treasure: [], currency: {}, xp_awards: [{ amount: 30 }] }],
+    entryOf,
+    partyFor,
+  )
+  assert.equal(r.rows[0].xp, 70) // 40 combat + 30 award (advancement)
+  assert.equal(r.rows[0].threat, 'trivial') // band still from the 40 combat XP, not 70
+  assert.equal(r.rows[0].targetCp, 0) // trivial → no treasure target; award doesn't create one
+  assert.equal(r.totalXp, 70)
 })
 
 test('rollupEncounters flags incomplete rows (unpriced/unknown) and tolerates empty', () => {

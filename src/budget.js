@@ -93,6 +93,16 @@ export function encounterXp(monsters, partyLevel, entryOf) {
   return { xp, unknown }
 }
 
+// awardXp sums an encounter's non-combat XP awards (story/exploration/ally
+// grants). These advance the party — so they add to the XP total and the chapter
+// rollups — but are deliberately NOT combat: they never feed encounterThreat or
+// the treasure budget, which stay creature-derived.
+export function awardXp(enc) {
+  let xp = 0
+  for (const a of enc?.xp_awards || []) xp += Number(a.amount) || 0
+  return xp
+}
+
 // rollupEncounters aggregates a set of encounters into a treasure total vs the
 // summed per-encounter budget (each encounter's difficulty-band target), plus a
 // per-encounter breakdown. `partyFor(encounter) -> {level, size}` resolves each
@@ -108,13 +118,14 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
     const { level, size } = partyFor(enc)
     const { cp, unpriced } = treasureValueCp(enc.treasure, enc.currency, entryOf)
     const { xp, unknown } = encounterXp(enc.monsters, level, entryOf)
-    const threat = encounterThreat(xp, size)
+    const threat = encounterThreat(xp, size) // combat difficulty: creatures only, no awards
     const targetGp = treasureBudget(level, threat, size) // null for a Trivial encounter
     const targetCp = targetGp == null ? 0 : targetGp * 100
-    rows.push({ id: enc.id, name: enc.name, cp, xp, threat, targetCp, incomplete: unpriced.length > 0 || unknown.length > 0 })
+    const encXp = xp + awardXp(enc) // advancement XP includes non-combat awards
+    rows.push({ id: enc.id, name: enc.name, cp, xp: encXp, threat, targetCp, incomplete: unpriced.length > 0 || unknown.length > 0 })
     totalCp += cp
     totalTargetCp += targetCp
-    totalXp += xp
+    totalXp += encXp
   }
   return { totalCp, totalTargetCp, totalXp, rows, anyIncomplete: rows.some((r) => r.incomplete) }
 }
