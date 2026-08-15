@@ -29,11 +29,35 @@ test('buildChapterGraph: dead-ends are rooms with ≤1 connection', () => {
   assert.ok(!g.deadEnds.has('2')) // A2 in the loop
 })
 
-test('buildChapterGraph: loop-closing edges = cyclomatic number', () => {
+test('buildChapterGraph: loop count = cyclomatic number; loop edges tagged', () => {
   const g = buildChapterGraph(chapter)
-  // 4 nodes, 4 edges, 1 connected component → 4 − 4 + 1 = 1 independent loop.
+  // 4 rooms, 4 distinct passages, 1 component → 4 − 4 + 1 = 1 independent loop.
   assert.equal(g.stats.loops, 1)
-  assert.equal(g.loopEdges.size, 1)
+  assert.equal(g.edges.filter((e) => e.isLoop).length, 1)
+})
+
+test('buildChapterGraph: two-way doors are NOT loops, and a corridor has dead-ends', () => {
+  // A↔B↔C, every door authored both directions (the natural GM pattern). This is a
+  // linear corridor with ZERO real loops; A and C are the termini (dead-ends).
+  const corridor = [
+    { id: 1, name: 'A', exits: [{ to_encounter_id: '2' }] },
+    { id: 2, name: 'B', exits: [{ to_encounter_id: '1' }, { to_encounter_id: '3' }] },
+    { id: 3, name: 'C', exits: [{ to_encounter_id: '2' }] },
+  ]
+  const g = buildChapterGraph(corridor)
+  assert.equal(g.stats.loops, 0) // reciprocal edges collapse — no false loop
+  assert.equal(g.stats.connections, 2) // 2 distinct passages (A-B, B-C), not 4 records
+  assert.deepEqual([...g.deadEnds].sort(), ['1', '3']) // A and C, by distinct-neighbour count
+})
+
+test('buildChapterGraph: a duplicate exit does not invent a loop', () => {
+  const dup = [
+    { id: 1, name: 'A', exits: [{ to_encounter_id: '2' }, { to_encounter_id: '2' }] }, // A→B twice
+    { id: 2, name: 'B', exits: [] },
+  ]
+  const g = buildChapterGraph(dup)
+  assert.equal(g.stats.loops, 0)
+  assert.equal(g.stats.connections, 1)
 })
 
 test('buildChapterGraph: a pure tree (no cycles) reports zero loops', () => {
@@ -54,6 +78,24 @@ test('layerLayout: every node gets a position; a root sits in the first column',
   // just assert positions are finite and distinct enough to render.
   const xs = new Set(Object.values(g.layout).map((p) => p.x))
   assert.ok(xs.size >= 1)
+})
+
+test('layerLayout: disconnected components + an isolated node all get positions', () => {
+  // Two disjoint pairs (1↔2, 3↔4) and a lone node (5) with no exits.
+  const disjoint = [
+    { id: 1, name: 'A', exits: [{ to_encounter_id: '2' }] },
+    { id: 2, name: 'B', exits: [] },
+    { id: 3, name: 'C', exits: [{ to_encounter_id: '4' }] },
+    { id: 4, name: 'D', exits: [] },
+    { id: 5, name: 'Lone', exits: [] },
+  ]
+  const g = buildChapterGraph(disjoint)
+  for (const n of g.nodes) {
+    const p = g.layout[n.id]
+    assert.ok(p && Number.isFinite(p.x) && Number.isFinite(p.y), `bad position for ${n.id}`)
+  }
+  assert.equal(g.stats.loops, 0)
+  assert.ok(g.deadEnds.has('5')) // isolated node is a dead-end (0 neighbours)
 })
 
 test('buildChapterGraph tolerates empty / missing input', () => {

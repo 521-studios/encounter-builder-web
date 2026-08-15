@@ -22,27 +22,43 @@ export function buildChapterGraph(encounters) {
     }
   }
 
-  const degree = Object.fromEntries(nodes.map((n) => [n.id, 0]))
-  for (const ed of edges) {
-    degree[ed.from]++
-    degree[ed.to]++
+  // Collapse reciprocal / duplicate directed exits to a DISTINCT UNDIRECTED
+  // adjacency before analysis. Exits are authored one-directionally and not
+  // auto-mirrored, so a two-way door is two records (A→B + B→A) and a corridor is a
+  // chain of them — but both Jaquays signals are about distinct *passages*, not
+  // authored records. Counting the multiset makes a plain corridor look full of
+  // loops and never flags its termini as dead-ends (the inverse of the truth).
+  const neighbors = Object.fromEntries(nodes.map((n) => [n.id, new Set()]))
+  const undirected = new Map() // canonical "a|b" -> [a, b]
+  for (const e of edges) {
+    neighbors[e.from].add(e.to)
+    neighbors[e.to].add(e.from)
+    undirected.set(pairKey(e.from, e.to), [e.from, e.to])
   }
-  // A dead-end connects to at most one other room (only way out is back) — the
-  // opposite of the loops Jaquays prized. Isolated (degree 0) rooms count too.
-  const deadEnds = new Set(nodes.filter((n) => degree[n.id] <= 1).map((n) => n.id))
 
-  // Loop-closing edges via union-find (treating edges as undirected): an edge whose
-  // endpoints are already connected closes a cycle. Their count is the cyclomatic
-  // number (E − V + components) — "how many independent loops" the chapter has.
-  const loopEdges = markLoopEdges(nodes, edges)
+  // A dead-end connects to at most one OTHER room (only way out is back) — the
+  // opposite of the loops Jaquays prized. Isolated (0-neighbor) rooms count too.
+  const deadEnds = new Set(nodes.filter((n) => neighbors[n.id].size <= 1).map((n) => n.id))
+
+  // Loop-closing passages via union-find over the undirected simple graph: a passage
+  // whose endpoints are already connected closes a cycle. Their count is the
+  // cyclomatic number (E − V + components) — the real independent-loop count. Each
+  // drawn edge is tagged isLoop when its passage closes a loop (so the map highlights it).
+  const loopPairs = markLoopPairs(nodes, [...undirected.values()])
+  for (const e of edges) e.isLoop = loopPairs.has(pairKey(e.from, e.to))
 
   const layout = layerLayout(nodes, edges)
-  const stats = { rooms: nodes.length, connections: edges.length, loops: loopEdges.size }
-  return { nodes, edges, layout, deadEnds, loopEdges, stats }
+  const stats = { rooms: nodes.length, connections: undirected.size, loops: loopPairs.size }
+  return { nodes, edges, layout, deadEnds, stats }
 }
 
-// Union-find over undirected edges → the set of edge indices that close a loop.
-function markLoopEdges(nodes, edges) {
+// Canonical undirected key for a node pair (order-independent).
+export function pairKey(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
+// Union-find over undirected passages → the set of canonical keys that close a loop.
+function markLoopPairs(nodes, pairs) {
   const parent = Object.fromEntries(nodes.map((n) => [n.id, n.id]))
   const find = (x) => {
     while (parent[x] !== x) {
@@ -52,12 +68,12 @@ function markLoopEdges(nodes, edges) {
     return x
   }
   const loops = new Set()
-  edges.forEach((e, i) => {
-    const ra = find(e.from)
-    const rb = find(e.to)
-    if (ra === rb) loops.add(i)
+  for (const [a, b] of pairs) {
+    const ra = find(a)
+    const rb = find(b)
+    if (ra === rb) loops.add(pairKey(a, b))
     else parent[ra] = rb
-  })
+  }
   return loops
 }
 

@@ -21,7 +21,7 @@ const ROOM_FILL = {
 
 export default function ChapterMap({ encounters, onOpenEncounter }) {
   const [collapsed, setCollapsed] = useState(false)
-  const { nodes, edges, layout, deadEnds, loopEdges, stats } = buildChapterGraph(encounters)
+  const { nodes, edges, layout, deadEnds, stats } = buildChapterGraph(encounters)
 
   const width = Math.max(1, ...nodes.map((n) => layout[n.id].x + NODE_W + 24))
   const height = Math.max(1, ...nodes.map((n) => layout[n.id].y + NODE_H + 24))
@@ -29,17 +29,16 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
 
   return (
     <section className="chapter-map" data-testid="chapter-map">
-      <h3
-        className="map-title"
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
+        className="map-title summary-toggle"
         aria-expanded={!collapsed}
         onClick={() => setCollapsed((c) => !c)}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setCollapsed((c) => !c)}
       >
-        Map — {stats.rooms} room{stats.rooms === 1 ? '' : 's'} · {stats.connections} connection
+        <span className="chapter-caret" aria-hidden="true">{collapsed ? '▸' : '▾'}</span> Map —{' '}
+        {stats.rooms} room{stats.rooms === 1 ? '' : 's'} · {stats.connections} connection
         {stats.connections === 1 ? '' : 's'} · {stats.loops} loop{stats.loops === 1 ? '' : 's'}
-      </h3>
+      </button>
 
       {!collapsed &&
         (edges.length === 0 ? (
@@ -48,7 +47,7 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
           </p>
         ) : (
           <div className="map-scroll" style={{ overflowX: 'auto' }}>
-            <svg width={width} height={height} data-testid="map-svg" role="img" aria-label="Chapter connectivity map">
+            <svg width={width} height={height} data-testid="map-svg" role="group" aria-label="Chapter connectivity map">
               <defs>
                 <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
                   <path d="M0,0 L7,3 L0,6 Z" fill="#888" />
@@ -61,7 +60,7 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
               {edges.map((e, i) => {
                 const a = center(e.from)
                 const b = center(e.to)
-                const loop = loopEdges.has(i)
+                const loop = e.isLoop
                 return (
                   <g key={i} data-testid="map-edge" data-loop={loop || undefined}>
                     <line
@@ -95,7 +94,12 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
                     aria-label={`Open ${n.name}`}
                     style={{ cursor: 'pointer' }}
                     onClick={() => onOpenEncounter(n.id)}
-                    onKeyDown={(ev) => (ev.key === 'Enter' || ev.key === ' ') && onOpenEncounter(n.id)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === 'Enter' || ev.key === ' ') {
+                        ev.preventDefault() // Space would otherwise scroll the page
+                        onOpenEncounter(n.id)
+                      }
+                    }}
                   >
                     <rect
                       x={p.x}
