@@ -6,6 +6,39 @@ export const ADJUSTMENTS = ['none', 'elite', 'weak']
 export const SALE_CLASSES = ['normal', 'pure_treasure']
 export const TREASURE_STATES = ['intact', 'consumed', 'destroyed']
 
+// Room/area type. `combat` (default) is the builder's original unit and the only
+// type with a meaningful difficulty band + treasure target; the others are
+// non-combat rooms (the band is suppressed for them).
+export const ROOM_TYPES = ['combat', 'hazard', 'haunt', 'exploration', 'social', 'knowledge', 'empty']
+export const ROOM_TYPE_LABELS = {
+  combat: 'Combat',
+  hazard: 'Hazard',
+  haunt: 'Haunt',
+  exploration: 'Exploration',
+  social: 'Social',
+  knowledge: 'Knowledge',
+  empty: 'Empty',
+}
+// A room shows its combat difficulty band + treasure target only when it's combat
+// (empty/unset defaults to combat, matching the API).
+export function isCombatRoom(roomType) {
+  return !roomType || roomType === 'combat'
+}
+// Display label for a room type, falling back to the raw value for an unknown one
+// (e.g. a type added server-side the client doesn't know yet).
+export function roomTypeLabel(roomType) {
+  return ROOM_TYPE_LABELS[roomType] || roomType
+}
+
+// Non-treasure reward kinds (informational — no gp/XP effect, unlike treasure/XP awards).
+export const REWARD_KINDS = ['information', 'ritual', 'ally', 'item']
+export const REWARD_KIND_LABELS = {
+  information: 'Information',
+  ritual: 'Ritual',
+  ally: 'Ally',
+  item: 'Item',
+}
+
 // Coin denominations, high-to-low for display.
 export const CURRENCIES = ['pp', 'gp', 'sp', 'cp']
 
@@ -52,6 +85,7 @@ export function keyed(e) {
     treasure,
     treasure_pools: pools,
     xp_awards: (e.xp_awards || []).map(withKey),
+    rewards: (e.rewards || []).map(withKey),
   }
 }
 
@@ -156,6 +190,8 @@ export function toEncounterInput(enc) {
     treasure: (enc.treasure || []).filter(hasTreasureContent).map(treasureLineInput),
     treasure_pools: treasurePoolsInput(enc),
     xp_awards: (enc.xp_awards || []).map(awardInput).filter((a) => a.amount > 0),
+    room_type: enc.room_type || 'combat',
+    rewards: (enc.rewards || []).map(rewardInput).filter((r) => r.label),
     currency: enc.currency || {},
   }
   // Party overrides use the shared clear-encoding: set when overridden, omitted
@@ -194,6 +230,19 @@ export function emptyAward() {
 export function awardInput(a) {
   const { _key, ...rest } = a
   return { amount: Math.round(Number(rest.amount) || 0), reason: (rest.reason || '').trim() }
+}
+
+// A non-treasure reward slot (information/ritual/ally/item). kind + a short label,
+// with optional GM markdown. _key is the client-only React key.
+export function emptyReward() {
+  return withKey({ kind: 'information', label: '', description: '' })
+}
+
+// Serialize a reward for the API: drop the client _key, trim the label. Rows with
+// an empty label are filtered out by the caller (the API requires a label).
+export function rewardInput(r) {
+  const { _key, ...rest } = r
+  return { kind: rest.kind, label: (rest.label || '').trim(), description: rest.description || '' }
 }
 
 export function emptyTreasure() {
