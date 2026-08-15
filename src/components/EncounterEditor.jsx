@@ -18,6 +18,7 @@ import {
   emptyPool,
   emptyAward,
   emptyReward,
+  emptySkillCheck,
   keyed,
 } from '../model.js'
 import { resolveParty } from '../party.js'
@@ -211,6 +212,14 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     patch({ rewards: rewards.map((r, j) => (j === i ? { ...r, ...fields } : r)) })
   const addReward = () => patch({ rewards: [...rewards, emptyReward()] })
   const removeReward = (i) => patch({ rewards: rewards.filter((_, j) => j !== i) })
+
+  // Structured skill checks / discovery entries (skill + DC + effect). Rows missing
+  // a skill or DC are dropped on save (model.js).
+  const skillChecks = enc.skill_checks || []
+  const setCheck = (i, fields) =>
+    patch({ skill_checks: skillChecks.map((s, j) => (j === i ? { ...s, ...fields } : s)) })
+  const addCheck = () => patch({ skill_checks: [...skillChecks, emptySkillCheck()] })
+  const removeCheck = (i) => patch({ skill_checks: skillChecks.filter((_, j) => j !== i) })
 
   // Release hands the loot to the party: it saves current edits first (so the
   // released encounter matches what the GM sees), then flips it to released —
@@ -501,6 +510,60 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         {!released && (
           <button type="button" className="add-reward" onClick={addReward}>
             + reward
+          </button>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>Skill checks</legend>
+        <p className="muted">
+          Structured discovery checks — skill + DC + what it reveals. Surfaced at the
+          table instead of buried in the description.
+        </p>
+        {skillChecks.map((s, i) => (
+          <div className="skill-check" data-testid="skill-check" key={s._key}>
+            <div className="skill-check-head">
+              <input
+                className="check-skill"
+                aria-label="check skill"
+                placeholder="Skill (e.g. Perception)"
+                value={s.skill || ''}
+                disabled={released}
+                onChange={(e) => setCheck(i, { skill: e.target.value })}
+              />
+              <input
+                type="number"
+                min="1"
+                step="1"
+                className="check-dc"
+                aria-label="check DC"
+                placeholder="DC"
+                value={s.dc || ''}
+                disabled={released}
+                onChange={(e) => setCheck(i, { dc: Number(e.target.value) })}
+              />
+              {!released && (
+                <button type="button" className="link danger" onClick={() => removeCheck(i)}>
+                  remove
+                </button>
+              )}
+            </div>
+            {!released ? (
+              <textarea
+                className="check-description"
+                aria-label="check effect"
+                placeholder="What it reveals / does (markdown)"
+                value={s.description || ''}
+                onChange={(e) => setCheck(i, { description: e.target.value })}
+              />
+            ) : s.description ? (
+              <Markdown block text={s.description} />
+            ) : null}
+          </div>
+        ))}
+        {!released && (
+          <button type="button" className="add-skill-check" onClick={addCheck}>
+            + skill check
           </button>
         )}
       </fieldset>

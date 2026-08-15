@@ -22,6 +22,8 @@ import {
   emptyReward,
   rewardInput,
   isCombatRoom,
+  emptySkillCheck,
+  skillCheckInput,
 } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
@@ -213,6 +215,33 @@ test('toEncounterInput sends room_type + labelled rewards, drops empty-label row
 
 test('toEncounterInput defaults room_type to combat when unset', () => {
   assert.equal(toEncounterInput(keyed({ name: 'x' })).room_type, 'combat')
+})
+
+test('keyed stamps a _key on every skill check; emptySkillCheck strips cleanly', () => {
+  const out = keyed({ skill_checks: [{ skill: 'Perception', dc: 12 }] })
+  assert.ok(out.skill_checks[0]._key)
+  assert.deepEqual(stripKey(emptySkillCheck()), { skill: '', dc: 0, description: '' })
+})
+
+test('skillCheckInput trims skill, coerces dc, drops _key', () => {
+  assert.deepEqual(skillCheckInput({ _key: 'k', skill: '  Nature ', dc: '15', description: 'd' }), {
+    skill: 'Nature',
+    dc: 15,
+    description: 'd',
+  })
+})
+
+test('toEncounterInput sends complete skill checks, drops rows missing skill or dc', () => {
+  const enc = keyed({
+    name: 'x',
+    skill_checks: [
+      { skill: 'Perception', dc: 12, description: 'spot the planks' },
+      { skill: '', dc: 10 }, // no skill → dropped
+      { skill: 'Society', dc: 0 }, // dc < 1 → dropped
+    ],
+  })
+  const input = toEncounterInput(enc)
+  assert.deepEqual(input.skill_checks, [{ skill: 'Perception', dc: 12, description: 'spot the planks' }])
 })
 
 test('toEncounterInput sends valued XP awards and drops blank/zero-amount ones', () => {

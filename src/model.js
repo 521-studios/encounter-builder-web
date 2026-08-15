@@ -86,6 +86,7 @@ export function keyed(e) {
     treasure_pools: pools,
     xp_awards: (e.xp_awards || []).map(withKey),
     rewards: (e.rewards || []).map(withKey),
+    skill_checks: (e.skill_checks || []).map(withKey),
   }
 }
 
@@ -192,6 +193,7 @@ export function toEncounterInput(enc) {
     xp_awards: (enc.xp_awards || []).map(awardInput).filter((a) => a.amount > 0),
     room_type: enc.room_type || 'combat',
     rewards: (enc.rewards || []).map(rewardInput).filter((r) => r.label),
+    skill_checks: (enc.skill_checks || []).map(skillCheckInput).filter((s) => s.skill && s.dc >= 1),
     currency: enc.currency || {},
   }
   // Party overrides use the shared clear-encoding: set when overridden, omitted
@@ -243,6 +245,20 @@ export function emptyReward() {
 export function rewardInput(r) {
   const { _key, ...rest } = r
   return { kind: rest.kind, label: (rest.label || '').trim(), description: rest.description || '' }
+}
+
+// A structured skill-check / discovery entry (e.g. "DC 12 Perception to spot the
+// loose planks"). skill + dc + a markdown effect. _key is the client-only React key.
+export function emptySkillCheck() {
+  return withKey({ skill: '', dc: 0, description: '' })
+}
+
+// Serialize a skill check for the API: drop the client _key, trim the skill, coerce
+// dc to a number. Incomplete rows (no skill or dc < 1) are filtered by the caller
+// (the API requires skill + dc >= 1).
+export function skillCheckInput(s) {
+  const { _key, ...rest } = s
+  return { skill: (rest.skill || '').trim(), dc: Number(rest.dc) || 0, description: rest.description || '' }
 }
 
 export function emptyTreasure() {
