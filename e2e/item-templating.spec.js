@@ -50,9 +50,13 @@ test('treasure item templating: compose a rune onto a weapon, name it, persist +
   await expect(page.getByTestId('chapter-tree')).toBeVisible()
   await page.locator('button.encounter', { hasText: name }).click()
   const line2 = page.locator('.treasure-line-wrap')
+  // A composed line renders collapsed: the resolved card (custom name + highlighted
+  // changes, both re-derived from the stored modifications), plus a Customize button.
   await expect(line2.locator('.itemcard .Monster__name')).toHaveText('Sting') // custom name survived
-  await expect(line2.getByTestId('applied-tag')).toContainText('Weapon Potency') // stack re-derived
   await expect(line2.locator('.itemcard .Monster__changed').first()).toBeVisible() // highlighting re-derived
+  // Re-opening the panel shows the re-derived apply stack.
+  await line2.getByTestId('customize-item').click()
+  await expect(page.getByTestId('item-slot-picker').getByTestId('applied-tag')).toContainText('Weapon Potency')
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()
