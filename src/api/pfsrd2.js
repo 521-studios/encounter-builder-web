@@ -79,9 +79,36 @@ export const pfsrd2 = {
   entryFull: (gameId, opts = {}) =>
     request('GET', `/api/pfsrd2/entries/${gameIdPath(gameId)}/full`, opts),
 
+  // Spell autocomplete for the item composer's spell-holder typeahead (a scroll or
+  // wand of X). Returns [{ game_id, name, level, ... }]; the apply endpoint enforces
+  // the holder's rank/type boundary.
+  suggestSpells: (q, opts = {}) => {
+    const params = new URLSearchParams({ q, limit: '10' })
+    params.append('type', 'spells')
+    return request('GET', `/api/pfsrd2/search/suggest/unified?${params.toString()}`, opts)
+  },
+
   // For the library's listTemplates({ get }): get(path) -> parsed JSON, path
   // relative to /api/pfsrd2 (e.g. /search?type=monster_templates&applicable_to=…).
+  // Also backs the item-templating GET for fetchEligible({ get }) → the eligible
+  // path carries a raw-colon game_id, which this passes through un-encoded (the
+  // API matches on the raw colon; %3A 404s), matching applyItemPost below.
   templatesGet: (path, opts = {}) => request('GET', `/api/pfsrd2${path}`, opts),
+
+  // For the library's applyItemEffect({ post }): a SIGNED raw POST to
+  // /entries/{item}/apply/{effect}?grade=N that returns the raw Response (the
+  // library reads res.ok/json itself). Same OAC signing as applyTemplatePost; the
+  // path (with raw-colon game_ids and a grade query) comes from the library.
+  applyItemPost: async (path, bodyStr, { tokenProvider = getToken, fetchImpl = fetch } = {}) => {
+    const token = await tokenProvider()
+    const headers = buildHeaders(token, { json: true })
+    headers['x-amz-content-sha256'] = await bodyHash(bodyStr)
+    return fetchImpl(`${config.apiBase}/api/pfsrd2${path}`, {
+      method: 'POST',
+      headers,
+      body: bodyStr,
+    })
+  },
 
   // For the library's applyTemplate({ post }): a SIGNED raw POST to
   // /templates/apply that returns the raw Response (the library parses the

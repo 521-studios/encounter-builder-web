@@ -125,6 +125,32 @@ test('applyTemplatePost signs the body with x-amz-content-sha256 (OAC) + X-Acces
   assert.equal(call.opts.headers['x-amz-content-sha256'], await bodyHash(body))
 })
 
+test('applyItemPost signs the item body (OAC) and posts to the library-supplied path', async () => {
+  const body = JSON.stringify({ name: 'Rapier', stat_block: {} })
+  const raw = { ok: true, status: 200 }
+  const fetchImpl = fakeFetch(raw)
+  const path = '/entries/weapons:1/apply/equipment:pot?grade=2'
+  const res = await pfsrd2.applyItemPost(path, body, { tokenProvider: tok, fetchImpl })
+  assert.equal(res, raw) // returns the RAW response (the library reads it)
+  const call = fetchImpl.calls[0]
+  assert.match(call.url, /\/api\/pfsrd2\/entries\/weapons:1\/apply\/equipment:pot\?grade=2$/)
+  assert.ok(!call.url.includes('%3A'), 'must not encode the colon')
+  assert.equal(call.opts.method, 'POST')
+  assert.equal(call.opts.body, body)
+  assert.equal(call.opts.headers['X-Access-Token'], 'jwt')
+  assert.equal(call.opts.headers['x-amz-content-sha256'], await bodyHash(body))
+})
+
+test('suggestSpells queries suggest/unified for type=spells', async () => {
+  const fetchImpl = fakeFetch(ok([{ game_id: 'spells:1', name: 'Fireball', level: 3 }]))
+  const out = await pfsrd2.suggestSpells('fire', { tokenProvider: tok, fetchImpl })
+  assert.equal(out[0].name, 'Fireball')
+  const url = fetchImpl.calls[0].url
+  assert.match(url, /\/search\/suggest\/unified\?/)
+  assert.match(url, /type=spells/)
+  assert.match(url, /q=fire/)
+})
+
 test('entryFull keeps the raw colon in the game_id (the API 404s on %3A)', async () => {
   const fetchImpl = fakeFetch(ok({ name: 'Goblin Dog', schema_version: 1.4 }))
   const out = await pfsrd2.entryFull('Monsters:3028', { tokenProvider: tok, fetchImpl })

@@ -1,7 +1,7 @@
 import { ItemSearch } from '@521studios/pfsrd2-display'
 import { SALE_CLASSES, TREASURE_STATES, gameIdOf, customTreasureRef, isCustomTreasure, gpToCp, cpToGp } from '../model.js'
 import { pfsrd2 } from '../api/pfsrd2.js'
-import ItemView from './ItemView.jsx'
+import ItemComposeView from './ItemComposeView.jsx'
 
 // One treasure row. Before an item is chosen, the library ItemSearch picks it by
 // name (no more typing raw game_ids). Once chosen: the ItemCard preview (masked-
@@ -12,12 +12,6 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
   const gameId = gameIdOf(treasure) // pristine game_id, or a templated ref's base.game_id
   const custom = isCustomTreasure(treasure) // freeform item (name + gp), not in the catalog
   const setCustom = (fields) => set({ ref: { json: { ...treasure.ref.json, ...fields } } })
-  // A treasure ref could in principle be derived (base + modifications). ItemView
-  // renders a plain item and — unlike MonsterView — has no modification support, so
-  // it can't faithfully show a derived treasure. The app never creates one (the
-  // picker only sets a pristine ref), but guard anyway: show an honest note rather
-  // than silently rendering the (wrong) base item.
-  const derived = Boolean(treasure.ref?.base || treasure.ref?.modifications?.length)
 
   const controls = (
     <div className="line treasure-controls">
@@ -192,17 +186,7 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
 
   return (
     <div className="treasure-line-wrap">
-      {derived ? (
-        <p className="muted" role="alert" data-testid="derived-treasure">
-          Derived treasure (base item + modifications) isn’t renderable yet — its modifications aren’t shown.
-        </p>
-      ) : (
-        <ItemView
-          gameId={gameId}
-          variant={treasure.variant}
-          onVariantChange={disabled ? undefined : (name) => set({ variant: name })}
-        />
-      )}
+      <ItemComposeView treasure={treasure} onChange={onChange} disabled={disabled} />
       {treasure.masked && (
         <p className="muted mask-note">Players see: {treasure.mask_label || 'Unidentified Item'}</p>
       )}
