@@ -223,12 +223,15 @@ test('keyed stamps a _key on every skill check; emptySkillCheck strips cleanly',
   assert.deepEqual(stripKey(emptySkillCheck()), { skill: '', dc: 0, description: '' })
 })
 
-test('skillCheckInput trims skill, coerces dc, drops _key', () => {
+test('skillCheckInput trims skill, coerces dc to a whole number, drops _key', () => {
   assert.deepEqual(skillCheckInput({ _key: 'k', skill: '  Nature ', dc: '15', description: 'd' }), {
     skill: 'Nature',
     dc: 15,
     description: 'd',
   })
+  // A fractional DC is rounded — the API's Go int rejects a non-integer JSON number,
+  // which would fail the whole PUT as an opaque "Save failed".
+  assert.equal(skillCheckInput({ skill: 'Perception', dc: 12.5 }).dc, 13)
 })
 
 test('toEncounterInput sends complete skill checks, drops rows missing skill or dc', () => {
