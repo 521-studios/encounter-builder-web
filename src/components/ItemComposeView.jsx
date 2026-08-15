@@ -75,7 +75,10 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
         // A stored custom name (in ref.json) that differs from the base seeds the field.
         const storedName = ref.json?.name
         if (storedName && storedName !== b.name) setName(storedName)
-        if (rebuilt.length) setCustomizing(true) // already composed → show the panel
+        // A composed line renders collapsed on load — the resolved card (name +
+        // highlighted changes, from the rebuilt stack) plus a Customize button to
+        // re-open the panel. Auto-expanding every treasure line's rune browser (and
+        // eagerly fetching eligibility for each) would be cluttered and slow.
       } catch (e) {
         if (alive) setError(errorMessage(e))
       }
