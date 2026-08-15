@@ -23,3 +23,12 @@ test('WikiMarkdown renders an unresolved [[link]] as plain text, not a link', ()
   assert.equal(screen.queryByRole('link'), null)
   assert.match(screen.getByTestId('wiki-markdown').textContent, /See Nowhere\./)
 })
+
+test('WikiMarkdown does not hijack an ordinary markdown link', () => {
+  const opened = []
+  render(<WikiMarkdown text="[docs](https://example.com)" encounters={encounters} onOpenEncounter={(id) => opened.push(id)} />)
+  const link = screen.getByRole('link', { name: 'docs' })
+  const notPrevented = fireEvent.click(link) // false only if a handler called preventDefault
+  assert.equal(opened.length, 0) // a normal link never triggers encounter navigation
+  assert.equal(notPrevented, true) // default navigation left intact
+})
