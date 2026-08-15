@@ -19,6 +19,7 @@ import {
   emptyAward,
   emptyReward,
   emptySkillCheck,
+  emptyExit,
   keyed,
 } from '../model.js'
 import { resolveParty } from '../party.js'
@@ -37,6 +38,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
   const [releasing, setReleasing] = useState(false)
   const [chapters, setChapters] = useState([]) // for the Chapter picker (keyboard-accessible move)
+  const [siblingEncounters, setSiblingEncounters] = useState([]) // campaign encounters, for the exit target picker
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
   const [partyContextError, setPartyContextError] = useState(false) // chapters/settings load failed
 
@@ -59,6 +61,10 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       // Picker falls back to Unsorted-only; also flag it so the party-inheritance
       // hint (which reads the encounter's chapter override) isn't a silent lie.
       .catch(() => alive && setPartyContextError(true))
+    encounters
+      .list(campaignId)
+      .then((es) => alive && setSiblingEncounters(es))
+      .catch(() => {}) // exit target picker just falls back to external-only
     settingsApi
       .get(campaignId)
       .then((s) => alive && setCampaignSettings(s))
@@ -220,6 +226,15 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     patch({ skill_checks: skillChecks.map((s, j) => (j === i ? { ...s, ...fields } : s)) })
   const addCheck = () => patch({ skill_checks: [...skillChecks, emptySkillCheck()] })
   const removeCheck = (i) => patch({ skill_checks: skillChecks.filter((_, j) => j !== i) })
+
+  // Exits: the room's connectivity edges. Each targets another encounter (a soft
+  // reference) or an external destination named by label. Empty rows drop on save.
+  const exits = enc.exits || []
+  const exitTargets = siblingEncounters.filter((e) => String(e.id) !== String(encounterId)) // not self
+  const setExit = (i, fields) =>
+    patch({ exits: exits.map((e, j) => (j === i ? { ...e, ...fields } : e)) })
+  const addExit = () => patch({ exits: [...exits, emptyExit()] })
+  const removeExit = (i) => patch({ exits: exits.filter((_, j) => j !== i) })
 
   // Release hands the loot to the party: it saves current edits first (so the
   // released encounter matches what the GM sees), then flips it to released —
@@ -564,6 +579,53 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         {!released && (
           <button type="button" className="add-skill-check" onClick={addCheck}>
             + skill check
+          </button>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>Exits</legend>
+        <p className="muted">
+          Where this room connects — the dungeon map graph. Link to another encounter,
+          or name an external exit (Exterior, stairs up).
+        </p>
+        {exits.map((ex, i) => (
+          <div className="exit" data-testid="exit" key={ex._key}>
+            <select
+              className="exit-target"
+              aria-label="exit target"
+              value={ex.to_encounter_id || ''}
+              disabled={released}
+              onChange={(e) => setExit(i, { to_encounter_id: e.target.value })}
+            >
+              <option value="">— External —</option>
+              {exitTargets.map((t) => (
+                <option key={t.id} value={t.id}>{t.name || 'Untitled'}</option>
+              ))}
+              {/* A soft reference to a since-deleted encounter shows honestly as broken
+                  (not silently as "— External —") so the GM can re-point or remove it. */}
+              {ex.to_encounter_id && !exitTargets.some((t) => String(t.id) === String(ex.to_encounter_id)) && (
+                <option value={ex.to_encounter_id}>(deleted encounter)</option>
+              )}
+            </select>
+            <input
+              className="exit-label"
+              aria-label="exit label"
+              placeholder={ex.to_encounter_id ? 'Passage (optional)' : 'Destination (e.g. Exterior)'}
+              value={ex.label || ''}
+              disabled={released}
+              onChange={(e) => setExit(i, { label: e.target.value })}
+            />
+            {!released && (
+              <button type="button" className="link danger" onClick={() => removeExit(i)}>
+                remove
+              </button>
+            )}
+          </div>
+        ))}
+        {!released && (
+          <button type="button" className="add-exit" onClick={addExit}>
+            + exit
           </button>
         )}
       </fieldset>

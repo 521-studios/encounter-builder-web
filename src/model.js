@@ -87,6 +87,7 @@ export function keyed(e) {
     xp_awards: (e.xp_awards || []).map(withKey),
     rewards: (e.rewards || []).map(withKey),
     skill_checks: (e.skill_checks || []).map(withKey),
+    exits: (e.exits || []).map(withKey),
   }
 }
 
@@ -194,6 +195,7 @@ export function toEncounterInput(enc) {
     room_type: enc.room_type || 'combat',
     rewards: (enc.rewards || []).map(rewardInput).filter((r) => r.label),
     skill_checks: (enc.skill_checks || []).map(skillCheckInput).filter((s) => s.skill && s.dc >= 1),
+    exits: (enc.exits || []).map(exitInput).filter((e) => e.to_encounter_id || e.label),
     currency: enc.currency || {},
   }
   // Party overrides use the shared clear-encoding: set when overridden, omitted
@@ -261,6 +263,20 @@ export function emptySkillCheck() {
 export function skillCheckInput(s) {
   const { _key, ...rest } = s
   return { skill: (rest.skill || '').trim(), dc: Math.round(Number(rest.dc) || 0), description: rest.description || '' }
+}
+
+// An exit / connectivity edge: a passage to another encounter (to_encounter_id, a
+// soft reference) or an external destination named by label ("Exterior"). _key is
+// the client-only React key.
+export function emptyExit() {
+  return withKey({ to_encounter_id: '', label: '' })
+}
+
+// Serialize an exit for the API: drop the client _key, trim the label. Rows with
+// neither a target nor a label are filtered by the caller (the API rejects them).
+export function exitInput(e) {
+  const { _key, ...rest } = e
+  return { to_encounter_id: rest.to_encounter_id || '', label: (rest.label || '').trim() }
 }
 
 export function emptyTreasure() {
