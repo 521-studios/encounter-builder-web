@@ -4,7 +4,21 @@ import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { settings as settingsApi } from '../api/settings.js'
-import { CURRENCIES, buildInput, emptyMonster, emptyTreasure, emptyPool, emptyAward, keyed } from '../model.js'
+import {
+  CURRENCIES,
+  ROOM_TYPES,
+  ROOM_TYPE_LABELS,
+  isCombatRoom,
+  REWARD_KINDS,
+  REWARD_KIND_LABELS,
+  buildInput,
+  emptyMonster,
+  emptyTreasure,
+  emptyPool,
+  emptyAward,
+  emptyReward,
+  keyed,
+} from '../model.js'
 import { resolveParty } from '../party.js'
 import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
@@ -189,6 +203,14 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const addAward = () => patch({ xp_awards: [...awards, emptyAward()] })
   const removeAward = (i) => patch({ xp_awards: awards.filter((_, j) => j !== i) })
 
+  // Non-treasure reward slots (information/ritual/ally/item) — informational, no
+  // gp/XP effect. Rows with an empty label are dropped on save (model.js).
+  const rewards = enc.rewards || []
+  const setReward = (i, fields) =>
+    patch({ rewards: rewards.map((r, j) => (j === i ? { ...r, ...fields } : r)) })
+  const addReward = () => patch({ rewards: [...rewards, emptyReward()] })
+  const removeReward = (i) => patch({ rewards: rewards.filter((_, j) => j !== i) })
+
   // Release hands the loot to the party: it saves current edits first (so the
   // released encounter matches what the GM sees), then flips it to released —
   // after which the editor renders read-only.
@@ -233,18 +255,28 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           disabled={released}
           onChange={(e) => patch({ name: e.target.value })}
         />
-        <span
-          className={`difficulty-badge difficulty-badge--${budget.threat}`}
-          data-testid="difficulty-badge"
-          title={
-            `${BAND_LABELS[budget.threat]} encounter for a level-${effectiveParty.level} party (from monster XP)` +
-            (effectiveParty.size !== BASE_PARTY
-              ? ` · ${BAND_LABELS[budget.canonicalThreat]} at ${BASE_PARTY} PCs (book standard)`
-              : '')
-          }
-        >
-          {BAND_LABELS[budget.threat]} {effectiveParty.level}
-        </span>
+        {isCombatRoom(budget.roomType) ? (
+          <span
+            className={`difficulty-badge difficulty-badge--${budget.threat}`}
+            data-testid="difficulty-badge"
+            title={
+              `${BAND_LABELS[budget.threat]} encounter for a level-${effectiveParty.level} party (from monster XP)` +
+              (effectiveParty.size !== BASE_PARTY
+                ? ` · ${BAND_LABELS[budget.canonicalThreat]} at ${BASE_PARTY} PCs (book standard)`
+                : '')
+            }
+          >
+            {BAND_LABELS[budget.threat]} {effectiveParty.level}
+          </span>
+        ) : (
+          <span
+            className="difficulty-badge difficulty-badge--noncombat"
+            data-testid="difficulty-badge"
+            title={`${ROOM_TYPE_LABELS[budget.roomType] || budget.roomType} room — no combat difficulty`}
+          >
+            {ROOM_TYPE_LABELS[budget.roomType] || budget.roomType}
+          </span>
+        )}
         <span className="status">{enc.status}</span>
         <button type="button" className="link danger" aria-label={`Delete ${enc.name || 'Untitled encounter'}`} onClick={del}>Delete</button>
         <button type="button" className="link" onClick={onClose}>Close</button>
@@ -264,6 +296,20 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           <option value="">Unsorted</option>
           {chapters.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      </label>
+
+      <label className="field">
+        <span>Room type</span>
+        <select
+          aria-label="room type"
+          value={enc.room_type || 'combat'}
+          disabled={released}
+          onChange={(e) => patch({ room_type: e.target.value })}
+        >
+          {ROOM_TYPES.map((t) => (
+            <option key={t} value={t}>{ROOM_TYPE_LABELS[t]}</option>
           ))}
         </select>
       </label>
@@ -401,6 +447,59 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         {!released && (
           <button type="button" className="add-award" onClick={addAward}>
             + XP award
+          </button>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>Rewards</legend>
+        <p className="muted">
+          Non-treasure rewards — information/lore unlocked, a ritual granted, an ally
+          recruited, a unique item. Recorded for the GM; no gp or XP effect.
+        </p>
+        {rewards.map((r, i) => (
+          <div className="reward" data-testid="reward" key={r._key}>
+            <div className="reward-head">
+              <select
+                aria-label="reward kind"
+                value={r.kind || 'information'}
+                disabled={released}
+                onChange={(e) => setReward(i, { kind: e.target.value })}
+              >
+                {REWARD_KINDS.map((k) => (
+                  <option key={k} value={k}>{REWARD_KIND_LABELS[k]}</option>
+                ))}
+              </select>
+              <input
+                className="reward-label"
+                aria-label="reward label"
+                placeholder="Name (e.g. The Whispering Reeds)"
+                value={r.label || ''}
+                disabled={released}
+                onChange={(e) => setReward(i, { label: e.target.value })}
+              />
+              {!released && (
+                <button type="button" className="link danger" onClick={() => removeReward(i)}>
+                  remove
+                </button>
+              )}
+            </div>
+            {!released ? (
+              <textarea
+                className="reward-description"
+                aria-label="reward description"
+                placeholder="Details — GM notes (markdown)"
+                value={r.description || ''}
+                onChange={(e) => setReward(i, { description: e.target.value })}
+              />
+            ) : r.description ? (
+              <Markdown block text={r.description} />
+            ) : null}
+          </div>
+        ))}
+        {!released && (
+          <button type="button" className="add-reward" onClick={addReward}>
+            + reward
           </button>
         )}
       </fieldset>

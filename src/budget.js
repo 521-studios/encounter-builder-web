@@ -4,7 +4,7 @@
 // without fetching; the TreasureBudget component wires the real fetched entries.
 import { itemPriceCp, creatureLevel, coinsToCp } from '@521studios/pfsrd2-display'
 import { creatureXp, encounterThreat, treasureBudget } from './pf2eRules.js'
-import { isCustomTreasure } from './model.js'
+import { isCustomTreasure, isCombatRoom } from './model.js'
 
 // refGameId: the game_id a monster/treasure ref resolves to — a pristine ref, or
 // a derived (templated/runed) ref's base.game_id.
@@ -118,11 +118,23 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
     const { level, size } = partyFor(enc)
     const { cp, unpriced } = treasureValueCp(enc.treasure, enc.currency, entryOf)
     const { xp, unknown } = encounterXp(enc.monsters, level, entryOf)
-    const threat = encounterThreat(xp, size) // combat difficulty: creatures only, no awards
-    const targetGp = treasureBudget(level, threat, size) // null for a Trivial encounter
+    // Non-combat rooms (hazard/haunt/social/knowledge/…) have no meaningful combat
+    // band or treasure target — suppress both; their loot still counts as value.
+    const combat = isCombatRoom(enc.room_type)
+    const threat = combat ? encounterThreat(xp, size) : null // creatures only, no awards
+    const targetGp = combat ? treasureBudget(level, threat, size) : null // null for Trivial / non-combat
     const targetCp = targetGp == null ? 0 : targetGp * 100
     const encXp = xp + awardXp(enc) // advancement XP includes non-combat awards
-    rows.push({ id: enc.id, name: enc.name, cp, xp: encXp, threat, targetCp, incomplete: unpriced.length > 0 || unknown.length > 0 })
+    rows.push({
+      id: enc.id,
+      name: enc.name,
+      cp,
+      xp: encXp,
+      threat,
+      roomType: enc.room_type || 'combat',
+      targetCp,
+      incomplete: unpriced.length > 0 || unknown.length > 0,
+    })
     totalCp += cp
     totalTargetCp += targetCp
     totalXp += encXp

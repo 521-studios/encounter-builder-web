@@ -5,6 +5,7 @@ import { encounters as encountersApi } from '../api/encounters.js'
 import { errorMessage } from '../api/errors.js'
 import { resolveParty, partyFields } from '../party.js'
 import { BAND_LABELS } from '../pf2eRules.js'
+import { isCombatRoom, ROOM_TYPE_LABELS } from '../model.js'
 import { useAutosave, SAVE_LABEL } from '../useAutosave.js'
 import { useRollup } from '../useRollup.js'
 import PartyFields from './PartyFields.jsx'
@@ -126,7 +127,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
         title="Chapter treasure"
         rowLabel="Encounter"
         secondaryLabel="Difficulty"
-        secondaryOf={(r) => BAND_LABELS[r.threat]}
+        secondaryOf={(r) => (isCombatRoom(r.roomType) ? BAND_LABELS[r.threat] : ROOM_TYPE_LABELS[r.roomType] || r.roomType)}
         emptyLabel="No encounters in this chapter yet."
         loadError={encountersError}
         onReload={() => setReloadKey((k) => k + 1)}

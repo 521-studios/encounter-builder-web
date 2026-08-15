@@ -1,5 +1,6 @@
 import { formatGp } from '@521studios/pfsrd2-display'
 import { treasureBudget, TREASURE_BANDS, BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
+import { isCombatRoom, ROOM_TYPE_LABELS } from '../model.js'
 
 // The encounter's treasure-vs-budget panel: presents the computed budget (from
 // useEncounterBudget — treasure value + difficulty band) against the Table 5-3
@@ -7,7 +8,12 @@ import { treasureBudget, TREASURE_BANDS, BAND_LABELS, BASE_PARTY } from '../pf2e
 // loot marked over/under its target. Fetching lives in the hook so the difficulty
 // badge on the title can share it.
 export default function TreasureBudget({ budget, partyLevel, partySize }) {
-  const { cp, xp, awardXp = 0, totalXp = xp, threat, canonicalThreat, xpPer4, loading, unpricedCount, unknownCount, failedCount, onRetry } = budget
+  const { cp, xp, awardXp = 0, totalXp = xp, roomType = 'combat', threat, canonicalThreat, xpPer4, loading, unpricedCount, unknownCount, failedCount, onRetry } = budget
+
+  // Non-combat rooms (hazard/haunt/social/knowledge/…) have no meaningful combat
+  // difficulty band or treasure target — the panel drops the band, the Table 5-3
+  // chart, and the canonical lens, and just shows the room type + any loot/XP.
+  const combat = isCombatRoom(roomType)
 
   // The treasure total is a floor whenever some lines couldn't be valued (still
   // loading, a failed fetch, or a genuinely unpriceable derived/"Varies" item).
@@ -26,14 +32,23 @@ export default function TreasureBudget({ budget, partyLevel, partySize }) {
     <section className="treasure-budget" data-testid="treasure-budget">
       <h3 className="budget-title">Budget — party level {partyLevel}, {partySize} PCs</h3>
       <p className="budget-summary">
-        Difficulty <strong data-testid="encounter-threat">{BAND_LABELS[threat]}</strong>
-        {' '}({xp} XP)
-        {awardXp > 0 && (
+        {combat ? (
+          <>
+            Difficulty <strong data-testid="encounter-threat">{BAND_LABELS[threat]}</strong>
+            {' '}({xp} XP)
+          </>
+        ) : (
+          <>
+            Room <strong data-testid="room-type">{ROOM_TYPE_LABELS[roomType] || roomType}</strong>
+            {totalXp > 0 ? ` (${totalXp} XP)` : ''}
+          </>
+        )}
+        {combat && awardXp > 0 && (
           <span data-testid="award-xp"> + {awardXp} non-combat = {totalXp} XP total</span>
         )}
         {' · '}Treasure <strong data-testid="treasure-value">{formatGp(cp)}</strong>
         {incomplete && cp > 0 ? ' (floor)' : ''}
-        {target != null && (
+        {combat && target != null && (
           <span data-testid="treasure-delta">
             {' — '}
             {meetsTarget
@@ -52,7 +67,7 @@ export default function TreasureBudget({ budget, partyLevel, partySize }) {
           6 is a Low the book intended for 4); the XP AWARD is the raw XP rescaled to
           a 4-PC budget (difficulty-preserving), the number GMs track by hand. Their
           implied bands can differ — they answer different questions. */}
-      {partySize !== BASE_PARTY && (
+      {combat && partySize !== BASE_PARTY && (
         <p className="budget-canonical" data-testid="budget-canonical">
           At {BASE_PARTY} PCs (book standard): difficulty{' '}
           <strong data-testid="canonical-threat">{BAND_LABELS[canonicalThreat]}</strong>
@@ -61,6 +76,7 @@ export default function TreasureBudget({ budget, partyLevel, partySize }) {
         </p>
       )}
 
+      {combat && (
       <div className="chart-scroll">
         <table className="treasure-chart">
           <thead>
@@ -93,6 +109,7 @@ export default function TreasureBudget({ budget, partyLevel, partySize }) {
           </tbody>
         </table>
       </div>
+      )}
 
       {failedCount > 0 && (
         <p className="error budget-error" role="alert" data-testid="budget-error">

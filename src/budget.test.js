@@ -240,6 +240,34 @@ test('rollupEncounters: awards add to XP total/row but never to combat threat or
   assert.equal(r.totalXp, 70)
 })
 
+test('rollupEncounters: a non-combat room suppresses threat + target but keeps loot value and award XP', () => {
+  const items = { 'W:1': { stat_block: { price: { value: 100, currency: 'gp' } } } } // 10000 cp
+  const entryOf = (id) => items[id] || null
+  const partyFor = () => ({ level: 5, size: 4 })
+  // A knowledge room: no monsters, one 100 gp item, a 40 XP award.
+  const r = rollupEncounters(
+    [
+      {
+        id: 'k1',
+        name: 'Secure Collection',
+        room_type: 'knowledge',
+        monsters: [],
+        treasure: [{ ref: { game_id: 'W:1' }, qty: 1 }],
+        currency: {},
+        xp_awards: [{ amount: 40 }],
+      },
+    ],
+    entryOf,
+    partyFor,
+  )
+  assert.equal(r.rows[0].threat, null) // no combat band
+  assert.equal(r.rows[0].roomType, 'knowledge')
+  assert.equal(r.rows[0].targetCp, 0) // no treasure target from a (nonexistent) band
+  assert.equal(r.rows[0].cp, 10000) // loot still counts as value
+  assert.equal(r.rows[0].xp, 40) // advancement XP (award) still counts
+  assert.equal(r.totalTargetCp, 0)
+})
+
 test('rollupEncounters flags incomplete rows (unpriced/unknown) and tolerates empty', () => {
   const entryOf = () => null // nothing loads
   const partyFor = () => ({ level: 3, size: 4 })
