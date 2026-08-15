@@ -226,6 +226,7 @@ export default function App() {
                   backToEmpty()
                   setReloadKey((k) => k + 1)
                 }}
+                onOpenEncounter={(id) => setView({ kind: 'encounter', enc: { id } })}
               />
             )}
             {view.kind === 'empty' && (
