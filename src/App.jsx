@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { clearSaveErrorOnSave } from './model.js'
 import { getUser, getAccessToken, login, logout, completeLogin, onUserChange } from './auth/oidc.js'
 import { setTokenProvider } from './api/token.js'
 import { fetchGames } from './api/letsroll.js'
@@ -22,18 +23,30 @@ export default function App() {
   // pages, or nothing. { kind: 'empty' | 'encounter' | 'campaign' | 'chapter', … }
   const [view, setView] = useState({ kind: 'empty' })
   const [reloadKey, setReloadKey] = useState(0) // bump to refresh the sidebar tree
-  // An autosave failure with no lasting on-screen indicator surfaces here at the
-  // app level: a flush that failed AFTER its editor/detail closed (EncounterEditor's
-  // flush-on-leave), and — since the detail pages route useAutosave's onError here —
-  // a still-open campaign/chapter save failure too (alongside its inline indicator).
-  // `what` names the record. Cleared only on Dismiss: auto-clearing on the next
-  // successful save would wrongly wipe record X's warning when a DIFFERENT record
-  // then saves (views are mutually exclusive), re-masking X's unsaved edit.
+  // An autosave failure surfaces here at the app level so it isn't lost when its
+  // editor's inline indicator is gone: a flush that failed AFTER its editor/detail
+  // closed (EncounterEditor's flush-on-leave), an encounter autosave that failed
+  // mid-flight then Closed (EncounterEditor's mounted catch), and a still-open
+  // campaign/chapter save failure (routed from useAutosave's onError, alongside its
+  // inline indicator). Shape is { what, id }: `what` names the record, `id` keys it.
+  // Cleared on Dismiss OR when the SAME record (matching id) next saves — id-keying is
+  // what lets same-record recovery auto-clear without a DIFFERENT record's save wiping
+  // record X's still-unsaved warning (views are mutually exclusive).
   const [saveError, setSaveError] = useState(null)
   const booted = useRef(false)
   const backToEmpty = () => setView({ kind: 'empty' })
-  const onSaved = () => setReloadKey((k) => k + 1)
-  const onSaveError = (what) => setSaveError(what)
+  const onSaved = (saved) => {
+    setReloadKey((k) => k + 1)
+    // Same-record recovery: clear the banner only when THIS record's save succeeds
+    // (id-keyed), so a different record saving can't re-mask X's unsaved warning.
+    setSaveError((prev) => clearSaveErrorOnSave(prev, saved))
+  }
+  const onSaveError = (what, id) => setSaveError({ what, id })
+  // Any successful save of a record clears its stale error banner (id-keyed) — including
+  // edits that don't change sidebar-visible state, so EncounterEditor's signature-gated
+  // onSaved never fires (a description fix recovering from a failed autosave). Chapter/
+  // campaign saves clear through onSaved directly (they fire it on every save).
+  const onSaveOk = (id) => setSaveError((prev) => clearSaveErrorOnSave(prev, { id }))
 
   // Restore the campaign + main view from the query string (deep-link, reload, and
   // back/forward). The campaign object comes from the games list; a chapter view
@@ -145,7 +158,7 @@ export default function App() {
 
       {saveError && (
         <div className="save-error-banner" role="alert" data-testid="save-error-banner">
-          A background save failed — your last change to {saveError} may not have been saved. Re-open it and check.{' '}
+          A background save failed — your last change to {saveError.what} may not have been saved. Re-open it and check.{' '}
           <button type="button" className="link" onClick={() => setSaveError(null)}>Dismiss</button>
         </div>
       )}
@@ -197,6 +210,7 @@ export default function App() {
                 }}
                 onSaved={onSaved}
                 onSaveError={onSaveError}
+                onSaveOk={onSaveOk}
                 onDeleted={() => {
                   backToEmpty()
                   setReloadKey((k) => k + 1)

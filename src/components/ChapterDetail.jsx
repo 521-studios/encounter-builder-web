@@ -39,7 +39,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
       onSaved && onSaved(updated)
     },
     800,
-    () => onSaveError && onSaveError(`chapter “${value.name.trim() || 'Untitled chapter'}”`),
+    () => onSaveError && onSaveError(`chapter “${value.name.trim() || 'Untitled chapter'}”`, chapter.id),
   )
 
   // Always-visible chapter treasure rollup (per encounter). Called unconditionally

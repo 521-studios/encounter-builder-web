@@ -36,7 +36,7 @@ import TreasureBudget from './TreasureBudget.jsx'
 
 const AUTOSAVE_MS = 800
 
-export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onOpenEncounter }) {
+export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onSaveOk, onOpenEncounter }) {
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
   const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
@@ -126,16 +126,25 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           }
         }
         setSaveState('saved')
+        // Clear any lingering app-level banner for THIS encounter on ANY successful
+        // save — onSaved above is gated on a sidebar-signature change, so a description/
+        // treasure/monster edit recovering from a failed autosave wouldn't clear it. 3kni.
+        onSaveOk && onSaveOk(encounterId)
       } catch (e) {
         setError(errorMessage(e))
         setSaveState('error')
         dirtyRef.current = true // ponytail: retry on the next edit, not on a timer
+        // Also surface at the app level, keyed by this encounter's id: if the editor
+        // then unmounts (Close mid-retry) the inline "Save failed" indicator is gone,
+        // and id-keying lets a later successful save of THIS encounter clear the
+        // banner (not a different record's). 3kni — closes the mid-flight-at-Close swallow.
+        onSaveError && onSaveError(`encounter “${encRef.current?.name || 'Untitled encounter'}”`, encounterId)
       } finally {
         savingRef.current = false
       }
     }, AUTOSAVE_MS)
     return () => clearTimeout(t)
-  }, [enc, released, campaignId, encounterId, onSaved])
+  }, [enc, released, campaignId, encounterId, onSaved, onSaveError, onSaveOk])
 
   // Flush a pending (debounced) autosave when leaving this encounter, so the last
   // <800ms of edits aren't lost on a quick switch or close. Fire-and-forget: the
@@ -150,7 +159,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         // failed flush must surface at the app level or the edit is lost silently.
         encounters
           .update(campaignId, encounterId, buildInput(leaving))
-          .catch(() => onSaveError && onSaveError(`encounter “${leaving.name || 'Untitled encounter'}”`))
+          .catch(() => onSaveError && onSaveError(`encounter “${leaving.name || 'Untitled encounter'}”`, encounterId))
       }
     }
   }, [campaignId, encounterId])

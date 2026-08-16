@@ -28,6 +28,7 @@ import {
   skillCheckInput,
   emptyExit,
   exitInput,
+  clearSaveErrorOnSave,
 } from './model.js'
 
 test('keyed stamps a _key on every monster and treasure line', () => {
@@ -459,4 +460,22 @@ test('toEncounterInput echoes a party override when set, omits it when null (inh
   const inheriting = toEncounterInput(keyed({ name: 'x' }))
   assert.ok(!('party_level' in inheriting))
   assert.ok(!('party_size' in inheriting))
+})
+
+test('clearSaveErrorOnSave clears the banner only when the SAME record saves (id-keyed)', () => {
+  const err = { what: 'encounter “Goblins”', id: 'e1' }
+  // A different record saving must NOT clear record e1's warning.
+  assert.deepEqual(clearSaveErrorOnSave(err, { id: 'e2' }), err)
+  // The same record saving clears it.
+  assert.equal(clearSaveErrorOnSave(err, { id: 'e1' }), null)
+  // id type mismatch (number vs string) still matches (list id vs URL id).
+  assert.equal(clearSaveErrorOnSave({ what: 'x', id: 42 }, { id: '42' }), null)
+})
+
+test('clearSaveErrorOnSave is a no-op when there is no banner, no saved record, or no ids', () => {
+  const err = { what: 'x', id: 'e1' }
+  assert.equal(clearSaveErrorOnSave(null, { id: 'e1' }), null) // nothing to clear
+  assert.deepEqual(clearSaveErrorOnSave(err, null), err) // no saved record
+  assert.deepEqual(clearSaveErrorOnSave(err, {}), err) // saved has no id → can't match, keep banner
+  assert.deepEqual(clearSaveErrorOnSave({ what: 'x' }, { id: 'e1' }), { what: 'x' }) // banner has no id
 })
