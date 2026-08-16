@@ -131,3 +131,65 @@ test('ItemComposeView overlays the custom name onto the composed item and persis
   // And the rendered card shows the overlaid name (customizedItem).
   assert.equal(screen.getByTestId('card').textContent, 'Bane of Goblins')
 })
+
+test('ItemComposeView composes the treasure price: base + applied rune grade price_cp → ref.price_cp (4den)', async () => {
+  const refs = []
+  const deps = makeDeps({
+    // base 1 gp = 100 cp (entryFull lives under deps.api, so override the whole api bag)
+    api: { entryFull: async () => ({ name: 'Longsword', stat_block: { price: { value: 1, currency: 'gp' } } }), applyItemPost: async () => ({}), templatesGet: async () => ({}), suggestSpells: async () => [] },
+    // eligibility now carries structured price_cp per grade; the stub applies Rune:striking @ grade(level) 2
+    fetchEligible: async () => ({
+      runes: {
+        fundamental: [{ game_id: 'Rune:striking', name: 'Striking', grades: [{ level: 2, price_cp: 6500 }] }],
+        property: [],
+      },
+    }),
+  })
+  await openPicker((t) => refs.push(t.ref), deps)
+  fireEvent.click(screen.getByText('apply'))
+  await waitFor(() => assert.equal(refs.length, 1))
+  const ref = refs.at(-1)
+  assert.equal(ref.modifications[0].price_cp, 6500) // the grade price rode into the modification
+  assert.equal(ref.price_cp, 6600) // base 100 + striking 6500, composed total in copper
+})
+
+test('ItemComposeView leaves ref.price_cp unset when the applied component has no price (4den)', async () => {
+  const refs = []
+  const deps = makeDeps({
+    api: { entryFull: async () => ({ name: 'Longsword', stat_block: { price: { value: 1, currency: 'gp' } } }), applyItemPost: async () => ({}), templatesGet: async () => ({}), suggestSpells: async () => [] },
+    // the applied rune isn't in eligibility (or carries no price_cp) → component price null
+    fetchEligible: async () => ({ runes: { fundamental: [], property: [] } }),
+  })
+  await openPicker((t) => refs.push(t.ref), deps)
+  fireEvent.click(screen.getByText('apply'))
+  await waitFor(() => assert.equal(refs.length, 1))
+  const ref = refs.at(-1)
+  assert.equal(ref.modifications[0].price_cp, null)
+  assert.equal(ref.price_cp, undefined) // one unpriced component → no composed total
+})
+
+test('ItemComposeView preserves per-modification price_cp across reload so the total stays composed (4den)', async () => {
+  const refs = []
+  const deps = makeDeps({
+    api: { entryFull: async () => ({ name: 'Longsword', stat_block: { price: { value: 1, currency: 'gp' } } }), applyItemPost: async () => ({}), templatesGet: async () => ({}), suggestSpells: async () => [] },
+    fetchEligible: async () => ({ runes: { fundamental: [{ game_id: 'Rune:striking', name: 'Striking', grades: [{ level: 2, price_cp: 6500 }] }], property: [] } }),
+  })
+  // Mount an ALREADY-composed item: a persisted modification carrying its price_cp. The
+  // rebuild re-applies it (no eligibility fetch) and must carry price_cp back onto the stack.
+  const treasure = {
+    ref: {
+      base: { game_id: 'Weapons:1' },
+      modifications: [{ effect_game_id: 'Rune:striking', effect_name: 'Striking', grade: 2, price_cp: 6500 }],
+      json: { name: 'Striking Longsword', stat_block: {} },
+    },
+  }
+  render(<ItemComposeView treasure={treasure} onChange={(t) => refs.push(t.ref)} deps={deps} />)
+  await screen.findByTestId('card')
+  // Re-open customize and apply a second rune; the RELOADED first rune's price must still count.
+  fireEvent.click(screen.getByTestId('customize-item'))
+  await screen.findByTestId('picker')
+  fireEvent.click(screen.getByText('apply'))
+  await waitFor(() => assert.equal(refs.length, 1))
+  // base 100 + reloaded striking 6500 + new striking 6500 = 13100 (a dropped reload price → undefined)
+  assert.equal(refs.at(-1).price_cp, 13100)
+})

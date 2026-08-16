@@ -15,11 +15,31 @@ test('a non-empty stack yields a derived ref with base, modifications (grade car
   assert.deepEqual(buildItemRef('weapons:1', stack), {
     base: { game_id: 'weapons:1' },
     modifications: [
-      { effect_game_id: 'equipment:pot', effect_name: 'Weapon Potency', grade: 2 },
-      { effect_game_id: 'equipment:strk', effect_name: 'Striking', grade: null },
+      { effect_game_id: 'equipment:pot', effect_name: 'Weapon Potency', grade: 2, price_cp: null },
+      { effect_game_id: 'equipment:strk', effect_name: 'Striking', grade: null, price_cp: null },
     ],
     json: { name: 'Rapier', v: 2 }, // the LAST resolved item is the snapshot
   })
+})
+
+test('buildItemRef sums base + component prices into ref.price_cp when all parts are priced', () => {
+  const stack = [
+    { effect: { game_id: 'e:pot', name: 'Weapon Potency' }, grade: 2, price_cp: 3500, item: {} }, // 35 gp
+    { effect: { game_id: 'e:strk', name: 'Striking' }, grade: 4, price_cp: 6500, item: {} }, // 65 gp
+  ]
+  const ref = buildItemRef('weapons:1', stack, '', 100) // base 1 gp = 100 cp
+  assert.equal(ref.price_cp, 100 + 3500 + 6500) // 10100 cp = 101 gp
+  assert.equal(ref.modifications[0].price_cp, 3500)
+  assert.equal(ref.modifications[1].price_cp, 6500)
+})
+
+test('buildItemRef omits ref.price_cp when a component (or the base) has no price', () => {
+  const priced = { effect: { game_id: 'e:pot', name: 'P' }, grade: 2, price_cp: 3500, item: {} }
+  const unpriced = { effect: { game_id: 'e:prop', name: 'Prop' }, grade: null, price_cp: null, item: {} }
+  // A single unpriced component leaves the whole line unpriced (no undercount).
+  assert.equal(buildItemRef('w:1', [priced, unpriced], '', 100).price_cp, undefined)
+  // A missing base price does the same, even if every component is priced.
+  assert.equal(buildItemRef('w:1', [priced], '', null).price_cp, undefined)
 })
 
 test('a custom name overlays onto the resolved json without mutating it; blank name is ignored', () => {
