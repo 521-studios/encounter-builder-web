@@ -126,8 +126,9 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
   }
 
   // The base item's price in copper, summed with the applied runes' prices to give the
-  // composed total that buildItemRef stores for the treasure budget.
-  const basePriceCp = base ? itemPriceCp(base) : null
+  // composed total that buildItemRef stores for the treasure budget. Honors the selected
+  // variant like the non-derived budget path (budget.js itemPriceCp(entry, line.variant)).
+  const basePriceCp = base ? itemPriceCp(base, treasure.variant || undefined) : null
 
   function persist(nextStack, nextName) {
     onChange({ ...treasure, ref: buildItemRef(baseGameId, nextStack, nextName, basePriceCp) })
