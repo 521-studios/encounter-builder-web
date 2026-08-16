@@ -386,3 +386,155 @@ button.chapter-name:hover { color: var(--gold); }
 .rollup-table { width: 100%; }
 .rollup-table td, .rollup-table th { text-align: left; }
 .rollup-table td:nth-child(3), .rollup-table td:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Encounter print/PDF sheet (u7dd). A read-only "paper" handout rendered as a
+   full-screen overlay. It's light-themed on screen too (WYSIWYG with what
+   prints), and at @media print everything but .print-sheet is hidden so the
+   browser's Save-as-PDF captures just the sheet. Single-column handout.
+   ───────────────────────────────────────────────────────────────────────── */
+.print-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
+  background: #4a4a4a;              /* dim ground behind the "page" */
+  padding: 2rem 1rem;
+  color: #1a1a1a;
+  font: 16px/1.55 Georgia, 'Times New Roman', serif;
+  /* Preserve the designed tints (parchment stat-block box, red headers, gold
+     rules) in the generated PDF without requiring the user to toggle the print
+     dialog's "Background graphics" option. */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* The page itself — a centered white column with book-ish measure. */
+.print-sheet > *:not(.print-toolbar) {
+  max-width: 44rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.print-sheet .print-head,
+.print-sheet .print-section,
+.print-sheet .treasure-budget {
+  background: #fff;
+  padding: 0.1rem 1.5rem;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+.print-sheet .print-head { padding-top: 1.25rem; padding-bottom: 0.5rem; }
+.print-sheet .print-section { padding-top: 0.75rem; padding-bottom: 0.75rem; margin-top: 2px; }
+
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 44rem;
+  margin: 0 auto 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: #2a2a2a;
+  border-radius: var(--radius);
+}
+.print-toolbar .muted { color: #bbb; font-family: system-ui, sans-serif; font-size: 0.82rem; }
+
+.print-sheet .print-name {
+  color: #5e0000;                  /* Paizo deep red for the title */
+  font-size: 1.9rem;
+  margin: 0 0 0.15rem;
+}
+.print-sheet .print-meta {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: #444;
+}
+.print-sheet .print-difficulty {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5e0000;
+}
+
+/* Section headings: a ruled small-caps bar, like an AP sidebar label. */
+.print-sheet .print-section > h2 {
+  color: #5e0000;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 2px solid #c9a54a;
+  padding-bottom: 0.2rem;
+  margin: 0.4rem 0 0.6rem;
+}
+.print-sheet .print-entry-head {
+  font-size: 1.05rem;
+  color: #1a1a1a;
+  margin: 0.8rem 0 0.3rem;
+}
+.print-sheet .print-entry-level {
+  color: #5e0000;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.print-sheet .print-notes { white-space: pre-wrap; }
+.print-sheet .print-treasure { margin: 0; padding-left: 1.25rem; }
+.print-sheet .print-treasure li { margin: 0.15rem 0; }
+
+/* Keep an entry (header + its stat block) together on a page when it fits. The
+   *View wrappers carry the app's dark card background (--card) — override to a
+   light parchment inset so the block reads like a Paizo stat-block box on paper. */
+.print-sheet .print-entry { break-inside: avoid; }
+.print-sheet .statblock,
+.print-sheet .hazardcard,
+.print-sheet .afflictioncard {
+  break-inside: avoid;
+  margin: 0.4rem 0;
+  background: #f7f2e7;
+  border: 1px solid #c9a54a;
+  border-radius: 4px;
+  padding: 0.6rem 0.9rem;
+}
+
+/* Library stat blocks assume a dark ground (gold/gray text, no bg of their own).
+   On white, retint the washed-out bits for print legibility; trait badges keep
+   their own dark fills + white text and read fine. */
+.print-sheet .Monster { color: #1a1a1a; }
+.print-sheet .Monster__name,
+.print-sheet .Monster__ability-name,
+.print-sheet .Monster__heading,
+.print-sheet .Monster__sidebar-heading,
+.print-sheet .Monster__family-title,
+.print-sheet .Monster__template-title { color: #5e0000; }
+.print-sheet .Monster__section-text { color: #444; }
+.print-sheet .Monster__roll { color: #1a1a1a; }        /* no live rolls on paper */
+.print-sheet .Monster__level { color: #444; }
+
+/* Reuse the shared budget panel, but drop its dark-theme surface for the sheet. */
+.print-sheet .treasure-budget { border: none; }
+.print-sheet .budget-title { color: #5e0000; }
+.print-sheet .treasure-chart th,
+.print-sheet .treasure-chart td { border-color: #ccc; }
+
+@media print {
+  /* The visibility trick: reliable regardless of DOM nesting. Hide the whole
+     app, reveal only the sheet, and drop the overlay's fixed positioning so it
+     flows onto paper from the top. */
+  body { background: #fff; }
+  body * { visibility: hidden; }
+  .print-sheet, .print-sheet * { visibility: visible; }
+  .print-sheet {
+    position: static;
+    overflow: visible;
+    background: #fff;
+    padding: 0;
+    color: #000;
+  }
+  .print-sheet .print-head,
+  .print-sheet .print-section,
+  .print-sheet .treasure-budget { box-shadow: none; padding-left: 0; padding-right: 0; }
+  .print-sheet > *:not(.print-toolbar) { max-width: none; }
+  .print-toolbar { display: none !important; }
+  @page { margin: 0.6in; }
+}

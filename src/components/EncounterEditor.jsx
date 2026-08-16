@@ -33,6 +33,7 @@ import WikiMarkdown from './WikiMarkdown.jsx'
 import TreasurePoolSection from './TreasurePoolSection.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
+import EncounterPrintSheet from './EncounterPrintSheet.jsx'
 
 const AUTOSAVE_MS = 800
 
@@ -41,6 +42,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [error, setError] = useState(null)
   const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
   const [releasing, setReleasing] = useState(false)
+  const [printing, setPrinting] = useState(false) // full-screen print/PDF sheet overlay
   const [chapters, setChapters] = useState([]) // for the Chapter picker (keyboard-accessible move)
   const [siblingEncounters, setSiblingEncounters] = useState([]) // campaign encounters, for the exit target picker
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
@@ -320,6 +322,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           </span>
         )}
         <span className="status">{enc.status}</span>
+        <button type="button" className="link" onClick={() => setPrinting(true)}>Print / PDF</button>
         <button type="button" className="link danger" aria-label={`Delete ${enc.name || 'Untitled encounter'}`} onClick={del}>Delete</button>
         <button type="button" className="link" onClick={onClose}>Close</button>
       </div>
@@ -690,6 +693,16 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         partyLevel={effectiveParty.level}
         partySize={effectiveParty.size}
       />
+
+      {printing && (
+        <EncounterPrintSheet
+          enc={enc}
+          budget={budget}
+          effectiveParty={effectiveParty}
+          siblings={siblingEncounters}
+          onClose={() => setPrinting(false)}
+        />
+      )}
 
       {!released && (
         <div className="actions">
