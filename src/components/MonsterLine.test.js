@@ -71,3 +71,21 @@ test('MonsterLine still shows Loading… for a pristine ref whose base entry has
   const { container } = render(<MonsterLine monster={monster} entryOf={entryOf} onChange={noop} onRemove={noop} />)
   assert.match(container.textContent, /Loading…/) // no entry, no snapshot → genuinely loading
 })
+
+test('MonsterLine falls back to snapshot.stat_block.name when the snapshot has no top-level name', () => {
+  // Some resolved snapshots carry the name only under stat_block; the fallback chain
+  // must reach it before the raw game_id.
+  const monster = {
+    ref: {
+      base: { game_id: 'Monsters:99' },
+      modifications: [{ template_game_id: 'elite', template_name: 'Elite' }],
+      json: { stat_block: { name: 'Weak Slurk', creature_type: { level: 1 } } },
+    },
+    count: 1,
+    nickname: '',
+    adjustment: 'none',
+  }
+  const { container } = render(<MonsterLine monster={monster} entryOf={entryOf} onChange={noop} onRemove={noop} />)
+  assert.match(container.textContent, /Weak Slurk/) // from stat_block.name
+  assert.doesNotMatch(container.textContent, /Monsters:99/) // never the raw base game_id
+})
