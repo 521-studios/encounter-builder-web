@@ -25,7 +25,9 @@ export default function HazardLine({ hazard, entryOf, disabled, onChange, onRemo
             <CreatureSearch
               search={pfsrd2.suggestHazards}
               levelFilter
-              onSelect={(h) => set({ ref: { game_id: h.game_id }, nickname: hazard.nickname || h.name })}
+              // No nickname seed: a hazard is shown by its real name (entry.name), so
+              // re-picking after "change" never carries a stale name forward.
+              onSelect={(h) => set({ ref: { game_id: h.game_id } })}
               placeholder="search a hazard…"
             />
           </div>

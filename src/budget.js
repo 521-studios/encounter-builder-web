@@ -145,7 +145,7 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
     // Non-combat rooms (hazard/haunt/social/knowledge/…) have no meaningful combat
     // band or treasure target — suppress both; their loot still counts as value.
     const combat = isCombatRoom(enc.room_type)
-    const threat = combat ? encounterThreat(xp, size) : null // creatures only, no awards
+    const threat = combat ? encounterThreat(xp, size) : null // creatures + hazards, no awards
     const targetGp = combat ? treasureBudget(level, threat, size) : null // null for Trivial / non-combat
     const targetCp = targetGp == null ? 0 : targetGp * 100
     const encXp = xp + awardXp(enc) // advancement XP includes non-combat awards

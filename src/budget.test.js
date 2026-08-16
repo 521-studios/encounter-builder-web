@@ -251,6 +251,28 @@ test('rollupEncounters sums XP per row and in total (difficulty as a number)', (
   assert.equal(r.totalXp, 160)
 })
 
+test('rollupEncounters folds hazard XP into each row (a Hazard N counts like a Creature N)', () => {
+  const entryOf = (id) =>
+    ({
+      'M:1': { stat_block: { creature_type: { level: 5 } } }, // Creature 5 vs PL 5 = 40
+      'Hazards:1': { hazard: { level: 5 } }, // Hazard 5 vs PL 5 = 40 (flat under `hazard`)
+    })[id] || null
+  const partyFor = () => ({ level: 5, size: 4 })
+  const r = rollupEncounters(
+    [
+      {
+        id: 'e1', name: 'A',
+        monsters: [{ ref: { game_id: 'M:1' }, count: 1 }],
+        hazards: [{ ref: { game_id: 'Hazards:1' }, count: 1 }],
+        treasure: [], currency: {},
+      },
+    ],
+    entryOf,
+    partyFor,
+  )
+  assert.equal(r.rows[0].xp, 80) // 40 creature + 40 hazard
+})
+
 test('awardXp sums non-combat XP awards (coercing/ignoring blanks)', () => {
   assert.equal(awardXp({ xp_awards: [{ amount: 30 }, { amount: 15 }] }), 45)
   assert.equal(awardXp({ xp_awards: [{ amount: '20' }, { amount: '' }, {}] }), 20) // string coerced, blanks -> 0
