@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { formatGp } from '@521studios/pfsrd2-display'
 import {
   isCombatRoom,
@@ -76,7 +77,13 @@ export default function EncounterPrintSheet({ enc, budget, effectiveParty, sibli
     return t ? t.name || 'Untitled' : null
   }
 
-  return (
+  // Portal to <body> so the sheet is NOT nested inside the editor's `.main`
+  // (overflow-y: auto, height-constrained). Nested, the @media print rules
+  // couldn't lift it out of that clipping container or above the hidden editor
+  // content; at body level, print can simply hide #root and let the sheet flow
+  // from the top of the page. Context/props still flow — a portal stays in the
+  // React tree, only the DOM parent changes.
+  return createPortal(
     <div className="print-sheet" data-testid="print-sheet">
       <div className="print-toolbar">
         <button type="button" onClick={() => window.print()}>Save as PDF / Print</button>
@@ -247,6 +254,7 @@ export default function EncounterPrintSheet({ enc, budget, effectiveParty, sibli
       )}
 
       <TreasureBudget budget={budget} partyLevel={effectiveParty.level} partySize={effectiveParty.size} />
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -43,14 +43,14 @@ const baseEnc = {
 }
 
 test('EncounterPrintSheet renders the title, difficulty, and budget summary line', () => {
-  const { container } = render(
+  render(
     <EncounterPrintSheet enc={baseEnc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />,
   )
-  assert.match(container.textContent, /The Flooded Wing/)
+  assert.match(document.body.textContent, /The Flooded Wing/)
   assert.match(screen.getByTestId('print-difficulty').textContent, /Moderate · level 1/)
-  assert.match(container.textContent, /Treasure 60 gp/) // formatGp(6000cp)
-  assert.match(container.textContent, /80 XP/)
-  assert.match(container.textContent, /4 PCs/)
+  assert.match(document.body.textContent, /Treasure 60 gp/) // formatGp(6000cp)
+  assert.match(document.body.textContent, /80 XP/)
+  assert.match(document.body.textContent, /4 PCs/)
 })
 
 test('EncounterPrintSheet has a screen-only toolbar with print + close', () => {
@@ -59,21 +59,34 @@ test('EncounterPrintSheet has a screen-only toolbar with print + close', () => {
   assert.ok(screen.getByRole('button', { name: /Close/ }))
 })
 
-test('EncounterPrintSheet lists treasure by name+qty (catalog, custom, masked)', () => {
+test('EncounterPrintSheet lists treasure by name+qty (catalog, custom, derived, masked)', () => {
   const enc = {
     ...baseEnc,
     treasure: [
       { ref: { game_id: 'Items:1' }, qty: 2, state: 'intact' },
       { ref: { json: { name: 'Peridot Bead', value_cp: 5000 } }, qty: 1, masked: true, mask_label: 'green stone' },
+      // Derived (composed/runed): carries base + modifications; name lives on ref.json.
+      { ref: { base: { game_id: 'Items:9' }, modifications: [{ effect_name: 'Striking' }], json: { name: '+1 Striking Dagger' }, price_cp: 3500 }, qty: 1 },
     ],
   }
-  const { container } = render(
+  render(
     <EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />,
   )
   const items = screen.getAllByTestId('print-treasure-item').map((li) => li.textContent)
   assert.ok(items.some((t) => /2 × Healing Potion/.test(t)))          // catalog name via entryOf, qty prefix
   assert.ok(items.some((t) => /Peridot Bead \(masked: green stone\)/.test(t))) // custom name + mask note
-  assert.doesNotMatch(container.textContent, /Items:1/)               // never the raw game_id
+  assert.ok(items.some((t) => /\+1 Striking Dagger/.test(t)))         // derived name from ref.json, not base game_id
+  assert.doesNotMatch(document.body.textContent, /Items:1|Items:9/)       // never a raw game_id
+})
+
+test('EncounterPrintSheet header shows the room type (not a difficulty band) for a non-combat room', () => {
+  const nonCombat = { ...budget, roomType: 'social' }
+  const enc = { ...baseEnc, room_type: 'social' }
+  render(
+    <EncounterPrintSheet enc={enc} budget={nonCombat} effectiveParty={effectiveParty} onClose={noop} />,
+  )
+  assert.match(screen.getByTestId('print-difficulty').textContent, /Social/) // roomTypeLabel branch
+  assert.doesNotMatch(screen.getByTestId('print-difficulty').textContent, /level 1/)
 })
 
 test('EncounterPrintSheet renders XP awards, rewards, skill checks, and exits read-only', () => {
@@ -88,14 +101,14 @@ test('EncounterPrintSheet renders XP awards, rewards, skill checks, and exits re
     ],
   }
   const siblings = [{ id: 'e2', name: 'The Sunken Vault' }]
-  const { container } = render(
+  render(
     <EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} siblings={siblings} onClose={noop} />,
   )
-  assert.match(container.textContent, /30 XP — recruited Augrael/)
-  assert.match(container.textContent, /Information: The Whispering Reeds/)
-  assert.match(container.textContent, /Perception DC 18/)
-  assert.match(container.textContent, /The Sunken Vault \(north door\)/) // resolved sibling name + passage
-  assert.match(container.textContent, /Exterior/)                        // external exit by label
+  assert.match(document.body.textContent, /30 XP — recruited Augrael/)
+  assert.match(document.body.textContent, /Information: The Whispering Reeds/)
+  assert.match(document.body.textContent, /Perception DC 18/)
+  assert.match(document.body.textContent, /The Sunken Vault \(north door\)/) // resolved sibling name + passage
+  assert.match(document.body.textContent, /Exterior/)                        // external exit by label
 })
 
 test('EncounterPrintSheet omits entity sections entirely when empty (no lazy stat-block fetch)', () => {

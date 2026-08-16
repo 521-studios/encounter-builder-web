@@ -518,12 +518,13 @@ button.chapter-name:hover { color: var(--gold); }
 .print-sheet .treasure-chart td { border-color: #ccc; }
 
 @media print {
-  /* The visibility trick: reliable regardless of DOM nesting. Hide the whole
-     app, reveal only the sheet, and drop the overlay's fixed positioning so it
+  /* The sheet is portaled to <body> as a sibling of #root, so hiding the whole
+     app is a clean `display: none` on #root — that removes its box entirely (no
+     leading blank pages, no overflow clipping), and the now out-of-flow sheet
      flows onto paper from the top. */
   body { background: #fff; }
-  body * { visibility: hidden; }
-  .print-sheet, .print-sheet * { visibility: visible; }
+  #root { display: none !important; }
+  .print-toolbar { display: none !important; }
   .print-sheet {
     position: static;
     overflow: visible;
@@ -535,6 +536,5 @@ button.chapter-name:hover { color: var(--gold); }
   .print-sheet .print-section,
   .print-sheet .treasure-budget { box-shadow: none; padding-left: 0; padding-right: 0; }
   .print-sheet > *:not(.print-toolbar) { max-width: none; }
-  .print-toolbar { display: none !important; }
   @page { margin: 0.6in; }
 }
