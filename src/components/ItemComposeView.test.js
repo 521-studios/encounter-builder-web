@@ -57,7 +57,7 @@ async function openPicker(onChange, deps) {
   await screen.findByTestId('picker') // eligibility loaded → panel open
 }
 
-test('ItemComposeView surfaces a 409 boundary refusal as a GM-facing "Not allowed" message', async () => {
+test('ItemComposeView surfaces a 409 boundary refusal with the "Not allowed: <reason>" text', async () => {
   const deps = makeDeps({
     applyItemEffect: async () => {
       const e = new Error('nope')
@@ -68,7 +68,10 @@ test('ItemComposeView surfaces a 409 boundary refusal as a GM-facing "Not allowe
   })
   await openPicker(() => {}, deps)
   fireEvent.click(screen.getByText('apply'))
-  await waitFor(() => assert.match(document.body.textContent, /Not allowed: ineligible/))
+  // The 409 sets `error`, which the top-level `if (error)` renders — so the full
+  // string is "Could not load item: Not allowed: ineligible" (the load-error wrapper
+  // is a pre-existing wart, bd_521Studios-2zi8; here we assert the refusal text shows).
+  await waitFor(() => assert.match(document.body.textContent, /Could not load item: Not allowed: ineligible/))
 })
 
 test('ItemComposeView persists a derived ref on apply, then reverts to pristine on remove', async () => {
