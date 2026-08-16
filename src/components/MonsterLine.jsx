@@ -41,9 +41,15 @@ export default function MonsterLine({ monster, entryOf, disabled, onChange, onRe
   }
 
   const entry = entryOf ? entryOf(gameId) : null
+  // A templated monster carries its resolved creature in ref.json — the line reads
+  // from that snapshot (name here, everything else via creatureHeader) instead of the
+  // base entry, which gameIdsInEncounter never prefetches for a derived ref. Without
+  // this a templated monster showed "Loading…" forever and (absent a nickname) fell
+  // back to the raw game_id for its name.
+  const snapshot = monster.ref?.json || null
   const hdr = creatureHeader(entry, monster)
   const count = monster.count || 1
-  const name = monster.nickname || entry?.name || gameId
+  const name = monster.nickname || entry?.name || snapshot?.name || snapshot?.stat_block?.name || gameId
 
   return (
     <div className="monster-line-wrap">
@@ -61,7 +67,7 @@ export default function MonsterLine({ monster, entryOf, disabled, onChange, onRe
           {hdr.initiative && (
             <div className="monster-header-init" data-testid="monster-header-init">Initiative {hdr.initiative}</div>
           )}
-          {entry == null && <div className="muted monster-header-loading">Loading…</div>}
+          {entry == null && snapshot == null && <div className="muted monster-header-loading">Loading…</div>}
         </div>
         {!disabled && (
           <button type="button" className="link" onClick={() => set({ ref: { game_id: '' } })}>change</button>
