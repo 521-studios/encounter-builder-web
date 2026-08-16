@@ -39,3 +39,53 @@ test('MonsterLine shows the search picker (no header) when no monster is chosen'
   assert.equal(screen.queryByTestId('monster-header'), null)
   assert.ok(container.querySelector('.monster-search'))
 })
+
+// bd_521Studios-t04v: a templated monster carries its resolved creature in ref.json.
+// gameIdsInEncounter skips derived refs, so entryOf(base) is null — the line must read
+// the snapshot (name + header) rather than showing "Loading…" forever or falling back
+// to the raw game_id. Base game_id 'Monsters:99' is absent from entryOf to simulate the
+// un-prefetched base.
+test('MonsterLine reads a templated monster from its ref.json snapshot (no Loading…, snapshot name + level)', () => {
+  const monster = {
+    ref: {
+      base: { game_id: 'Monsters:99' },
+      modifications: [{ template_game_id: 'elite', template_name: 'Elite' }],
+      json: {
+        name: 'Elite Goblin Warrior',
+        stat_block: { creature_type: { level: 2 }, senses: { perception: { value: 5 } } },
+      },
+    },
+    count: 1,
+    nickname: '',
+    adjustment: 'none',
+  }
+  const { container } = render(<MonsterLine monster={monster} entryOf={entryOf} onChange={noop} onRemove={noop} />)
+  assert.doesNotMatch(container.textContent, /Loading…/) // snapshot present → not loading
+  assert.match(container.textContent, /Elite Goblin Warrior/) // name from snapshot, not raw game_id
+  assert.doesNotMatch(container.textContent, /Monsters:99/) // never the raw base game_id
+  assert.equal(screen.getByTestId('monster-header-level').textContent, 'CREATURE 2') // snapshot level
+})
+
+test('MonsterLine still shows Loading… for a pristine ref whose base entry has not loaded', () => {
+  const monster = { ref: { game_id: 'Monsters:99' }, count: 1, nickname: '', adjustment: 'none' }
+  const { container } = render(<MonsterLine monster={monster} entryOf={entryOf} onChange={noop} onRemove={noop} />)
+  assert.match(container.textContent, /Loading…/) // no entry, no snapshot → genuinely loading
+})
+
+test('MonsterLine falls back to snapshot.stat_block.name when the snapshot has no top-level name', () => {
+  // Some resolved snapshots carry the name only under stat_block; the fallback chain
+  // must reach it before the raw game_id.
+  const monster = {
+    ref: {
+      base: { game_id: 'Monsters:99' },
+      modifications: [{ template_game_id: 'elite', template_name: 'Elite' }],
+      json: { stat_block: { name: 'Weak Slurk', creature_type: { level: 1 } } },
+    },
+    count: 1,
+    nickname: '',
+    adjustment: 'none',
+  }
+  const { container } = render(<MonsterLine monster={monster} entryOf={entryOf} onChange={noop} onRemove={noop} />)
+  assert.match(container.textContent, /Weak Slurk/) // from stat_block.name
+  assert.doesNotMatch(container.textContent, /Monsters:99/) // never the raw base game_id
+})
