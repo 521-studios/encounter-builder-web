@@ -150,6 +150,15 @@ test('suggestHazards queries suggest/unified for hazards + weatherhazards', asyn
   assert.match(url, /type=weatherhazards/)
   assert.match(url, /q=spike/)
 })
+test('suggestAfflictions queries suggest/unified for curses + diseases', async () => {
+  const fetchImpl = fakeFetch(ok([{ game_id: 'Diseases:1', name: 'Blueblisters', level: 3 }]))
+  const out = await pfsrd2.suggestAfflictions('blue', {}, { tokenProvider: tok, fetchImpl })
+  assert.equal(out[0].name, 'Blueblisters')
+  const url = fetchImpl.calls[0].url
+  assert.match(url, /type=curses/)
+  assert.match(url, /type=diseases/)
+  assert.match(url, /q=blue/)
+})
 
 test('suggestSpells queries suggest/unified for type=spells', async () => {
   const fetchImpl = fakeFetch(ok([{ game_id: 'spells:1', name: 'Fireball', level: 3 }]))

@@ -83,6 +83,7 @@ export function keyed(e) {
     ...e,
     monsters: (e.monsters || []).map(withKey),
     hazards: (e.hazards || []).map(withKey),
+    afflictions: (e.afflictions || []).map(withKey),
     treasure,
     treasure_pools: pools,
     xp_awards: (e.xp_awards || []).map(withKey),
@@ -191,6 +192,7 @@ export function toEncounterInput(enc) {
     notes: enc.notes || '',
     monsters: (enc.monsters || []).filter(hasRef).map(stripKey),
     hazards: (enc.hazards || []).filter(hasRef).map(stripKey),
+    afflictions: (enc.afflictions || []).filter(hasRef).map(stripKey),
     treasure: (enc.treasure || []).filter(hasTreasureContent).map(treasureLineInput),
     treasure_pools: treasurePoolsInput(enc),
     xp_awards: (enc.xp_awards || []).map(awardInput).filter((a) => a.amount > 0),
@@ -224,6 +226,11 @@ export function emptyMonster() {
 
 // A hazard row: ref + count (a haunt/hazard has no elite/weak, so no adjustment).
 export function emptyHazard() {
+  return withKey({ ref: { game_id: '' }, count: 1, nickname: '' })
+}
+
+// An affliction row (curse/disease): ref + count, no elite/weak.
+export function emptyAffliction() {
   return withKey({ ref: { game_id: '' }, count: 1, nickname: '' })
 }
 

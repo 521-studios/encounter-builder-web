@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { treasureValueCp, encounterXp, hazardXp, awardXp, refGameId, gameIdsInEncounter } from './budget.js'
+import { treasureValueCp, encounterXp, hazardXp, afflictionXp, awardXp, refGameId, gameIdsInEncounter } from './budget.js'
 
 // Minimal fake entries keyed by game_id.
 const ITEMS = {
@@ -17,7 +17,12 @@ const HAZARDS = {
   'Hazards:noose': { hazard: { level: 2 } },
   'Hazards:drawbridge': { hazard: { level: 1 } },
 }
-const entryOf = (id) => ITEMS[id] || CREATURES[id] || HAZARDS[id] || null
+// Afflictions are flat under `affliction`; a Varies-level one has level_text, no level.
+const AFFLICTIONS = {
+  'Diseases:blue': { affliction: { affliction_type: 'disease', level: 3 } },
+  'Curses:varies': { affliction: { affliction_type: 'curse', level_text: 'Varies' } },
+}
+const entryOf = (id) => ITEMS[id] || CREATURES[id] || HAZARDS[id] || AFFLICTIONS[id] || null
 
 test('refGameId reads pristine and derived-base refs', () => {
   assert.equal(refGameId({ game_id: 'Weapons:1' }), 'Weapons:1')
@@ -135,6 +140,25 @@ test('hazardXp sums hazard XP like creatures (level from the flat hazard doc, ×
 
 test('hazardXp reports a hazard whose entry/level cannot be read as unknown', () => {
   const { xp, unknown } = hazardXp([{ ref: { game_id: 'Hazards:missing' }, count: 1 }], 2, entryOf)
+  assert.equal(xp, 0)
+  assert.equal(unknown.length, 1)
+})
+
+test('afflictionXp counts a leveled affliction like a creature; a Varies-level one is 0 (not unknown)', () => {
+  const { xp, unknown } = afflictionXp(
+    [
+      { ref: { game_id: 'Diseases:blue' }, count: 1 }, // Disease 3 vs PL 3 = PL+0 = 40
+      { ref: { game_id: 'Curses:varies' }, count: 1 }, // Varies → no level → 0, not unknown
+    ],
+    3,
+    entryOf,
+  )
+  assert.equal(xp, 40)
+  assert.equal(unknown.length, 0) // the Varies affliction is a deliberate 0, not unknown
+})
+
+test('afflictionXp reports an unresolved entry as unknown', () => {
+  const { xp, unknown } = afflictionXp([{ ref: { game_id: 'Diseases:missing' }, count: 1 }], 3, entryOf)
   assert.equal(xp, 0)
   assert.equal(unknown.length, 1)
 })

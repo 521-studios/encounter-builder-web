@@ -83,6 +83,27 @@ export function hazardXp(hazards, partyLevel, entryOf) {
   return { xp, unknown }
 }
 
+// afflictionXp sums leveled afflictions' XP: a leveled disease/curse (e.g. Blueblisters
+// Disease 3) counts like a creature/hazard of that level. A "Varies"-level affliction
+// (level_text, no level) has no XP — that's a 0 contribution, not unknown; only an
+// unresolved entry is unknown.
+export function afflictionXp(afflictions, partyLevel, entryOf) {
+  let xp = 0
+  const unknown = []
+  for (const a of afflictions || []) {
+    const gid = refGameId(a.ref)
+    const entry = gid ? entryOf(gid) : null
+    if (!entry) {
+      unknown.push(a)
+      continue
+    }
+    const af = entry.affliction || entry // flat under `affliction`
+    if (af.level == null) continue // Varies-level → no XP, deliberately
+    xp += creatureXp(af.level, partyLevel, 'none') * (a.count || 1)
+  }
+  return { xp, unknown }
+}
+
 // encounterXp sums the monsters' XP against the party level (Table 10-2 via
 // creatureXp, honoring elite/weak). Monsters whose creature level can't be read
 // (entry not loaded, or a level-changing template) are returned in `unknown`.
@@ -140,8 +161,9 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
     const { cp, unpriced } = treasureValueCp(enc.treasure, enc.currency, entryOf)
     const { xp: mXp, unknown: mUnknown } = encounterXp(enc.monsters, level, entryOf)
     const { xp: hXp, unknown: hUnknown } = hazardXp(enc.hazards, level, entryOf)
-    const xp = mXp + hXp
-    const unknown = [...mUnknown, ...hUnknown]
+    const { xp: aXp, unknown: aUnknown } = afflictionXp(enc.afflictions, level, entryOf)
+    const xp = mXp + hXp + aXp
+    const unknown = [...mUnknown, ...hUnknown, ...aUnknown]
     // Non-combat rooms (hazard/haunt/social/knowledge/…) have no meaningful combat
     // band or treasure target — suppress both; their loot still counts as value.
     const combat = isCombatRoom(enc.room_type)
@@ -215,6 +237,10 @@ export function gameIdsInEncounter(enc) {
   }
   for (const h of enc?.hazards || []) {
     const g = refGameId(h.ref)
+    if (g) ids.add(g)
+  }
+  for (const a of enc?.afflictions || []) {
+    const g = refGameId(a.ref)
     if (g) ids.add(g)
   }
   for (const t of enc?.treasure || []) {
