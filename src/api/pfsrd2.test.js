@@ -141,6 +141,16 @@ test('applyItemPost signs the item body (OAC) and posts to the library-supplied 
   assert.equal(call.opts.headers['x-amz-content-sha256'], await bodyHash(body))
 })
 
+test('suggestHazards queries suggest/unified for hazards + weatherhazards', async () => {
+  const fetchImpl = fakeFetch(ok([{ game_id: 'Hazards:1', name: 'Spike Launcher', level: 1 }]))
+  const out = await pfsrd2.suggestHazards('spike', {}, { tokenProvider: tok, fetchImpl })
+  assert.equal(out[0].name, 'Spike Launcher')
+  const url = fetchImpl.calls[0].url
+  assert.match(url, /type=hazards/)
+  assert.match(url, /type=weatherhazards/)
+  assert.match(url, /q=spike/)
+})
+
 test('suggestSpells queries suggest/unified for type=spells', async () => {
   const fetchImpl = fakeFetch(ok([{ game_id: 'spells:1', name: 'Fireball', level: 3 }]))
   const out = await pfsrd2.suggestSpells('fire', { tokenProvider: tok, fetchImpl })

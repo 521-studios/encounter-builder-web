@@ -13,6 +13,7 @@ import {
   REWARD_KIND_LABELS,
   buildInput,
   emptyMonster,
+  emptyHazard,
   emptyTreasure,
   emptyPool,
   emptyAward,
@@ -25,6 +26,7 @@ import { resolveParty } from '../party.js'
 import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
 import MonsterLine from './MonsterLine.jsx'
+import HazardLine from './HazardLine.jsx'
 import WikiMarkdown from './WikiMarkdown.jsx'
 import TreasurePoolSection from './TreasurePoolSection.jsx'
 import PartyFields from './PartyFields.jsx'
@@ -170,9 +172,11 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     setEnc({ ...enc, ...fields })
   }
   const monsters = enc.monsters || []
+  const hazards = enc.hazards || []
   const treasure = enc.treasure || []
 
   const setMonster = (i, m) => patch({ monsters: monsters.map((x, j) => (j === i ? m : x)) })
+  const setHazard = (i, h) => patch({ hazards: hazards.map((x, j) => (j === i ? h : x)) })
   const setTreasure = (i, t) => patch({ treasure: treasure.map((x, j) => (j === i ? t : x)) })
 
   // Treasure pools: loot grouped by where it's found. Every encounter with treasure
@@ -407,6 +411,25 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         {!released && (
           <button type="button" onClick={() => patch({ monsters: [...monsters, emptyMonster()] })}>
             + monster
+          </button>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>Hazards</legend>
+        {hazards.map((h, i) => (
+          <HazardLine
+            key={h._key}
+            hazard={h}
+            entryOf={budget.entryOf}
+            disabled={released}
+            onChange={(h2) => setHazard(i, h2)}
+            onRemove={() => patch({ hazards: hazards.filter((_, j) => j !== i) })}
+          />
+        ))}
+        {!released && (
+          <button type="button" onClick={() => patch({ hazards: [...hazards, emptyHazard()] })}>
+            + hazard
           </button>
         )}
       </fieldset>

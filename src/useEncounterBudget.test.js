@@ -20,6 +20,15 @@ test('useEncounterBudget exposes awardXp + totalXp; combat xp/threat ignore awar
   assert.equal(result.current.roomType, 'combat') // default when unset
 })
 
+test('useEncounterBudget folds hazards into the budget (unknown until the entry loads)', () => {
+  // A hazard ref fires a fetch that won't resolve synchronously, so its entry is
+  // null and the hazard flows into the COMBINED unknown via the hazard-XP fold —
+  // proving hazards are wired into the hook's xp/unknown, not just hazardXp alone.
+  const enc = { monsters: [], hazards: [{ ref: { game_id: 'Hazards:1' }, count: 1 }], treasure: [], currency: {} }
+  const { result } = renderHook(() => useEncounterBudget(enc, 5, 4))
+  assert.equal(result.current.unknownCount, 1)
+})
+
 test('useEncounterBudget surfaces a non-combat room_type', () => {
   const enc = { monsters: [], treasure: [], currency: {}, room_type: 'knowledge' }
   const { result } = renderHook(() => useEncounterBudget(enc, 5, 4))

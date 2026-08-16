@@ -5,6 +5,7 @@ import {
   withKey,
   stripKey,
   emptyMonster,
+  emptyHazard,
   emptyTreasure,
   toEncounterInput,
   hasRef,
@@ -46,6 +47,27 @@ test('keyed tolerates missing monsters/treasure arrays', () => {
   const out = keyed({ name: 'x' })
   assert.deepEqual(out.monsters, [])
   assert.deepEqual(out.treasure, [])
+})
+
+test('hazards round-trip: keyed stamps _key; toEncounterInput strips it, drops empty refs', () => {
+  const out = keyed({ name: 'x', hazards: [{ ref: { game_id: 'Hazards:1' }, count: 2 }] })
+  assert.ok(out.hazards.every((h) => typeof h._key === 'string' && h._key.length > 0))
+  // emptyHazard is a ref-less row; toEncounterInput must drop it and strip _key.
+  const enc = keyed({
+    name: 'x',
+    hazards: [{ ref: { game_id: 'Hazards:1' }, count: 2 }, emptyHazard()],
+  })
+  const input = toEncounterInput(enc)
+  assert.equal(input.hazards.length, 1) // the ref-less empty row is dropped
+  assert.equal(input.hazards[0].ref.game_id, 'Hazards:1')
+  assert.ok(!('_key' in input.hazards[0]))
+})
+
+test('emptyHazard is a ref-less count-1 row (no elite/weak adjustment)', () => {
+  const h = emptyHazard()
+  assert.equal(h.ref.game_id, '')
+  assert.equal(h.count, 1)
+  assert.ok(!('adjustment' in h)) // a hazard has no elite/weak
 })
 
 test('stripKey(withKey(x)) removes only _key and preserves the rest incl. nested ref', () => {
