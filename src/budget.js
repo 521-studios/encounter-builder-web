@@ -47,7 +47,13 @@ export function treasureValueCp(treasure, currency, entryOf) {
       continue
     }
     if (isDerived(line.ref)) {
-      unpriced.push(line)
+      // A composed item (runed weapon/armor) carries its composed copper total in
+      // ref.price_cp when every component was priced; sum it. A missing total (an
+      // unpriced component, or an item composed before pricing shipped) still floors
+      // the budget via unpriced. (4den)
+      const v = line.ref.price_cp
+      if (typeof v === 'number' && Number.isFinite(v)) cp += v * (line.qty || 1)
+      else unpriced.push(line)
       continue
     }
     const gid = refGameId(line.ref)

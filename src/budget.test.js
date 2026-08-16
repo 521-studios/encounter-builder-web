@@ -57,6 +57,21 @@ test('treasureValueCp flags Varies / derived / missing lines as unpriced (not 0)
   assert.equal(unpriced.length, 3)
 })
 
+test('treasureValueCp sums a composed item by its ref.price_cp × qty; one without stays unpriced', () => {
+  const { cp, unpriced } = treasureValueCp(
+    [
+      // +1 striking longsword: base 1 gp + 35 gp potency + 65 gp striking = 101 gp = 10100 cp
+      { ref: { base: { game_id: 'Weapons:1' }, modifications: [{}, {}], price_cp: 10100 }, qty: 2 },
+      // a derived item whose components weren't all priced → no total → unpriced (floors)
+      { ref: { base: { game_id: 'Weapons:1' }, modifications: [{}] }, qty: 1 },
+    ],
+    {},
+    entryOf,
+  )
+  assert.equal(cp, 10100 * 2) // the composed line counts; the unpriced one contributes 0
+  assert.equal(unpriced.length, 1)
+})
+
 test('treasureValueCp values a custom (freeform) item by its gp value × qty', () => {
   const { cp, unpriced } = treasureValueCp(
     [
