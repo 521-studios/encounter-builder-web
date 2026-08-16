@@ -6,6 +6,7 @@ import {
   applyItemEffect,
   mergeItemPatches,
   customizedItem,
+  itemPriceCp,
 } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import { errorMessage } from '../api/errors.js'
@@ -81,6 +82,7 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
             effect: { game_id: m.effect_game_id, name: m.effect_name || m.effect_game_id },
             applied: res.applied || m.effect_name || m.effect_game_id, // label for the picker tag + patch attribution
             grade: m.grade ?? null,
+            price_cp: typeof m.price_cp === 'number' ? m.price_cp : null, // persisted component price (4den)
             item: res.item,
             patches: res.patches,
           })
@@ -109,8 +111,26 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
   const variants = (current?.stat_block && current.stat_block.variants) || []
   const vIndex = variantIndex(variants, treasure.variant)
 
+  // The copper price of an applied rune at a chosen grade, from the loaded eligibility
+  // (grades now carry price_cp). The picker passes grade = the grade's LEVEL; a
+  // single-grade rune may apply with no level, so fall back to its only grade. null when
+  // the rune/grade or its price can't be resolved (e.g. a spell — priced in a later
+  // phase), which leaves the whole line unpriced rather than undercounting. (4den)
+  function gradePriceCp(effectGameId, gradeLevel) {
+    const runes = eligibility?.runes
+    if (!runes) return null
+    const rune = [...(runes.fundamental || []), ...(runes.property || [])].find((r) => r.game_id === effectGameId)
+    const grades = rune?.grades || []
+    const g = (gradeLevel != null && grades.find((x) => x.level === gradeLevel)) || (grades.length === 1 ? grades[0] : null)
+    return g && typeof g.price_cp === 'number' ? g.price_cp : null
+  }
+
+  // The base item's price in copper, summed with the applied runes' prices to give the
+  // composed total that buildItemRef stores for the treasure budget.
+  const basePriceCp = base ? itemPriceCp(base) : null
+
   function persist(nextStack, nextName) {
-    onChange({ ...treasure, ref: buildItemRef(baseGameId, nextStack, nextName) })
+    onChange({ ...treasure, ref: buildItemRef(baseGameId, nextStack, nextName, basePriceCp) })
   }
 
   async function startCustomize() {
@@ -147,6 +167,7 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
           effect: { game_id: effectGameId, name: effectName },
           applied: res.applied || effectName, // the resolved label (e.g. "Weapon Potency (+1)")
           grade: grade ?? null,
+          price_cp: gradePriceCp(effectGameId, grade), // component price for the treasure total (4den)
           item: res.item,
           patches: res.patches,
         },
