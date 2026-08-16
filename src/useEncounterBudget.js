@@ -1,5 +1,5 @@
 import { useEntries } from './useEntries.js'
-import { treasureValueCp, encounterXp, awardXp, gameIdsInEncounter } from './budget.js'
+import { treasureValueCp, encounterXp, hazardXp, awardXp, gameIdsInEncounter } from './budget.js'
 import { encounterThreat, BASE_PARTY } from './pf2eRules.js'
 
 // useEncounterBudget computes an encounter's treasure value (copper) + difficulty
@@ -12,7 +12,10 @@ export function useEncounterBudget(encounter, partyLevel, partySize) {
   const { entryOf, loading, failedCount, onRetry } = useEntries(ids)
 
   const { cp, unpriced } = treasureValueCp(encounter.treasure, encounter.currency, entryOf)
-  const { xp, unknown } = encounterXp(encounter.monsters, partyLevel, entryOf)
+  const { xp: mXp, unknown: mUnknown } = encounterXp(encounter.monsters, partyLevel, entryOf)
+  const { xp: hXp, unknown: hUnknown } = hazardXp(encounter.hazards, partyLevel, entryOf)
+  const xp = mXp + hXp
+  const unknown = [...mUnknown, ...hUnknown]
   const threat = encounterThreat(xp, partySize)
   // Non-combat XP awards advance the party (added to the total XP the GM tracks)
   // but never shift the combat difficulty band or treasure budget above.

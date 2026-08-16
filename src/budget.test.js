@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { treasureValueCp, encounterXp, awardXp, refGameId, gameIdsInEncounter } from './budget.js'
+import { treasureValueCp, encounterXp, hazardXp, awardXp, refGameId, gameIdsInEncounter } from './budget.js'
 
 // Minimal fake entries keyed by game_id.
 const ITEMS = {
@@ -12,7 +12,12 @@ const CREATURES = {
   'Monsters:goblin': { stat_block: { creature_type: { level: 1 } } },
   'Monsters:dragon': { stat_block: { creature_type: { level: 10 } } },
 }
-const entryOf = (id) => ITEMS[id] || CREATURES[id] || null
+// Hazards are flat under `hazard` (not stat_block) — level lives there.
+const HAZARDS = {
+  'Hazards:noose': { hazard: { level: 2 } },
+  'Hazards:drawbridge': { hazard: { level: 1 } },
+}
+const entryOf = (id) => ITEMS[id] || CREATURES[id] || HAZARDS[id] || null
 
 test('refGameId reads pristine and derived-base refs', () => {
   assert.equal(refGameId({ game_id: 'Weapons:1' }), 'Weapons:1')
@@ -111,6 +116,35 @@ test('encounterXp sums creature XP vs party level, honoring count + elite/weak',
   )
   assert.equal(xp, 40 + 160)
   assert.equal(unknown.length, 0)
+})
+
+test('hazardXp sums hazard XP like creatures (level from the flat hazard doc, × count)', () => {
+  // A Hazard N is worth the same XP as a Creature N. vs PL 2: a level-2 noose = PL+0
+  // = 40 each; two of them (B30's Web Lurker Nooses) = 80. A level-1 = PL-1 = 30.
+  const { xp, unknown } = hazardXp(
+    [
+      { ref: { game_id: 'Hazards:noose' }, count: 2 }, // 2 × 40 = 80
+      { ref: { game_id: 'Hazards:drawbridge' }, count: 1 }, // 30
+    ],
+    2,
+    entryOf,
+  )
+  assert.equal(xp, 80 + 30)
+  assert.equal(unknown.length, 0)
+})
+
+test('hazardXp reports a hazard whose entry/level cannot be read as unknown', () => {
+  const { xp, unknown } = hazardXp([{ ref: { game_id: 'Hazards:missing' }, count: 1 }], 2, entryOf)
+  assert.equal(xp, 0)
+  assert.equal(unknown.length, 1)
+})
+
+test('gameIdsInEncounter includes hazard refs (so their entries prefetch)', () => {
+  const ids = gameIdsInEncounter({
+    monsters: [{ ref: { game_id: 'Monsters:goblin' } }],
+    hazards: [{ ref: { game_id: 'Hazards:noose' } }],
+  })
+  assert.ok(ids.includes('Hazards:noose'))
 })
 
 test('encounterXp counts a templated monster at its resolved ref.json level, not the base', () => {
