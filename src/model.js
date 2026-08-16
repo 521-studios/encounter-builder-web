@@ -82,6 +82,7 @@ export function keyed(e) {
   return {
     ...e,
     monsters: (e.monsters || []).map(withKey),
+    hazards: (e.hazards || []).map(withKey),
     treasure,
     treasure_pools: pools,
     xp_awards: (e.xp_awards || []).map(withKey),
@@ -189,6 +190,7 @@ export function toEncounterInput(enc) {
     description: enc.description || '',
     notes: enc.notes || '',
     monsters: (enc.monsters || []).filter(hasRef).map(stripKey),
+    hazards: (enc.hazards || []).filter(hasRef).map(stripKey),
     treasure: (enc.treasure || []).filter(hasTreasureContent).map(treasureLineInput),
     treasure_pools: treasurePoolsInput(enc),
     xp_awards: (enc.xp_awards || []).map(awardInput).filter((a) => a.amount > 0),
@@ -218,6 +220,11 @@ export function buildInput(enc) {
 
 export function emptyMonster() {
   return withKey({ ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '' })
+}
+
+// A hazard row: ref + count (a haunt/hazard has no elite/weak, so no adjustment).
+export function emptyHazard() {
+  return withKey({ ref: { game_id: '' }, count: 1, nickname: '' })
 }
 
 // A non-combat XP award line (story/exploration/quest milestone, ally recruited).

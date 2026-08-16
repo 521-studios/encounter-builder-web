@@ -62,6 +62,27 @@ export function treasureValueCp(treasure, currency, entryOf) {
   return { cp, unpriced }
 }
 
+// hazardXp sums the hazards' XP: a Hazard N contributes the same XP as a Creature N
+// (no elite/weak). Level comes from the indexed entry; a hazard whose level can't be
+// read is returned in `unknown`.
+export function hazardXp(hazards, partyLevel, entryOf) {
+  let xp = 0
+  const unknown = []
+  for (const h of hazards || []) {
+    const gid = refGameId(h.ref)
+    const entry = gid ? entryOf(gid) : null
+    // The full entry is flat under `hazard` (not stat_block); level lives there.
+    const hz = entry && (entry.hazard || entry)
+    const lvl = hz && hz.level != null ? hz.level : null
+    if (lvl == null) {
+      unknown.push(h)
+      continue
+    }
+    xp += creatureXp(lvl, partyLevel, 'none') * (h.count || 1)
+  }
+  return { xp, unknown }
+}
+
 // encounterXp sums the monsters' XP against the party level (Table 10-2 via
 // creatureXp, honoring elite/weak). Monsters whose creature level can't be read
 // (entry not loaded, or a level-changing template) are returned in `unknown`.
@@ -117,11 +138,14 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
   for (const enc of encounters || []) {
     const { level, size } = partyFor(enc)
     const { cp, unpriced } = treasureValueCp(enc.treasure, enc.currency, entryOf)
-    const { xp, unknown } = encounterXp(enc.monsters, level, entryOf)
+    const { xp: mXp, unknown: mUnknown } = encounterXp(enc.monsters, level, entryOf)
+    const { xp: hXp, unknown: hUnknown } = hazardXp(enc.hazards, level, entryOf)
+    const xp = mXp + hXp
+    const unknown = [...mUnknown, ...hUnknown]
     // Non-combat rooms (hazard/haunt/social/knowledge/…) have no meaningful combat
     // band or treasure target — suppress both; their loot still counts as value.
     const combat = isCombatRoom(enc.room_type)
-    const threat = combat ? encounterThreat(xp, size) : null // creatures only, no awards
+    const threat = combat ? encounterThreat(xp, size) : null // creatures + hazards, no awards
     const targetGp = combat ? treasureBudget(level, threat, size) : null // null for Trivial / non-combat
     const targetCp = targetGp == null ? 0 : targetGp * 100
     const encXp = xp + awardXp(enc) // advancement XP includes non-combat awards
@@ -188,6 +212,10 @@ export function gameIdsInEncounter(enc) {
       const g = refGameId(m.ref)
       if (g) ids.add(g)
     }
+  }
+  for (const h of enc?.hazards || []) {
+    const g = refGameId(h.ref)
+    if (g) ids.add(g)
   }
   for (const t of enc?.treasure || []) {
     if (t.state === 'destroyed' || isDerived(t.ref)) continue
