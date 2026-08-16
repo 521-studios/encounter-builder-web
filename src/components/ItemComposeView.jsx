@@ -239,7 +239,19 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
         patches={mergeItemPatches(stack)}
         variant={vIndex}
         onVariantChange={
-          disabled ? undefined : (i) => onChange({ ...treasure, variant: variants[i] ? variants[i].name : '' })
+          disabled
+            ? undefined
+            : (i) => {
+                const variantName = variants[i] ? variants[i].name : ''
+                // A composed line bakes its price into ref.price_cp, which the budget reads
+                // directly (ignoring line.variant) — so re-derive it against the newly chosen
+                // variant's base price. A pristine line is budgeted via line.variant, so its
+                // ref is untouched. (4den)
+                const ref = stack.length
+                  ? buildItemRef(baseGameId, stack, name, base ? itemPriceCp(base, variantName || undefined) : null)
+                  : treasure.ref
+                onChange({ ...treasure, variant: variantName, ref })
+              }
         }
       />
     </div>
