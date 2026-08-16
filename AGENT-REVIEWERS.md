@@ -1,3 +1,19 @@
+# Configuration
+
+```json
+{
+  "bots": { "gemini": false },
+  "defaults_version_checked": "1.3.0"
+}
+```
+
+Gemini Code Assist has been retired from this org, so it is disabled here to
+stop the review loop from triggering and waiting on a bot that will never
+respond. This repo runs its own agent pack (below); the `defaults_version_checked`
+pin acknowledges the current plugin defaults so the stale-pin gate passes.
+
+---
+
 # Agents
 
 ## test-coverage-reviewer
