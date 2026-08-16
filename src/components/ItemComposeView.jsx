@@ -121,7 +121,10 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
       if (!elig) throw new Error('Could not load what can be applied to this item.')
       setEligibility(elig)
     } catch (e) {
-      // Non-fatal: the base item still renders; surface inline so the GM can retry.
+      // Non-fatal: the base item still renders. Drop back out of customize mode so the
+      // Customize button reappears (the picker never opened — eligibility is null), giving
+      // the GM a retry affordance alongside the inline error.
+      setCustomizing(false)
       setApplyError(errorMessage(e))
     }
   }

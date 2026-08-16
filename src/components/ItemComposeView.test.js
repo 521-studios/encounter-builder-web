@@ -76,6 +76,19 @@ test('ItemComposeView surfaces a 409 boundary refusal INLINE, keeping the compos
   assert.ok(screen.getByTestId('picker'), 'the compose panel remains open after a refusal')
 })
 
+test('ItemComposeView surfaces a Customize/eligibility failure inline and restores the retry button (2zi8)', async () => {
+  const deps = makeDeps({ fetchEligible: async () => { throw new Error('boom') } })
+  render(<ItemComposeView treasure={{ ref: { game_id: 'Weapons:1' } }} onChange={() => {}} deps={deps} />)
+  await screen.findByTestId('card') // base item still renders
+  fireEvent.click(screen.getByTestId('customize-item'))
+  // Inline error, not the fatal "Could not load item" wrapper, and — since the picker
+  // never opened — we drop back out of customize mode so the Customize button returns.
+  const err = await screen.findByTestId('apply-error')
+  assert.match(err.textContent, /boom/)
+  assert.doesNotMatch(document.body.textContent, /Could not load item/)
+  assert.ok(screen.getByTestId('customize-item'), 'the Customize button is available again to retry')
+})
+
 test('ItemComposeView persists a derived ref on apply, then reverts to pristine on remove', async () => {
   const refs = []
   await openPicker((t) => refs.push(t.ref), makeDeps())
