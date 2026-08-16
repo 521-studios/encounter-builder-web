@@ -171,6 +171,15 @@ test('gameIdsInEncounter includes hazard refs (so their entries prefetch)', () =
   assert.ok(ids.includes('Hazards:noose'))
 })
 
+test('gameIdsInEncounter includes affliction refs (so their entries prefetch), skipping ref-less', () => {
+  const ids = gameIdsInEncounter({
+    monsters: [{ ref: { game_id: 'Monsters:goblin' } }],
+    afflictions: [{ ref: { game_id: 'Diseases:blue' } }, { ref: { game_id: '' } }], // ref-less skipped
+  })
+  assert.ok(ids.includes('Diseases:blue'))
+  assert.ok(!ids.includes('')) // an unfilled affliction slot contributes no id
+})
+
 test('encounterXp counts a templated monster at its resolved ref.json level, not the base', () => {
   // hq4t/21ro shared root cause: elite/weak is applied via the TemplatePicker, which
   // writes a derived ref.json (resolved creature) — NOT the legacy adjustment field.
@@ -295,6 +304,35 @@ test('rollupEncounters folds hazard XP into each row (a Hazard N counts like a C
     partyFor,
   )
   assert.equal(r.rows[0].xp, 80) // 40 creature + 40 hazard
+})
+
+test('rollupEncounters folds affliction XP + unknowns into each row', () => {
+  const entryOf = (id) =>
+    ({
+      'M:1': { stat_block: { creature_type: { level: 5 } } }, // Creature 5 vs PL 5 = 40
+      'Diseases:1': { affliction: { affliction_type: 'disease', level: 5 } }, // Disease 5 vs PL 5 = 40
+    })[id] || null
+  const partyFor = () => ({ level: 5, size: 4 })
+  const r = rollupEncounters(
+    [
+      {
+        id: 'e1', name: 'A',
+        monsters: [{ ref: { game_id: 'M:1' }, count: 1 }],
+        afflictions: [{ ref: { game_id: 'Diseases:1' }, count: 1 }],
+        treasure: [], currency: {},
+      },
+      {
+        id: 'e2', name: 'B',
+        monsters: [],
+        afflictions: [{ ref: { game_id: 'Diseases:missing' }, count: 1 }], // unresolved -> floors + flags
+        treasure: [], currency: {},
+      },
+    ],
+    entryOf,
+    partyFor,
+  )
+  assert.equal(r.rows[0].xp, 80) // 40 creature + 40 affliction
+  assert.equal(r.rows[1].incomplete, true) // aUnknown flows into the row's floor flag
 })
 
 test('awardXp sums non-combat XP awards (coercing/ignoring blanks)', () => {

@@ -229,9 +229,11 @@ export function emptyHazard() {
   return withKey({ ref: { game_id: '' }, count: 1, nickname: '' })
 }
 
-// An affliction row (curse/disease): ref + count, no elite/weak.
+// An affliction row (curse/disease): ref + count. No elite/weak (no adjustment) and no
+// nickname — AfflictionLine derives its label purely from the entry name, so a nickname
+// field would be dead weight that only round-trips an empty string to the API.
 export function emptyAffliction() {
-  return withKey({ ref: { game_id: '' }, count: 1, nickname: '' })
+  return withKey({ ref: { game_id: '' }, count: 1 })
 }
 
 // A non-combat XP award line (story/exploration/quest milestone, ally recruited).
