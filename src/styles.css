@@ -511,11 +511,22 @@ button.chapter-name:hover { color: var(--gold); }
 .print-sheet .Monster__roll { color: #1a1a1a; }        /* no live rolls on paper */
 .print-sheet .Monster__level { color: #444; }
 
-/* Reuse the shared budget panel, but drop its dark-theme surface for the sheet. */
+/* Reuse the shared budget panel, but drop its dark-theme surface for the sheet.
+   The chart's active-column rule uses color: var(--fg) (#e0e0e0, the DARK theme's
+   light text) on a light tint — light-on-light on white paper. Retint all chart
+   text to dark and give the active band a readable gold wash. */
 .print-sheet .treasure-budget { border: none; }
 .print-sheet .budget-title { color: #5e0000; }
+.print-sheet .treasure-chart { color: #1a1a1a; }
 .print-sheet .treasure-chart th,
-.print-sheet .treasure-chart td { border-color: #ccc; }
+.print-sheet .treasure-chart td { border-color: #ccc; color: #1a1a1a; }
+.print-sheet .treasure-chart thead th { color: #555; }
+.print-sheet .treasure-chart thead th[data-active],
+.print-sheet .treasure-chart .chart-band--active {
+  color: #1a1a1a;
+  font-weight: 700;
+  background: color-mix(in srgb, #c9a54a 32%, transparent);
+}
 
 @media print {
   /* The sheet is portaled to <body> as a sibling of #root, so hiding the whole
