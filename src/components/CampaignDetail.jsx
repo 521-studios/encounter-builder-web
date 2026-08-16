@@ -25,10 +25,12 @@ export default function CampaignDetail({ campaign, onClose, onSaved, onSaveError
   const { state: saveState, schedule } = useAutosave(
     async (v) => {
       const s = await settingsApi.put(campaign.id, partyFields(v))
-      onSaved && onSaved(s)
+      // Settings carry no per-record id, so stamp campaign.id explicitly — that's the
+      // id onSaveError keys the banner on, so App's same-record clear can match. 3kni.
+      onSaved && onSaved({ ...s, id: campaign.id })
     },
     800,
-    () => onSaveError && onSaveError('campaign settings'),
+    () => onSaveError && onSaveError('campaign settings', campaign.id),
   )
 
   // Campaign summary rolled up BY CHAPTER (one row per chapter, XP/treasure/target
