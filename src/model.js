@@ -307,3 +307,14 @@ export function emptyTreasure() {
     state: 'intact',
   })
 }
+
+// clearSaveErrorOnSave decides whether an app-level save-error banner should clear
+// when a record saves. It clears ONLY when the record that just saved is the SAME
+// one that failed (matched by id) — a DIFFERENT record saving must not wipe record
+// X's still-unsaved warning (views are mutually exclusive, so X isn't on screen to
+// re-fail). ids may be number (list) or string (URL restore), so compare as strings.
+// Returns the next saveError value: null to clear, or the unchanged {what,id}. (3kni)
+export function clearSaveErrorOnSave(saveError, saved) {
+  if (!saveError || !saved || saved.id == null || saveError.id == null) return saveError
+  return String(saveError.id) === String(saved.id) ? null : saveError
+}

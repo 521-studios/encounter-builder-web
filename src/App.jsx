@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { clearSaveErrorOnSave } from './model.js'
 import { getUser, getAccessToken, login, logout, completeLogin, onUserChange } from './auth/oidc.js'
 import { setTokenProvider } from './api/token.js'
 import { fetchGames } from './api/letsroll.js'
@@ -32,8 +33,13 @@ export default function App() {
   const [saveError, setSaveError] = useState(null)
   const booted = useRef(false)
   const backToEmpty = () => setView({ kind: 'empty' })
-  const onSaved = () => setReloadKey((k) => k + 1)
-  const onSaveError = (what) => setSaveError(what)
+  const onSaved = (saved) => {
+    setReloadKey((k) => k + 1)
+    // Same-record recovery: clear the banner only when THIS record's save succeeds
+    // (id-keyed), so a different record saving can't re-mask X's unsaved warning.
+    setSaveError((prev) => clearSaveErrorOnSave(prev, saved))
+  }
+  const onSaveError = (what, id) => setSaveError({ what, id })
 
   // Restore the campaign + main view from the query string (deep-link, reload, and
   // back/forward). The campaign object comes from the games list; a chapter view
@@ -145,7 +151,7 @@ export default function App() {
 
       {saveError && (
         <div className="save-error-banner" role="alert" data-testid="save-error-banner">
-          A background save failed — your last change to {saveError} may not have been saved. Re-open it and check.{' '}
+          A background save failed — your last change to {saveError.what} may not have been saved. Re-open it and check.{' '}
           <button type="button" className="link" onClick={() => setSaveError(null)}>Dismiss</button>
         </div>
       )}
