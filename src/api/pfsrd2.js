@@ -47,6 +47,16 @@ export const pfsrd2 = {
     if (filters.levelMax) params.set('level_max', filters.levelMax)
     return request('GET', `/api/pfsrd2/search/suggest/unified?${params.toString()}`, opts)
   },
+  // Autocomplete over afflictions (curses + diseases), for the encounter's SEPARATE
+  // "add affliction" search. Same result shape as suggestMonsters.
+  suggestAfflictions: (q, filters = {}, opts = {}) => {
+    const params = new URLSearchParams({ q })
+    params.append('type', 'curses')
+    params.append('type', 'diseases')
+    if (filters.levelMin) params.set('level_min', filters.levelMin)
+    if (filters.levelMax) params.set('level_max', filters.levelMax)
+    return request('GET', `/api/pfsrd2/search/suggest/unified?${params.toString()}`, opts)
+  },
   // Co-occurring trait typeahead for the CreatureSearch trait filter: only traits
   // that still narrow the current (type + selected) set.
   suggestMonsterTraits: (prefix, selected = [], opts = {}) => {

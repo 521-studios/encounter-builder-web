@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { treasureValueCp, encounterXp, hazardXp, awardXp, refGameId, gameIdsInEncounter } from './budget.js'
+import { treasureValueCp, encounterXp, hazardXp, afflictionXp, awardXp, refGameId, gameIdsInEncounter } from './budget.js'
 
 // Minimal fake entries keyed by game_id.
 const ITEMS = {
@@ -17,7 +17,12 @@ const HAZARDS = {
   'Hazards:noose': { hazard: { level: 2 } },
   'Hazards:drawbridge': { hazard: { level: 1 } },
 }
-const entryOf = (id) => ITEMS[id] || CREATURES[id] || HAZARDS[id] || null
+// Afflictions are flat under `affliction`; a Varies-level one has level_text, no level.
+const AFFLICTIONS = {
+  'Diseases:blue': { affliction: { affliction_type: 'disease', level: 3 } },
+  'Curses:varies': { affliction: { affliction_type: 'curse', level_text: 'Varies' } },
+}
+const entryOf = (id) => ITEMS[id] || CREATURES[id] || HAZARDS[id] || AFFLICTIONS[id] || null
 
 test('refGameId reads pristine and derived-base refs', () => {
   assert.equal(refGameId({ game_id: 'Weapons:1' }), 'Weapons:1')
@@ -139,12 +144,40 @@ test('hazardXp reports a hazard whose entry/level cannot be read as unknown', ()
   assert.equal(unknown.length, 1)
 })
 
+test('afflictionXp counts a leveled affliction like a creature; a Varies-level one is 0 (not unknown)', () => {
+  const { xp, unknown } = afflictionXp(
+    [
+      { ref: { game_id: 'Diseases:blue' }, count: 1 }, // Disease 3 vs PL 3 = PL+0 = 40
+      { ref: { game_id: 'Curses:varies' }, count: 1 }, // Varies → no level → 0, not unknown
+    ],
+    3,
+    entryOf,
+  )
+  assert.equal(xp, 40)
+  assert.equal(unknown.length, 0) // the Varies affliction is a deliberate 0, not unknown
+})
+
+test('afflictionXp reports an unresolved entry as unknown', () => {
+  const { xp, unknown } = afflictionXp([{ ref: { game_id: 'Diseases:missing' }, count: 1 }], 3, entryOf)
+  assert.equal(xp, 0)
+  assert.equal(unknown.length, 1)
+})
+
 test('gameIdsInEncounter includes hazard refs (so their entries prefetch)', () => {
   const ids = gameIdsInEncounter({
     monsters: [{ ref: { game_id: 'Monsters:goblin' } }],
     hazards: [{ ref: { game_id: 'Hazards:noose' } }],
   })
   assert.ok(ids.includes('Hazards:noose'))
+})
+
+test('gameIdsInEncounter includes affliction refs (so their entries prefetch), skipping ref-less', () => {
+  const ids = gameIdsInEncounter({
+    monsters: [{ ref: { game_id: 'Monsters:goblin' } }],
+    afflictions: [{ ref: { game_id: 'Diseases:blue' } }, { ref: { game_id: '' } }], // ref-less skipped
+  })
+  assert.ok(ids.includes('Diseases:blue'))
+  assert.ok(!ids.includes('')) // an unfilled affliction slot contributes no id
 })
 
 test('encounterXp counts a templated monster at its resolved ref.json level, not the base', () => {
@@ -271,6 +304,35 @@ test('rollupEncounters folds hazard XP into each row (a Hazard N counts like a C
     partyFor,
   )
   assert.equal(r.rows[0].xp, 80) // 40 creature + 40 hazard
+})
+
+test('rollupEncounters folds affliction XP + unknowns into each row', () => {
+  const entryOf = (id) =>
+    ({
+      'M:1': { stat_block: { creature_type: { level: 5 } } }, // Creature 5 vs PL 5 = 40
+      'Diseases:1': { affliction: { affliction_type: 'disease', level: 5 } }, // Disease 5 vs PL 5 = 40
+    })[id] || null
+  const partyFor = () => ({ level: 5, size: 4 })
+  const r = rollupEncounters(
+    [
+      {
+        id: 'e1', name: 'A',
+        monsters: [{ ref: { game_id: 'M:1' }, count: 1 }],
+        afflictions: [{ ref: { game_id: 'Diseases:1' }, count: 1 }],
+        treasure: [], currency: {},
+      },
+      {
+        id: 'e2', name: 'B',
+        monsters: [],
+        afflictions: [{ ref: { game_id: 'Diseases:missing' }, count: 1 }], // unresolved -> floors + flags
+        treasure: [], currency: {},
+      },
+    ],
+    entryOf,
+    partyFor,
+  )
+  assert.equal(r.rows[0].xp, 80) // 40 creature + 40 affliction
+  assert.equal(r.rows[1].incomplete, true) // aUnknown flows into the row's floor flag
 })
 
 test('awardXp sums non-combat XP awards (coercing/ignoring blanks)', () => {
