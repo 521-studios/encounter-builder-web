@@ -12,6 +12,19 @@ import { errorMessage } from '../api/errors.js'
 import { buildItemRef } from '../itemRef.js'
 import { variantIndex } from '../variants.js'
 
+// Injectable dependencies — the async client/library calls and the two library
+// components this view drives. Production uses these real ones; a test injects fakes
+// (Node 24 has no unflagged test:mock.module, so this DI bag is the seam). The pure
+// transforms customizedItem/mergeItemPatches stay imported directly — they're tolerant
+// of a minimal item, so nothing to fake. (j54u)
+const defaultDeps = {
+  api: pfsrd2, // entryFull / applyItemPost / templatesGet / suggestSpells
+  applyItemEffect,
+  fetchEligible,
+  SlotPicker: ItemSlotPicker,
+  Card: ItemCard,
+}
+
 // A treasure item with rune/material/spell composition — the item analog of
 // MonsterView. The library owns the machinery (eligible/apply + the ItemSlotPicker);
 // this wires it to the web (signed POST) and persists the result as a derived
@@ -23,7 +36,8 @@ import { variantIndex } from '../variants.js'
 // modifications, so remove/clear, the custom name, and change-highlighting survive a
 // reload. Composition is opt-in behind a "Customize" toggle (Devon's flow: select →
 // Customize → panel); a plain catalog item just renders its card until then.
-export default function ItemComposeView({ treasure, onChange, disabled }) {
+export default function ItemComposeView({ treasure, onChange, disabled, deps = defaultDeps }) {
+  const { api, applyItemEffect, fetchEligible, SlotPicker, Card } = deps
   const ref = treasure.ref || {}
   const baseGameId = ref.base?.game_id || ref.game_id || ''
 
@@ -48,14 +62,14 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
     setError(null)
     ;(async () => {
       try {
-        const b = await pfsrd2.entryFull(baseGameId)
+        const b = await api.entryFull(baseGameId)
         if (!alive) return
         setBase(b)
         let current = b
         const rebuilt = []
         for (const m of ref.modifications || []) {
           const res = await applyItemEffect({
-            post: pfsrd2.applyItemPost,
+            post: api.applyItemPost,
             itemGameId: baseGameId,
             item: current,
             effectGameId: m.effect_game_id,
@@ -101,7 +115,7 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
     setCustomizing(true)
     setError(null)
     try {
-      const elig = await fetchEligible({ get: pfsrd2.templatesGet, itemGameId: baseGameId })
+      const elig = await fetchEligible({ get: api.templatesGet, itemGameId: baseGameId })
       if (!elig) throw new Error('Could not load what can be applied to this item.')
       setEligibility(elig)
     } catch (e) {
@@ -115,7 +129,7 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
     setError(null)
     try {
       const res = await applyItemEffect({
-        post: pfsrd2.applyItemPost,
+        post: api.applyItemPost,
         itemGameId: baseGameId,
         item: currentItem,
         effectGameId,
@@ -172,7 +186,7 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
         </button>
       )}
       {customizing && eligibility && !disabled && (
-        <ItemSlotPicker
+        <SlotPicker
           eligibility={eligibility}
           name={name}
           onNameChange={onNameChange}
@@ -182,11 +196,11 @@ export default function ItemComposeView({ treasure, onChange, disabled }) {
           onApplySpell={(spell) => applyEffect(spell.game_id, spell.name, undefined)}
           onRemoveLast={onRemoveLast}
           onClearAll={onClearAll}
-          searchSpells={pfsrd2.suggestSpells}
+          searchSpells={api.suggestSpells}
         />
       )}
       {needsPick ? <p className="variant-hint">Choose a version below to lock this item in.</p> : null}
-      <ItemCard
+      <Card
         data={current}
         patches={mergeItemPatches(stack)}
         variant={vIndex}
