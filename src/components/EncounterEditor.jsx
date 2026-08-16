@@ -36,7 +36,7 @@ import TreasureBudget from './TreasureBudget.jsx'
 
 const AUTOSAVE_MS = 800
 
-export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onOpenEncounter }) {
+export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onSaveOk, onOpenEncounter }) {
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
   const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
@@ -126,6 +126,10 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           }
         }
         setSaveState('saved')
+        // Clear any lingering app-level banner for THIS encounter on ANY successful
+        // save — onSaved above is gated on a sidebar-signature change, so a description/
+        // treasure/monster edit recovering from a failed autosave wouldn't clear it. 3kni.
+        onSaveOk && onSaveOk(encounterId)
       } catch (e) {
         setError(errorMessage(e))
         setSaveState('error')
@@ -140,7 +144,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       }
     }, AUTOSAVE_MS)
     return () => clearTimeout(t)
-  }, [enc, released, campaignId, encounterId, onSaved, onSaveError])
+  }, [enc, released, campaignId, encounterId, onSaved, onSaveError, onSaveOk])
 
   // Flush a pending (debounced) autosave when leaving this encounter, so the last
   // <800ms of edits aren't lost on a quick switch or close. Fire-and-forget: the
