@@ -14,6 +14,7 @@ import {
   buildInput,
   emptyMonster,
   emptyHazard,
+  emptyAffliction,
   emptyTreasure,
   emptyPool,
   emptyAward,
@@ -27,6 +28,7 @@ import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
 import MonsterLine from './MonsterLine.jsx'
 import HazardLine from './HazardLine.jsx'
+import AfflictionLine from './AfflictionLine.jsx'
 import WikiMarkdown from './WikiMarkdown.jsx'
 import TreasurePoolSection from './TreasurePoolSection.jsx'
 import PartyFields from './PartyFields.jsx'
@@ -173,10 +175,12 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   }
   const monsters = enc.monsters || []
   const hazards = enc.hazards || []
+  const afflictions = enc.afflictions || []
   const treasure = enc.treasure || []
 
   const setMonster = (i, m) => patch({ monsters: monsters.map((x, j) => (j === i ? m : x)) })
   const setHazard = (i, h) => patch({ hazards: hazards.map((x, j) => (j === i ? h : x)) })
+  const setAffliction = (i, a) => patch({ afflictions: afflictions.map((x, j) => (j === i ? a : x)) })
   const setTreasure = (i, t) => patch({ treasure: treasure.map((x, j) => (j === i ? t : x)) })
 
   // Treasure pools: loot grouped by where it's found. Every encounter with treasure
@@ -430,6 +434,25 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         {!released && (
           <button type="button" onClick={() => patch({ hazards: [...hazards, emptyHazard()] })}>
             + hazard
+          </button>
+        )}
+      </fieldset>
+
+      <fieldset>
+        <legend>Afflictions</legend>
+        {afflictions.map((a, i) => (
+          <AfflictionLine
+            key={a._key}
+            affliction={a}
+            entryOf={budget.entryOf}
+            disabled={released}
+            onChange={(a2) => setAffliction(i, a2)}
+            onRemove={() => patch({ afflictions: afflictions.filter((_, j) => j !== i) })}
+          />
+        ))}
+        {!released && (
+          <button type="button" onClick={() => patch({ afflictions: [...afflictions, emptyAffliction()] })}>
+            + affliction
           </button>
         )}
       </fieldset>

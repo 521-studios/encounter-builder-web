@@ -160,7 +160,8 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
 .check { display: inline-flex; align-items: center; gap: 0.3rem; }
 
 .monster-line-wrap,
-.hazard-line-wrap { display: grid; gap: 0.5rem; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.7rem; }
+.hazard-line-wrap,
+.affliction-line-wrap { display: grid; gap: 0.5rem; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.7rem; }
 /* The monster picker now renders the library CreatureSearch (.CreatureSearch__*,
    styled by the lib's style.css); the old .monster-search/.suggestions rules
    for the hand-rolled dropdown are gone with MonsterSearch.jsx. */

@@ -6,6 +6,7 @@ import {
   stripKey,
   emptyMonster,
   emptyHazard,
+  emptyAffliction,
   emptyTreasure,
   toEncounterInput,
   hasRef,
@@ -68,6 +69,18 @@ test('emptyHazard is a ref-less count-1 row (no elite/weak adjustment)', () => {
   assert.equal(h.ref.game_id, '')
   assert.equal(h.count, 1)
   assert.ok(!('adjustment' in h)) // a hazard has no elite/weak
+})
+
+test('afflictions round-trip: keyed stamps _key; toEncounterInput strips it + drops empty', () => {
+  const enc = keyed({
+    name: 'x',
+    afflictions: [{ ref: { game_id: 'Diseases:1' }, count: 1 }, emptyAffliction()],
+  })
+  assert.ok(enc.afflictions.every((a) => typeof a._key === 'string'))
+  const input = toEncounterInput(enc)
+  assert.equal(input.afflictions.length, 1) // ref-less empty dropped
+  assert.equal(input.afflictions[0].ref.game_id, 'Diseases:1')
+  assert.ok(!('_key' in input.afflictions[0]))
 })
 
 test('stripKey(withKey(x)) removes only _key and preserves the rest incl. nested ref', () => {

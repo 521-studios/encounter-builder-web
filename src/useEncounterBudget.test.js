@@ -29,6 +29,15 @@ test('useEncounterBudget folds hazards into the budget (unknown until the entry 
   assert.equal(result.current.unknownCount, 1)
 })
 
+test('useEncounterBudget folds afflictions into the budget (unknown until the entry loads)', () => {
+  // Same wiring proof as hazards: an affliction ref fires a fetch that won't resolve
+  // synchronously, so its entry is null and it flows into the COMBINED unknown via the
+  // affliction-XP fold — proving afflictions are wired into the hook, not afflictionXp alone.
+  const enc = { monsters: [], afflictions: [{ ref: { game_id: 'Diseases:1' }, count: 1 }], treasure: [], currency: {} }
+  const { result } = renderHook(() => useEncounterBudget(enc, 5, 4))
+  assert.equal(result.current.unknownCount, 1)
+})
+
 test('useEncounterBudget surfaces a non-combat room_type', () => {
   const enc = { monsters: [], treasure: [], currency: {}, room_type: 'knowledge' }
   const { result } = renderHook(() => useEncounterBudget(enc, 5, 4))
