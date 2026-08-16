@@ -47,7 +47,8 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
   const [eligibility, setEligibility] = useState(null)
   const [customizing, setCustomizing] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState(null) // FATAL: the base item couldn't load — nothing to show
+  const [applyError, setApplyError] = useState(null) // non-fatal: a customize/apply refusal, shown inline
 
   // Load the base item and rebuild the applied-effect stack from the ref by
   // re-applying each stored modification (mirrors MonsterView). Deriving fresh gives
@@ -60,6 +61,7 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
     setCustomizing(false)
     setEligibility(null)
     setError(null)
+    setApplyError(null)
     ;(async () => {
       try {
         const b = await api.entryFull(baseGameId)
@@ -113,20 +115,24 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
 
   async function startCustomize() {
     setCustomizing(true)
-    setError(null)
+    setApplyError(null)
     try {
       const elig = await fetchEligible({ get: api.templatesGet, itemGameId: baseGameId })
       if (!elig) throw new Error('Could not load what can be applied to this item.')
       setEligibility(elig)
     } catch (e) {
-      setError(errorMessage(e))
+      // Non-fatal: the base item still renders. Drop back out of customize mode so the
+      // Customize button reappears (the picker never opened — eligibility is null), giving
+      // the GM a retry affordance alongside the inline error.
+      setCustomizing(false)
+      setApplyError(errorMessage(e))
     }
   }
 
   async function applyEffect(effectGameId, effectName, grade) {
     const currentItem = stack.length ? stack[stack.length - 1].item : base
     setBusy(true)
-    setError(null)
+    setApplyError(null)
     try {
       const res = await applyItemEffect({
         post: api.applyItemPost,
@@ -148,8 +154,9 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
       setStack(next)
       persist(next, name)
     } catch (e) {
-      // A boundary refusal (409) is a GM-facing "not allowed", not a crash.
-      setError(e.status === 409 ? `Not allowed: ${e.body || 'ineligible'}` : errorMessage(e))
+      // A boundary refusal (409) is a GM-facing "not allowed", not a crash — surface it
+      // inline (the compose panel + item card stay put) rather than replacing the view.
+      setApplyError(e.status === 409 ? `Not allowed: ${e.body || 'ineligible'}` : errorMessage(e))
     }
     setBusy(false)
   }
@@ -184,6 +191,11 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
         <button type="button" className="link" data-testid="customize-item" onClick={startCustomize}>
           Customize
         </button>
+      )}
+      {applyError && (
+        <p className="error" data-testid="apply-error">
+          {applyError}
+        </p>
       )}
       {customizing && eligibility && !disabled && (
         <SlotPicker
