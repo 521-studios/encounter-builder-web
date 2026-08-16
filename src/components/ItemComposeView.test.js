@@ -57,7 +57,7 @@ async function openPicker(onChange, deps) {
   await screen.findByTestId('picker') // eligibility loaded → panel open
 }
 
-test('ItemComposeView surfaces a 409 boundary refusal with the "Not allowed: <reason>" text', async () => {
+test('ItemComposeView surfaces a 409 boundary refusal INLINE, keeping the compose panel (2zi8)', async () => {
   const deps = makeDeps({
     applyItemEffect: async () => {
       const e = new Error('nope')
@@ -68,10 +68,12 @@ test('ItemComposeView surfaces a 409 boundary refusal with the "Not allowed: <re
   })
   await openPicker(() => {}, deps)
   fireEvent.click(screen.getByText('apply'))
-  // The 409 sets `error`, which the top-level `if (error)` renders — so the full
-  // string is "Could not load item: Not allowed: ineligible" (the load-error wrapper
-  // is a pre-existing wart, bd_521Studios-2zi8; here we assert the refusal text shows).
-  await waitFor(() => assert.match(document.body.textContent, /Could not load item: Not allowed: ineligible/))
+  // A boundary refusal is non-fatal: it shows inline as "Not allowed: <reason>" (no
+  // "Could not load item" load-error wrapper) and the compose panel stays put. (2zi8)
+  const err = await screen.findByTestId('apply-error')
+  assert.equal(err.textContent, 'Not allowed: ineligible')
+  assert.doesNotMatch(document.body.textContent, /Could not load item/)
+  assert.ok(screen.getByTestId('picker'), 'the compose panel remains open after a refusal')
 })
 
 test('ItemComposeView persists a derived ref on apply, then reverts to pristine on remove', async () => {
