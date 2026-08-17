@@ -84,11 +84,7 @@ function markLoopPairs(nodes, pairs) {
 const DX = 170
 const DY = 92
 export function layerLayout(nodes, edges) {
-  const adj = new Map(nodes.map((n) => [n.id, []]))
-  for (const e of edges) {
-    adj.get(e.from).push(e.to)
-    adj.get(e.to).push(e.from)
-  }
+  const adj = adjacency(nodes, edges)
   const inDeg = Object.fromEntries(nodes.map((n) => [n.id, 0]))
   for (const e of edges) inDeg[e.to]++
 
@@ -136,93 +132,153 @@ export function layerLayout(nodes, edges) {
 // a golden-angle spiral seeds initial positions (no RNG), so the same graph always
 // lays out the same way (stable across renders + testable). Returns the same
 // {id: {x, y}} top-left-corner shape as layerLayout, so the renderer is unchanged.
+//
+// Each connected component is laid out INDEPENDENTLY, then the components are
+// shelf-packed side by side. A dungeon map is usually several disjoint pieces (main
+// halls, an island building, a stray unlinked room); simulating them together makes
+// all-pairs repulsion shove the pieces into a huge sparse cloud with no springs to
+// pull them back (gravity to fix that just crushes each piece). Per-component +
+// packing keeps every piece tight and readable with zero dead whitespace between them.
 const NODE_W = 132
 const NODE_H = 46
+const K = 190 // target edge length — > node diagonal (~140) so connected nodes don't overlap
 export function forceLayout(nodes, edges, { iterations = 400 } = {}) {
-  const N = nodes.length
-  if (N === 0) return {}
-  if (N === 1) return { [nodes[0].id]: { x: 24, y: 24 } }
+  if (nodes.length === 0) return {}
+  // Lay each connected component out on its own, measure its box, then pack.
+  const boxes = connectedComponents(nodes, edges).map((comp) => {
+    const pos = simulateComponent(comp, edges, iterations)
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity
+    for (const id in pos) {
+      minx = Math.min(minx, pos[id].x); maxx = Math.max(maxx, pos[id].x)
+      miny = Math.min(miny, pos[id].y); maxy = Math.max(maxy, pos[id].y)
+    }
+    return { pos, minx, miny, w: maxx - minx + NODE_W, h: maxy - miny + NODE_H }
+  })
+  return shelfPack(boxes, { gap: 48, margin: 24 })
+}
 
-  const area = N * 60000 // ~ (node + gap)² per node, so k > node diagonal → little overlap
-  const side = Math.sqrt(area)
-  const k = Math.sqrt(area / N) // ideal edge length
-  const GA = Math.PI * (3 - Math.sqrt(5)) // golden angle — deterministic, symmetry-breaking seed
+// Undirected adjacency map (id -> neighbour ids, both directions). Guards against
+// dangling endpoints so it's safe for raw edge lists. Shared by the component
+// split and layerLayout.
+function adjacency(nodes, edges) {
+  const adj = new Map(nodes.map((n) => [n.id, []]))
+  for (const e of edges) {
+    if (adj.has(e.from) && adj.has(e.to)) {
+      adj.get(e.from).push(e.to)
+      adj.get(e.to).push(e.from)
+    }
+  }
+  return adj
+}
+
+// Connected components over the undirected adjacency, as arrays of node objects,
+// in first-seen (node) order — deterministic.
+export function connectedComponents(nodes, edges) {
+  const nodeById = new Map(nodes.map((n) => [n.id, n]))
+  const adj = adjacency(nodes, edges)
+  const seen = new Set()
+  const components = []
+  for (const n of nodes) {
+    if (seen.has(n.id)) continue
+    const comp = []
+    const q = [n.id]
+    seen.add(n.id)
+    while (q.length) {
+      const u = q.shift()
+      comp.push(nodeById.get(u))
+      for (const v of adj.get(u)) if (!seen.has(v)) { seen.add(v); q.push(v) }
+    }
+    components.push(comp)
+  }
+  return components
+}
+
+// Shelf-pack component boxes ({pos, minx, miny, w, h}) into rows, biggest first, so
+// the main hall anchors the top-left. Wraps at a target width (√total-area) to keep
+// the whole map roughly as wide as it is tall — a balanced, scannable block rather
+// than one long strip. Returns the {id: {x, y}} top-left-corner map. Array.sort is
+// stable, so equal-area boxes keep their input (node) order → deterministic.
+export function shelfPack(boxes, { gap = 48, margin = 24 } = {}) {
+  const sorted = [...boxes].sort((a, b) => b.w * b.h - a.w * a.h)
+  const totalArea = sorted.reduce((s, c) => s + c.w * c.h, 0)
+  const targetW = Math.max(Math.sqrt(totalArea) * 1.3, ...sorted.map((c) => c.w))
+  const out = {}
+  let shelfX = margin, shelfY = margin, rowH = 0
+  for (const comp of sorted) {
+    if (shelfX > margin && shelfX + comp.w > margin + targetW) {
+      shelfX = margin // wrap to next shelf
+      shelfY += rowH + gap
+      rowH = 0
+    }
+    for (const id in comp.pos) {
+      out[id] = { x: comp.pos[id].x - comp.minx + shelfX, y: comp.pos[id].y - comp.miny + shelfY }
+    }
+    shelfX += comp.w + gap
+    rowH = Math.max(rowH, comp.h)
+  }
+  return out
+}
+
+// One connected component through Fruchterman–Reingold, seeded on a golden-angle
+// spiral (deterministic). No gravity needed: a connected component is held together
+// by its own springs, so it settles to a compact equilibrium instead of drifting.
+function simulateComponent(comp, edges, iterations) {
+  const N = comp.length
+  const ids = comp.map((n) => n.id)
+  if (N === 1) return { [ids[0]]: { x: 0, y: 0 } }
+
+  const GA = Math.PI * (3 - Math.sqrt(5)) // golden angle — symmetry-breaking seed
   const pos = {}
-  nodes.forEach((n, i) => {
-    const r = k * Math.sqrt(i + 0.5)
+  comp.forEach((n, i) => {
+    const r = K * Math.sqrt(i + 0.5)
     const a = i * GA
-    pos[n.id] = { x: side / 2 + r * Math.cos(a), y: side / 2 + r * Math.sin(a) }
+    pos[n.id] = { x: r * Math.cos(a), y: r * Math.sin(a) }
   })
 
-  // Undirected, de-duplicated springs (a two-way door is one spring, not two).
+  const inComp = new Set(ids)
   const springs = []
   const seenPair = new Set()
   for (const e of edges) {
+    if (!inComp.has(e.from) || !inComp.has(e.to)) continue
     const key = pairKey(e.from, e.to)
     if (seenPair.has(key)) continue
     seenPair.add(key)
     springs.push([e.from, e.to])
   }
-  const ids = nodes.map((n) => n.id)
-  let temp = side / 8
-  const cool = temp / (iterations + 1)
 
+  let temp = (K * Math.sqrt(N)) / 6
+  const cool = temp / (iterations + 1)
   for (let it = 0; it < iterations; it++) {
     const disp = {}
     for (const id of ids) disp[id] = { x: 0, y: 0 }
-    // Repulsion between every pair (Coulomb: f = k²/d).
     for (let i = 0; i < N; i++) {
       for (let j = i + 1; j < N; j++) {
-        const a = ids[i]
-        const b = ids[j]
+        const a = ids[i], b = ids[j]
         let dx = pos[a].x - pos[b].x
         let dy = pos[a].y - pos[b].y
         const d = Math.hypot(dx, dy) || 0.01
-        const f = (k * k) / d
-        dx /= d
-        dy /= d
-        disp[a].x += dx * f
-        disp[a].y += dy * f
-        disp[b].x -= dx * f
-        disp[b].y -= dy * f
+        const f = (K * K) / d
+        dx /= d; dy /= d
+        disp[a].x += dx * f; disp[a].y += dy * f
+        disp[b].x -= dx * f; disp[b].y -= dy * f
       }
     }
-    // Attraction along springs (Hooke-ish: f = d²/k).
     for (const [u, v] of springs) {
       let dx = pos[u].x - pos[v].x
       let dy = pos[u].y - pos[v].y
       const d = Math.hypot(dx, dy) || 0.01
-      const f = (d * d) / k
-      dx /= d
-      dy /= d
-      disp[u].x -= dx * f
-      disp[u].y -= dy * f
-      disp[v].x += dx * f
-      disp[v].y += dy * f
+      const f = (d * d) / K
+      dx /= d; dy /= d
+      disp[u].x -= dx * f; disp[u].y -= dy * f
+      disp[v].x += dx * f; disp[v].y += dy * f
     }
-    // Move each node by its displacement, capped at the current temperature, then
-    // CLAMP to the frame — without this the mutual repulsion drifts sparse parts
-    // off to infinity (the layout would balloon to tens of thousands of px). A weak
-    // centre gravity is a softer alternative but tunes poorly here (its equilibrium
-    // spacing k/√g balloons the map), so the frame clamp is the pragmatic bound.
     for (const id of ids) {
       const dd = disp[id]
       const d = Math.hypot(dd.x, dd.y) || 0.01
-      pos[id].x = Math.min(side, Math.max(0, pos[id].x + (dd.x / d) * Math.min(d, temp)))
-      pos[id].y = Math.min(side, Math.max(0, pos[id].y + (dd.y / d) * Math.min(d, temp)))
+      pos[id].x += (dd.x / d) * Math.min(d, temp)
+      pos[id].y += (dd.y / d) * Math.min(d, temp)
     }
-    temp = Math.max(temp - cool, k * 0.05)
+    temp = Math.max(temp - cool, K * 0.05)
   }
-
-  // Translate to positive coords with a margin (same top-left convention as
-  // layerLayout — a uniform half-node offset from the sim's centres is harmless
-  // since every node + edge endpoint shifts together).
-  const M = 24
-  const minx = Math.min(...ids.map((id) => pos[id].x))
-  const miny = Math.min(...ids.map((id) => pos[id].y))
-  const out = {}
-  for (const id of ids) {
-    out[id] = { x: pos[id].x - minx + M, y: pos[id].y - miny + M }
-  }
-  return out
+  return pos
 }
