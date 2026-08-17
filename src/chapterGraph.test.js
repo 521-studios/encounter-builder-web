@@ -81,10 +81,11 @@ test('layerLayout: every node gets a position, laid out in BFS columns', () => {
 
 test('forceLayout (the map layout): finite, BOUNDED positions + deterministic across runs', () => {
   const g1 = buildChapterGraph(chapter)
-  // The frame clamp keeps positions within ~sqrt(N*60000) of the origin — without
-  // it the mutual repulsion balloons the layout to tens of thousands of px. Bound
-  // the assertion tightly so a regression removing the clamp fails here.
-  const bound = Math.sqrt(g1.nodes.length * 60000) + 100
+  // Per-component layout + shelf packing keeps the whole map within a modest
+  // multiple of N·(edge length + node size) — no disconnected piece can balloon to
+  // infinity (each is held by its own springs, packed by box). Bound loosely but
+  // finitely so a regression that lets a component drift still fails here.
+  const bound = g1.nodes.length * (190 + 132) + 500
   for (const n of g1.nodes) {
     const p = g1.layout[n.id]
     assert.ok(p && Number.isFinite(p.x) && Number.isFinite(p.y), `bad position for ${n.id}`)
