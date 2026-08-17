@@ -41,6 +41,28 @@ test('release flips status to released; remove deletes', () => {
   assert.throws(() => localStore.encounters.get(a.id), /not found/)
 })
 
+test('release throws on a missing id (parallel to get)', () => {
+  assert.throws(() => localStore.encounters.release('nope'), /not found/)
+})
+
+test('degrades to in-memory when localStorage throws (private mode / quota)', () => {
+  const real = globalThis.localStorage
+  // A Storage whose reads/writes throw — the private-mode / over-quota case.
+  globalThis.localStorage = {
+    getItem() { throw new Error('blocked') },
+    setItem() { throw new Error('quota') },
+    removeItem() { throw new Error('blocked') },
+  }
+  try {
+    // persist() swallows the setItem throw; the record still lives in memory.
+    const a = localStore.encounters.create({ name: 'Ephemeral' })
+    assert.equal(localStore.encounters.get(a.id).name, 'Ephemeral')
+    assert.deepEqual(localStore.encounters.list().map((e) => e.id), [a.id])
+  } finally {
+    globalThis.localStorage = real
+  }
+})
+
 test('mutations persist to localStorage (survive a reload)', () => {
   const a = localStore.encounters.create({ name: 'Persisted' })
   const blob = JSON.parse(localStorage.getItem('eb:anon:v1'))

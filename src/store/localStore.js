@@ -88,9 +88,9 @@ export const localStore = {
       return e
     },
     create: (input = {}) => {
-      const rec = { ...encounterDefaults(), ...input, id: uuid() }
-      // create input never carries a status; keep the default 'draft'.
-      rec.status = 'draft'
+      // Defensive: a create is always a draft — force it, so any status a caller
+      // happened to pass in the input can't override the server-owned field.
+      const rec = { ...encounterDefaults(), ...input, id: uuid(), status: 'draft' }
       state.encounters[rec.id] = rec
       persist()
       return rec

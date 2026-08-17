@@ -128,8 +128,15 @@ export default function App() {
 
   // Leave anon mode back to the sign-in screen. Work stays in localStorage, so
   // re-entering restores it; we only clear the auto-re-enter flag.
+  //
+  // Deliberately do NOT flip the runtime isAnon() flag here: unmounting the open
+  // editor runs its flush-on-leave autosave during teardown (and useAutosave's
+  // microtask flush), which must still route a pending sub-debounce edit to the
+  // localStore — flipping the flag first would send it to /api/app with no bearer
+  // (401, silent loss). The flag is a page-session property: it resets naturally on
+  // the next full load (the "Sign in" redirect, or a manual reload), and the
+  // sign-in screen issues no app-API calls, so leaving it set until then is inert.
   const exitAnon = () => {
-    setAnon(false)
     try { localStorage.removeItem(ANON_ACTIVE_KEY) } catch { /* non-fatal */ }
     setCampaign(null)
     setView({ kind: 'empty' })
@@ -190,7 +197,7 @@ export default function App() {
     <main className="app">
       <header className="topbar">
         <h1>Encounter Builder</h1>
-        {isAnon() ? (
+        {status === 'authed' && isAnon() ? (
           <button className="link" onClick={exitAnon}>Exit</button>
         ) : status === 'authed' ? (
           <button className="link" onClick={() => logout()}>Sign out</button>
