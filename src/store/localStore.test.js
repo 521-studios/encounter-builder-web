@@ -1,11 +1,13 @@
 import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { localStore, resetLocalStore, LOCAL_CAMPAIGN } from './localStore.js'
+import { resetStore } from './store.js'
 import { setAnon } from '../api/anon.js'
 import { encounters } from '../api/encounters.js'
 
 afterEach(() => {
   resetLocalStore()
+  resetStore() // the api-client delegation test flows through the store cache
   setAnon(false)
 })
 
