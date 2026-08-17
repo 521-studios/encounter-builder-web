@@ -309,7 +309,7 @@ test('loadoutItemInput drops _key, floors qty at 1, includes variant only when s
 
 test('monsterInput cleans the loadout (drops ref-less rows + _keys, omits when empty)', () => {
   const withLoad = monsterInput({
-    _key: 'm', ref: { game_id: 'M:1' }, count: 3, adjustment: 'none', nickname: '',
+    _key: 'm', ref: { game_id: 'M:1' }, count: 3, adjustment: 'elite', nickname: 'Bite Bite',
     loadout: [
       { _key: 'a', ref: { game_id: 'shortsword' }, qty: 3 },
       { _key: 'b', ref: { game_id: '' }, qty: 1 }, // ref-less → dropped
@@ -317,12 +317,25 @@ test('monsterInput cleans the loadout (drops ref-less rows + _keys, omits when e
   })
   assert.equal('_key' in withLoad, false)
   assert.deepEqual(withLoad.loadout, [{ ref: { game_id: 'shortsword' }, qty: 3 }])
+  // The stripKey→monsterInput swap must still carry the non-loadout fields.
+  assert.equal(withLoad.count, 3)
+  assert.equal(withLoad.adjustment, 'elite')
+  assert.equal(withLoad.nickname, 'Bite Bite')
+  assert.deepEqual(withLoad.ref, { game_id: 'M:1' })
 
   // No usable loadout → the field is omitted entirely.
   const bare = monsterInput({ _key: 'm', ref: { game_id: 'M:1' }, count: 1, loadout: [{ ref: { game_id: '' } }] })
   assert.equal('loadout' in bare, false)
   const none = monsterInput({ _key: 'm', ref: { game_id: 'M:1' }, count: 1 })
   assert.equal('loadout' in none, false)
+})
+
+test('keyed stamps a _key on every loadout item (LoadoutView keys rows on it)', () => {
+  const out = keyed({ monsters: [{ ref: { game_id: 'M:1' }, count: 1, loadout: [{ ref: { game_id: 'shortsword' }, qty: 3 }] }] })
+  assert.ok(out.monsters[0]._key)
+  assert.ok(out.monsters[0].loadout[0]._key, 'loadout item got a _key')
+  // A monster with no loadout survives keyed() without a crash (empty array).
+  assert.deepEqual(keyed({ monsters: [{ ref: { game_id: 'M:1' }, count: 1 }] }).monsters[0].loadout, [])
 })
 
 test('skillCheckLabel renders base, successes, and alternatives', () => {
