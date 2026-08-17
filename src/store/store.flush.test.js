@@ -117,6 +117,18 @@ test('get() serves the unsaved working copy while dirty (not a stale list refres
   assert.equal(got.name, 'EDITED', 'read-through prefers the unsaved working copy over the stale cache')
 })
 
+test('after a flush, get() returns the saved record (write-through), not a stale list refresh', async () => {
+  stubFetch((url, o) => {
+    if (o.method === 'PUT') return res({ ...JSON.parse(o.body), id: 'e1', status: 'draft' })
+    return res([{ id: 'e1', name: 'ORIGINAL', status: 'draft' }]) // GET list
+  })
+  store.encounters.edit('c1', 'e1', rec({ name: 'EDITED' }), {})
+  await store.encounters.list('c1') // clobbers slice with ORIGINAL
+  await store.encounters.flush('c1', 'e1') // persists EDITED and writes it back into slice
+  const got = await store.encounters.get('c1', 'e1') // dirty is now false → served from slice
+  assert.equal(got.name, 'EDITED', 'the flushed record is written through, so get() is not stale post-flush')
+})
+
 test('cancel drops a pending edit without persisting (release/delete path)', async () => {
   const calls = echoPut()
   store.encounters.edit('c1', 'e1', rec({ name: 'Abandoned' }), {})

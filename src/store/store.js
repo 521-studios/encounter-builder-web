@@ -171,6 +171,7 @@ async function runFlush(cid, id) {
       const rec = x.record
       if (!rec) break // removed mid-flush — nothing to persist
       const saved = await backend().encounters.update(cid, id, buildInput(rec))
+      slice(cid).encounters.set(String(id), saved) // write-through, like update/create/release, so a post-flush get() isn't stale
       x.handlers.onSaved && x.handlers.onSaved(saved)
     }
     setFlushState(x, 'saved')
