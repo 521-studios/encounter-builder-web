@@ -130,6 +130,26 @@ test('after a flush, get() returns the saved record (write-through), not a stale
   assert.equal(got.name, 'EDITED', 'the flushed record is written through, so get() is not stale post-flush')
 })
 
+test('an edit landing mid-flush is coalesced by the drain loop (newest wins, exactly 2 PUTs)', async () => {
+  let putCount = 0
+  let releaseFirst
+  const calls = stubFetch((url, o) => {
+    if (o.method !== 'PUT') return res(rec())
+    putCount += 1
+    if (putCount === 1) return new Promise((resolve) => { releaseFirst = () => resolve(res({ ...JSON.parse(o.body), id: 'e1', status: 'draft' })) })
+    return res({ ...JSON.parse(o.body), id: 'e1', status: 'draft' })
+  })
+  store.encounters.edit('c1', 'e1', rec({ name: 'A' }), {})
+  const p1 = store.encounters.flush('c1', 'e1') // PUT #1 (A) suspends in flight
+  await new Promise((r) => setTimeout(r, 20)) // let PUT #1 reach the network
+  store.encounters.edit('c1', 'e1', rec({ name: 'B' }), {}) // lands while #1 is in flight
+  releaseFirst() // #1 resolves → drain loop re-iterates and PUTs B
+  await p1
+  const puts = calls.filter((c) => c.method === 'PUT')
+  assert.equal(puts.length, 2, 'the in-flight edit was drained in one extra pass, not dropped or double-batched')
+  assert.equal(puts.at(-1).body.name, 'B', 'the newest record wins')
+})
+
 test('cancel drops a pending edit without persisting (release/delete path)', async () => {
   const calls = echoPut()
   store.encounters.edit('c1', 'e1', rec({ name: 'Abandoned' }), {})

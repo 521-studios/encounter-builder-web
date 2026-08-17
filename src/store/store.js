@@ -103,21 +103,22 @@ export function resetStore(cid) {
   }
 }
 
-// ─── flush layer (rtd8b): optimistic write-behind over the working set ───
+// ─── flush layer (rtd8b / rtd8b-2): optimistic write-behind, generic over entity ───
 //
-// edit(cid, id, record, handlers) writes the (rich, keyed) record into the cache
-// — the WORKING COPY — marks it dirty, and debounces a backend write. This is the
-// forward-compatible store-first seam: today the editor mirrors its local `enc`
-// into edit() on each keystroke; later the editor drops local state and `patch`
-// IS edit(), with the flush layer unchanged. buildInput() is applied at flush
-// time, so the store holds exactly the record the editor will one day render from.
+// An entity's edit() holds the working copy on the flush record (x.record) and
+// debounces a backend write via a per-entity persist fn; the read cache is warmed
+// by that persist at flush time (not by edit itself), so a concurrent list()
+// replacing the cache can't clobber a dirty edit. This is the forward-compatible
+// store-first seam: today a component mirrors its local state into edit() on each
+// keystroke; later it drops local state and mutates the store directly, with the
+// flush layer unchanged.
 //
 // Per-record flush state (saved|unsaved|saving|error) is observable via
-// subscribeFlush + flushState, for the editor's Saving… indicator today and the
-// record itself under store-first later. handlers.{onSaved,onError} carry the
-// app-callback logic (sidebar refresh / error banner) that stays in the editor
-// for now; the flush mechanics (debounce, mid-flight coalescing, retry-on-next-
-// edit, flush-on-leave) live here.
+// subscribeFlush + flushState(key), for the Saving… indicator today and the record
+// itself under store-first later. handlers.{onSaved,onError} carry the app-callback
+// logic (sidebar refresh / error banner) that stays in the component for now; the
+// flush mechanics (debounce, mid-flight coalescing, retry-on-next-edit, flush-on-
+// leave) live here and are shared by encounters, chapters, and settings.
 // Save-indicator labels, shared by every persist-on-change surface.
 export const SAVE_LABEL = { saving: 'Saving…', unsaved: 'Unsaved…', error: 'Save failed', saved: 'Saved' }
 
@@ -181,6 +182,9 @@ async function runFlush(key) {
     }
     setFlushState(x, 'saved')
   } catch (e) {
+    // Keep a trace: the 'error' state + banner are static (a stale label), so the
+    // specific failure — 401 vs 422 vs network — is otherwise observable nowhere.
+    console.error('flush failed:', e)
     x.dirty = true // retry on the next edit, not on a timer
     setFlushState(x, 'error')
     x.onError && x.onError(e)
