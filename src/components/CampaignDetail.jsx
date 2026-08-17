@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { settings as settingsApi } from '../api/settings.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { errorMessage } from '../api/errors.js'
+import { flushState, subscribeFlush, setKey, SAVE_LABEL } from '../store/store.js'
 import { PARTY_DEFAULT, partyFields, resolveParty } from '../party.js'
 import { treasureTotalForLevel } from '../pf2eRules.js'
-import { useAutosave, SAVE_LABEL } from '../useAutosave.js'
 import { useChapterSummary } from '../useRollup.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
@@ -22,16 +22,11 @@ export default function CampaignDetail({ campaign, onClose, onSaved, onSaveError
   const [rollupError, setRollupError] = useState(false) // chapters/encounters list failed — rollup can't be trusted
   const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the rollup's lists on retry
 
-  const { state: saveState, schedule } = useAutosave(
-    async (v) => {
-      const s = await settingsApi.put(campaign.id, partyFields(v))
-      // Settings carry no per-record id, so stamp campaign.id explicitly — that's the
-      // id onSaveError keys the banner on, so App's same-record clear can match. 3kni.
-      onSaved && onSaved({ ...s, id: campaign.id })
-    },
-    800,
-    () => onSaveError && onSaveError('campaign settings', campaign.id),
-  )
+  // Autosave via the store's flush layer (rtd8b-2). Settings carry no per-record
+  // id, so onSaved stamps campaign.id explicitly — that's the id onSaveError keys
+  // the banner on, so App's same-record clear can match. 3kni.
+  const saveState = useSyncExternalStore(subscribeFlush, () => flushState(setKey(campaign.id)))
+  useEffect(() => () => settingsApi.flush(campaign.id), [campaign.id])
 
   // Campaign summary rolled up BY CHAPTER (one row per chapter, XP/treasure/target
   // summed). Called unconditionally before the early return (rules of hooks).
@@ -64,7 +59,10 @@ export default function CampaignDetail({ campaign, onClose, onSaved, onSaveError
 
   function commit(next) {
     setValue(next)
-    schedule(next)
+    settingsApi.edit(campaign.id, partyFields(next), {
+      onSaved: (s) => onSaved && onSaved({ ...s, id: campaign.id }),
+      onError: () => onSaveError && onSaveError('campaign settings', campaign.id),
+    })
   }
 
   if (error && !value) return <p className="error" role="alert">{error}</p>
