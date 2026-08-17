@@ -7,6 +7,7 @@ import { flushState, subscribeFlush, chKey, SAVE_LABEL } from '../store/store.js
 import { resolveParty, partyFields } from '../party.js'
 import { BAND_LABELS } from '../pf2eRules.js'
 import { isCombatRoom, roomTypeLabel } from '../model.js'
+import { naturalSort } from '../sort.js'
 import { useRollup } from '../useRollup.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
@@ -37,7 +38,11 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
 
   // Always-visible chapter treasure rollup (per encounter). Called unconditionally
   // before the early return (rules of hooks); tolerates the still-loading state.
-  const rollup = useRollup(chapterEncounters, (enc) => resolveParty({ encounter: enc, chapter, campaign: campaignSettings }))
+  // Resolve each encounter's party from the LIVE edited party fields, not the stale
+  // `chapter` prop — otherwise changing this chapter's PC count/level doesn't
+  // recompute the rollup until you leave and re-open (the prop reloads then).
+  const liveChapter = { ...chapter, party_level: value.party_level, party_size: value.party_size }
+  const rollup = useRollup(chapterEncounters, (enc) => resolveParty({ encounter: enc, chapter: liveChapter, campaign: campaignSettings }))
 
   useEffect(() => {
     let alive = true
@@ -55,7 +60,9 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
       })
     encountersApi
       .list(campaignId)
-      .then((all) => alive && setChapterEncounters(all.filter((e) => e.chapter_id === chapter.id)))
+      // Natural-sort (A1, A2, A3, A7, A10, A15, A23 — not lexical, not list order)
+      // so the rollup + map match the sidebar's ordering, not the API's.
+      .then((all) => alive && setChapterEncounters(naturalSort(all.filter((e) => e.chapter_id === chapter.id), (e) => e.name || '')))
       .catch(() => {
         // Don't let a load failure masquerade as an empty chapter in the rollup —
         // flag it so TreasureRollup shows an error + retry instead of "no encounters".
