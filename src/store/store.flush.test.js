@@ -76,6 +76,47 @@ test('a failed flush → error state + onError, keeps dirty, and recovers on the
   assert.equal(flushState('c1', 'e1'), 'saved')
 })
 
+test('a second flush while one is in flight does not double-write (concurrent guard)', async () => {
+  let releasePut
+  const calls = stubFetch((url, o) => {
+    if (o.method === 'PUT') {
+      return new Promise((resolve) => { releasePut = () => resolve(res({ ...o.body ? JSON.parse(o.body) : {}, id: 'e1', status: 'draft' })) })
+    }
+    return res(rec())
+  })
+  store.encounters.edit('c1', 'e1', rec({ name: 'InFlight' }), {})
+  const p1 = store.encounters.flush('c1', 'e1') // starts runFlush; saving=true is set synchronously
+  const p2 = store.encounters.flush('c1', 'e1') // must early-return on the saving guard — no 2nd PUT
+  // Let request() reach fetch (tokenProvider + bodyHash awaits) so the PUT is actually in flight.
+  await new Promise((r) => setTimeout(r, 20))
+  releasePut()
+  await Promise.all([p1, p2])
+  assert.equal(calls.filter((c) => c.method === 'PUT').length, 1, 'the in-flight guard prevented a concurrent double-write')
+  assert.equal(flushState('c1', 'e1'), 'saved')
+})
+
+test('a concurrent list() does not clobber a dirty edit — the edit still persists (lost-update regression)', async () => {
+  const calls = stubFetch((url, o) => {
+    if (o.method === 'PUT') return res({ ...JSON.parse(o.body), id: 'e1', status: 'draft' })
+    return res([{ id: 'e1', name: 'ORIGINAL', status: 'draft' }]) // GET list
+  })
+  store.encounters.edit('c1', 'e1', rec({ name: 'EDITED' }), {})
+  await store.encounters.list('c1') // backend ORIGINAL replaces the read cache — must NOT clobber the working copy
+  await store.encounters.flush('c1', 'e1')
+  const put = calls.find((c) => c.method === 'PUT')
+  assert.equal(put.body.name, 'EDITED', 'the dirty working copy persisted, not the list-refreshed backend record')
+})
+
+test('get() serves the unsaved working copy while dirty (not a stale list refresh)', async () => {
+  stubFetch((url, o) => (o.method === 'GET' && url.endsWith('/encounters')
+    ? res([{ id: 'e1', name: 'ORIGINAL', status: 'draft' }])
+    : res({ id: 'e1', name: 'ORIGINAL', status: 'draft' })))
+  store.encounters.edit('c1', 'e1', rec({ name: 'EDITED' }), {})
+  await store.encounters.list('c1') // refreshes cache with ORIGINAL
+  const got = await store.encounters.get('c1', 'e1')
+  assert.equal(got.name, 'EDITED', 'read-through prefers the unsaved working copy over the stale cache')
+})
+
 test('cancel drops a pending edit without persisting (release/delete path)', async () => {
   const calls = echoPut()
   store.encounters.edit('c1', 'e1', rec({ name: 'Abandoned' }), {})

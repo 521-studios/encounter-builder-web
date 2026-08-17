@@ -84,11 +84,23 @@ function slice(cid) {
   return s
 }
 
-// Clear cached records. cid omitted → clear everything (sign-out / mode switch);
-// also used for test isolation.
+// Clear cached records AND their flush metadata (timers/dirty/handlers), so a
+// sign-out / mode switch can't leave a stale 'Save failed' or leak meta entries.
+// cid omitted → clear everything; also used for test isolation.
 export function resetStore(cid) {
-  if (cid == null) cache.clear()
-  else cache.delete(String(cid))
+  if (cid == null) {
+    cache.clear()
+    resetFlush()
+    return
+  }
+  cache.delete(String(cid))
+  const prefix = `${String(cid)}::`
+  for (const [k, x] of meta) {
+    if (k.startsWith(prefix)) {
+      if (x.timer) clearTimeout(x.timer)
+      meta.delete(k)
+    }
+  }
 }
 
 // ─── flush layer (rtd8b): optimistic write-behind over the working set ───
@@ -114,7 +126,7 @@ function metaOf(cid, id) {
   const k = mkey(cid, id)
   let x = meta.get(k)
   if (!x) {
-    x = { dirty: false, saving: false, state: 'saved', timer: null, handlers: {} }
+    x = { dirty: false, saving: false, state: 'saved', timer: null, handlers: {}, record: null }
     meta.set(k, x)
   }
   return x
@@ -153,7 +165,10 @@ async function runFlush(cid, id) {
   try {
     while (x.dirty) {
       x.dirty = false
-      const rec = slice(cid).encounters.get(String(id))
+      // The working copy lives on the flush record, NOT slice().encounters — the
+      // read cache is wholesale-replaced by list(), which would otherwise clobber
+      // a dirty edit mid-debounce and persist stale data (silent lost update).
+      const rec = x.record
       if (!rec) break // removed mid-flush — nothing to persist
       const saved = await backend().encounters.update(cid, id, buildInput(rec))
       x.handlers.onSaved && x.handlers.onSaved(saved)
@@ -177,8 +192,11 @@ export const store = {
       slice(cid).encounters = new Map((arr || []).map((e) => [String(e.id), e]))
       return arr
     },
-    // Read-through: cached record, else fetch and cache.
+    // Read-through: the unsaved working copy if this record is mid-edit, else the
+    // cached record, else fetch and cache.
     async get(cid, id, opts) {
+      const dx = meta.get(mkey(cid, id))
+      if (dx?.dirty && dx.record) return dx.record // don't serve a stale record over unsaved edits
       const s = slice(cid)
       const k = String(id)
       if (s.encounters.has(k)) return s.encounters.get(k)
@@ -213,8 +231,9 @@ export const store = {
     // flush always uses the latest closures. rtd8b's write path — the editor
     // calls this on every change instead of PUTting on a timer itself.
     edit(cid, id, record, handlers = {}) {
-      slice(cid).encounters.set(String(id), record)
+      slice(cid).encounters.set(String(id), record) // keep the read cache warm for get()
       const x = metaOf(cid, id)
+      x.record = record // the working copy the flush persists (immune to list() clobber)
       x.handlers = handlers
       x.dirty = true
       if (x.state !== 'saving') setFlushState(x, 'unsaved')
