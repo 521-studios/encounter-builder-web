@@ -194,6 +194,17 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   }
   const addLineToPool = (poolId) =>
     patch({ treasure: [...treasure, { ...emptyTreasure(), pool_id: poolId }] })
+  // 0o77: drop a monster's loadout items into the default treasure pool (one line
+  // each), materializing the pool if needed — they price through budget.js like any
+  // catalog/composed treasure line.
+  const addLoadoutToTreasure = (items) => {
+    const def = pools[0] || emptyPool()
+    const lines = items.map((it) => ({ ...emptyTreasure(), ref: it.ref, qty: it.qty || 1, variant: it.variant || '', pool_id: def.id }))
+    patch({
+      treasure_pools: pools.length ? pools : [def],
+      treasure: [...treasure, ...lines],
+    })
+  }
 
   // Non-combat XP awards. Blank/zero-amount lines are dropped on save (model.js);
   // the on-screen helper text explains the rest.
@@ -402,6 +413,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
             disabled={released}
             onChange={(m2) => setMonster(i, m2)}
             onRemove={() => patch({ monsters: monsters.filter((_, j) => j !== i) })}
+            onAddToTreasure={addLoadoutToTreasure}
           />
         ))}
         {!released && (

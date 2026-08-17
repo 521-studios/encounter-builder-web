@@ -27,6 +27,8 @@ import {
   emptySkillCheck,
   skillCheckInput,
   skillCheckLabel,
+  loadoutItemInput,
+  monsterInput,
   emptyExit,
   exitInput,
   clearSaveErrorOnSave,
@@ -295,6 +297,32 @@ test('skillCheckInput serializes the richer fields (xhwl), omitting empties', ()
   assert.equal('successes' in bare, false)
   assert.equal('alternatives' in bare, false)
   assert.equal('outcomes' in bare, false)
+})
+
+test('loadoutItemInput drops _key, floors qty at 1, includes variant only when set (0o77)', () => {
+  assert.deepEqual(loadoutItemInput({ _key: 'k', ref: { game_id: 'w' }, qty: 3 }), { ref: { game_id: 'w' }, qty: 3 })
+  assert.deepEqual(loadoutItemInput({ ref: { game_id: 'w' }, qty: 0 }), { ref: { game_id: 'w' }, qty: 1 }) // floored
+  assert.deepEqual(loadoutItemInput({ ref: { base: { game_id: 'w' } }, qty: 1, variant: '+1' }), {
+    ref: { base: { game_id: 'w' } }, qty: 1, variant: '+1',
+  })
+})
+
+test('monsterInput cleans the loadout (drops ref-less rows + _keys, omits when empty)', () => {
+  const withLoad = monsterInput({
+    _key: 'm', ref: { game_id: 'M:1' }, count: 3, adjustment: 'none', nickname: '',
+    loadout: [
+      { _key: 'a', ref: { game_id: 'shortsword' }, qty: 3 },
+      { _key: 'b', ref: { game_id: '' }, qty: 1 }, // ref-less → dropped
+    ],
+  })
+  assert.equal('_key' in withLoad, false)
+  assert.deepEqual(withLoad.loadout, [{ ref: { game_id: 'shortsword' }, qty: 3 }])
+
+  // No usable loadout → the field is omitted entirely.
+  const bare = monsterInput({ _key: 'm', ref: { game_id: 'M:1' }, count: 1, loadout: [{ ref: { game_id: '' } }] })
+  assert.equal('loadout' in bare, false)
+  const none = monsterInput({ _key: 'm', ref: { game_id: 'M:1' }, count: 1 })
+  assert.equal('loadout' in none, false)
 })
 
 test('skillCheckLabel renders base, successes, and alternatives', () => {

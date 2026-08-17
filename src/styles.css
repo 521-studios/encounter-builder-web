@@ -566,3 +566,11 @@ button.chapter-name:hover { color: var(--gold); }
 .check-outcomes .outcome textarea { min-height: 2.2rem; }
 .check-outcomes-ro { margin: 0.2rem 0 0 1rem; font-size: 0.9rem; }
 .print-outcomes { margin: 0.2rem 0 0.4rem 1.1rem; }
+
+/* Creature equipment loadout (0o77). */
+.loadout { margin: 0.5rem 0 0.5rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; border-left: 2px solid var(--border); padding-left: 0.75rem; }
+.loadout-line { display: flex; flex-direction: column; gap: 0.25rem; }
+.loadout-search { display: flex; align-items: center; gap: 0.5rem; }
+.loadout-controls { display: flex; align-items: center; gap: 0.6rem; }
+.loadout-controls input[type=number] { width: 3.5rem; }
+.loadout-actions { display: flex; gap: 0.75rem; }
