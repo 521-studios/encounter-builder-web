@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { settings as settingsApi } from '../api/settings.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { errorMessage } from '../api/errors.js'
+import { flushState, subscribeFlush, chKey, SAVE_LABEL } from '../store/store.js'
 import { resolveParty, partyFields } from '../party.js'
 import { BAND_LABELS } from '../pf2eRules.js'
 import { isCombatRoom, roomTypeLabel } from '../model.js'
-import { useAutosave, SAVE_LABEL } from '../useAutosave.js'
 import { useRollup } from '../useRollup.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
@@ -29,18 +29,11 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
   const [error, setError] = useState(null)
   const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the encounters list on retry
 
-  const { state: saveState, schedule } = useAutosave(
-    async (v) => {
-      const updated = await chaptersApi.update(campaignId, chapter.id, {
-        name: v.name.trim(),
-        order: chapter.order,
-        ...partyFields(v),
-      })
-      onSaved && onSaved(updated)
-    },
-    800,
-    () => onSaveError && onSaveError(`chapter “${value.name.trim() || 'Untitled chapter'}”`, chapter.id),
-  )
+  // Autosave now runs through the store's flush layer (rtd8b-2): the indicator
+  // reads flush state; commit() mirrors the built input into the store, which
+  // debounces the PUT. Flush a pending edit when leaving.
+  const saveState = useSyncExternalStore(subscribeFlush, () => flushState(chKey(campaignId, chapter.id)))
+  useEffect(() => () => chaptersApi.flush(campaignId, chapter.id), [campaignId, chapter.id])
 
   // Always-visible chapter treasure rollup (per encounter). Called unconditionally
   // before the early return (rules of hooks); tolerates the still-loading state.
@@ -77,7 +70,17 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
   // field then shows a "name is required" hint until it's filled back in.
   function commit(next) {
     setValue(next)
-    if (next.name.trim()) schedule(next)
+    if (next.name.trim()) {
+      chaptersApi.edit(
+        campaignId,
+        chapter.id,
+        { name: next.name.trim(), order: chapter.order, ...partyFields(next) },
+        {
+          onSaved: (updated) => onSaved && onSaved(updated),
+          onError: () => onSaveError && onSaveError(`chapter “${next.name.trim() || 'Untitled chapter'}”`, chapter.id),
+        },
+      )
+    }
   }
 
   async function del() {

@@ -118,16 +118,23 @@ export function resetStore(cid) {
 // app-callback logic (sidebar refresh / error banner) that stays in the editor
 // for now; the flush mechanics (debounce, mid-flight coalescing, retry-on-next-
 // edit, flush-on-leave) live here.
+// Save-indicator labels, shared by every persist-on-change surface.
+export const SAVE_LABEL = { saving: 'Saving…', unsaved: 'Unsaved…', error: 'Save failed', saved: 'Saved' }
+
+// Flush keys — all prefixed by `${cid}::` so resetStore(cid) prunes a campaign's
+// whole flush set in one sweep, regardless of entity.
+export const encKey = (cid, id) => `${String(cid)}::enc::${String(id)}`
+export const chKey = (cid, id) => `${String(cid)}::ch::${String(id)}`
+export const setKey = (cid) => `${String(cid)}::set`
+
 const AUTOSAVE_MS = 800
-const meta = new Map() // `${cid}::${id}` -> { dirty, saving, state, timer, handlers }
+const meta = new Map() // key -> { dirty, saving, state, timer, record, persist, onSaved, onError }
 const flushListeners = new Set()
-const mkey = (cid, id) => `${String(cid)}::${String(id)}`
-function metaOf(cid, id) {
-  const k = mkey(cid, id)
-  let x = meta.get(k)
+function metaOf(key) {
+  let x = meta.get(key)
   if (!x) {
-    x = { dirty: false, saving: false, state: 'saved', timer: null, handlers: {}, record: null }
-    meta.set(k, x)
+    x = { dirty: false, saving: false, state: 'saved', timer: null, record: null, persist: null, onSaved: null, onError: null }
+    meta.set(key, x)
   }
   return x
 }
@@ -145,8 +152,8 @@ export function subscribeFlush(listener) {
   flushListeners.add(listener)
   return () => flushListeners.delete(listener)
 }
-export function flushState(cid, id) {
-  return meta.get(mkey(cid, id))?.state || 'saved'
+export function flushState(key) {
+  return meta.get(key)?.state || 'saved'
 }
 // Test isolation: drop timers + flush metadata.
 export function resetFlush() {
@@ -154,35 +161,65 @@ export function resetFlush() {
   meta.clear()
 }
 
-// The coalescing save loop, lifted verbatim in spirit from EncounterEditor: read
-// the freshest working copy each pass so overlapping edits can't reorder; on
-// failure keep dirty (retry on the next edit) and surface via handlers.onError.
-async function runFlush(cid, id) {
-  const x = metaOf(cid, id)
+// The coalescing save loop, generic over the entity: read the freshest working
+// copy (x.record, set synchronously by flushEdit — immune to a concurrent list()
+// replacing a read cache) each pass so overlapping edits can't reorder; persist
+// via the entity's x.persist; on failure keep dirty (retry on next edit) and
+// surface via x.onError.
+async function runFlush(key) {
+  const x = metaOf(key)
   if (x.saving || !x.dirty) return
   x.saving = true
   setFlushState(x, 'saving')
   try {
     while (x.dirty) {
       x.dirty = false
-      // The working copy lives on the flush record, NOT slice().encounters — the
-      // read cache is wholesale-replaced by list(), which would otherwise clobber
-      // a dirty edit mid-debounce and persist stale data (silent lost update).
       const rec = x.record
-      if (!rec) break // removed mid-flush — nothing to persist
-      const saved = await backend().encounters.update(cid, id, buildInput(rec))
-      slice(cid).encounters.set(String(id), saved) // write-through, like update/create/release, so a post-flush get() isn't stale
-      x.handlers.onSaved && x.handlers.onSaved(saved)
+      if (rec == null) break // removed/cancelled mid-flush — nothing to persist
+      const saved = await x.persist(rec)
+      x.onSaved && x.onSaved(saved)
     }
     setFlushState(x, 'saved')
   } catch (e) {
     x.dirty = true // retry on the next edit, not on a timer
     setFlushState(x, 'error')
-    x.handlers.onError && x.handlers.onError(e)
+    x.onError && x.onError(e)
   } finally {
     x.saving = false
     notifyFlush()
   }
+}
+
+// Generic optimistic edit: store the working copy + the entity's persist fn +
+// handlers, mark dirty, debounce the write. flushNow forces it; flushCancel drops
+// it. Entity wrappers (encounters/chapters/settings .edit) provide persist.
+function flushEdit(key, record, { persist, onSaved, onError }) {
+  const x = metaOf(key)
+  x.record = record
+  x.persist = persist
+  x.onSaved = onSaved
+  x.onError = onError
+  x.dirty = true
+  if (x.state !== 'saving') setFlushState(x, 'unsaved')
+  if (x.timer) clearTimeout(x.timer)
+  x.timer = setTimeout(() => runFlush(key), AUTOSAVE_MS)
+}
+function flushNow(key) {
+  const x = metaOf(key)
+  if (x.timer) {
+    clearTimeout(x.timer)
+    x.timer = null
+  }
+  return runFlush(key)
+}
+function flushCancel(key) {
+  const x = metaOf(key)
+  if (x.timer) {
+    clearTimeout(x.timer)
+    x.timer = null
+  }
+  x.dirty = false
+  setFlushState(x, 'saved')
 }
 
 export const store = {
@@ -196,7 +233,7 @@ export const store = {
     // Read-through: the unsaved working copy if this record is mid-edit, else the
     // cached record, else fetch and cache.
     async get(cid, id, opts) {
-      const dx = meta.get(mkey(cid, id))
+      const dx = meta.get(encKey(cid, id))
       if (dx?.dirty && dx.record) return dx.record // don't serve a stale record over unsaved edits
       const s = slice(cid)
       const k = String(id)
@@ -227,44 +264,28 @@ export const store = {
       return rec
     },
 
-    // Optimistic edit: update the working copy now (instant UI), debounce the
+    // Optimistic edit: mirror the working copy into the store and debounce the
     // backend write. handlers.{onSaved,onError} are refreshed each call so the
-    // flush always uses the latest closures. rtd8b's write path — the editor
-    // calls this on every change instead of PUTting on a timer itself.
+    // flush uses the latest closures. rtd8b's write path — the editor calls this
+    // on every change instead of PUTting on a timer itself. persist keeps the read
+    // cache warm and writes the saved record through so a post-flush get() isn't
+    // stale; the working copy lives on the flush record (immune to list() clobber).
     edit(cid, id, record, handlers = {}) {
-      slice(cid).encounters.set(String(id), record) // keep the read cache warm for get()
-      const x = metaOf(cid, id)
-      x.record = record // the working copy the flush persists (immune to list() clobber)
-      x.handlers = handlers
-      x.dirty = true
-      if (x.state !== 'saving') setFlushState(x, 'unsaved')
-      if (x.timer) clearTimeout(x.timer)
-      x.timer = setTimeout(() => runFlush(cid, id), AUTOSAVE_MS)
+      flushEdit(encKey(cid, id), record, {
+        persist: async (rec) => {
+          const saved = await backend().encounters.update(cid, id, buildInput(rec))
+          slice(cid).encounters.set(String(id), saved)
+          return saved
+        },
+        onSaved: handlers.onSaved,
+        onError: handlers.onError,
+      })
     },
-
-    // Flush any pending edit now (leaving the editor). Returns the flush promise
-    // so a caller can await it; safe to call when nothing is pending.
-    flush(cid, id) {
-      const x = metaOf(cid, id)
-      if (x.timer) {
-        clearTimeout(x.timer)
-        x.timer = null
-      }
-      return runFlush(cid, id)
-    },
-
+    // Flush a pending edit now (leaving the editor); safe when nothing is pending.
+    flush: (cid, id) => flushNow(encKey(cid, id)),
     // Drop a pending debounced flush without persisting — for callers that take
-    // over the write explicitly (release, which saves-then-releases) or make it
-    // moot (delete). Clears the timer + dirty so the flush-on-leave can't re-fire.
-    cancel(cid, id) {
-      const x = metaOf(cid, id)
-      if (x.timer) {
-        clearTimeout(x.timer)
-        x.timer = null
-      }
-      x.dirty = false
-      setFlushState(x, 'saved')
-    },
+    // over the write (release) or make it moot (delete).
+    cancel: (cid, id) => flushCancel(encKey(cid, id)),
   },
   // Chapters have no per-record read (only list), so they pass through — list is
   // always fresh, mutations are awaited. (The sidebar re-lists after each.) These
@@ -275,6 +296,15 @@ export const store = {
     create: async (cid, input, opts) => backend().chapters.create(cid, input, opts),
     update: async (cid, id, input, opts) => backend().chapters.update(cid, id, input, opts),
     remove: async (cid, id, opts) => backend().chapters.remove(cid, id, opts),
+    // Optimistic edit for the chapter detail (full-replace PUT of the built input).
+    edit: (cid, id, input, handlers = {}) =>
+      flushEdit(chKey(cid, id), input, {
+        persist: (rec) => backend().chapters.update(cid, id, rec),
+        onSaved: handlers.onSaved,
+        onError: handlers.onError,
+      }),
+    flush: (cid, id) => flushNow(chKey(cid, id)),
+    cancel: (cid, id) => flushCancel(chKey(cid, id)),
   },
   settings: {
     async get(cid, opts) {
@@ -289,5 +319,19 @@ export const store = {
       slice(cid).settings = v
       return v
     },
+    // Optimistic edit for the campaign-settings detail (one record per campaign,
+    // no id). persist writes through the settings cache.
+    edit: (cid, input, handlers = {}) =>
+      flushEdit(setKey(cid), input, {
+        persist: async (rec) => {
+          const v = await backend().settings.put(cid, rec)
+          slice(cid).settings = v
+          return v
+        },
+        onSaved: handlers.onSaved,
+        onError: handlers.onError,
+      }),
+    flush: (cid) => flushNow(setKey(cid)),
+    cancel: (cid) => flushCancel(setKey(cid)),
   },
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
-import { flushState, subscribeFlush } from '../store/store.js'
+import { flushState, subscribeFlush, encKey } from '../store/store.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { settings as settingsApi } from '../api/settings.js'
 import {
@@ -43,7 +43,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [printing, setPrinting] = useState(false) // full-screen print/PDF sheet overlay
   // The save indicator now reflects the store's flush layer (rtd8b): edits are
   // written to the store optimistically and it owns the debounced backend write.
-  const saveState = useSyncExternalStore(subscribeFlush, () => flushState(campaignId, encounterId))
+  const saveState = useSyncExternalStore(subscribeFlush, () => flushState(encKey(campaignId, encounterId)))
   const [chapters, setChapters] = useState([]) // for the Chapter picker (keyboard-accessible move)
   const [siblingEncounters, setSiblingEncounters] = useState([]) // campaign encounters, for the exit target picker
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
