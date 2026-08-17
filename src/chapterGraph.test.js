@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack } from './chapterGraph.js'
 
 // A1↔A2↔A3↔A1 form a loop; A4 hangs off A1 as a spur (dead-end). One exit is
 // external (no target) and one is dangling (target not in the chapter) — neither
@@ -100,15 +100,55 @@ test('forceLayout: a single node lays out at the origin margin', () => {
   assert.deepEqual(g.layout['1'], { x: 24, y: 24 })
 })
 
+test('connectedComponents: splits a disjoint graph into first-seen-order components', () => {
+  const g = buildChapterGraph(disjoint)
+  const comps = connectedComponents(g.nodes, g.edges).map((c) => c.map((n) => n.id))
+  // 1↔2, 3↔4, and lone 5 — three components, membership by connectivity.
+  assert.equal(comps.length, 3)
+  assert.deepEqual(comps.map((c) => [...c].sort()), [['1', '2'], ['3', '4'], ['5']])
+})
+
+test('shelfPack: wraps to a new shelf and never overlaps components', () => {
+  // Six equal boxes wide enough that the √area target width forces a wrap — a real
+  // 2-D pack, not a single row. Each box is one node so its position IS its corner.
+  const box = (id, w, h) => ({ pos: { [id]: { x: 0, y: 0 } }, minx: 0, miny: 0, w, h })
+  const boxes = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => box(id, 200, 100))
+  const out = shelfPack(boxes, { gap: 48, margin: 24 })
+
+  assert.equal(Object.keys(out).length, 6) // all placed
+  const ys = new Set(Object.values(out).map((p) => p.y))
+  assert.ok(ys.size >= 2, 'expected the pack to wrap to at least a second shelf')
+
+  // No two placed boxes overlap (rects are w×h at their placed top-left corner).
+  const rects = boxes.map((b) => {
+    const id = Object.keys(b.pos)[0]
+    return { x: out[id].x, y: out[id].y, w: b.w, h: b.h }
+  })
+  for (let i = 0; i < rects.length; i++) {
+    for (let j = i + 1; j < rects.length; j++) {
+      const A = rects[i]
+      const B = rects[j]
+      const overlap = A.x < B.x + B.w && B.x < A.x + A.w && A.y < B.y + B.h && B.y < A.y + A.h
+      assert.ok(!overlap, `boxes ${i} and ${j} overlap: ${JSON.stringify(A)} vs ${JSON.stringify(B)}`)
+    }
+  }
+})
+
+test('forceLayout: a multi-component layout is deterministic across runs', () => {
+  // The packing pass must be stable (no RNG anywhere) so the map doesn't jitter.
+  assert.deepEqual(buildChapterGraph(disjoint).layout, buildChapterGraph(disjoint).layout)
+})
+
+// Two disjoint pairs (1↔2, 3↔4) and a lone node (5) with no exits — three components.
+const disjoint = [
+  { id: 1, name: 'A', exits: [{ to_encounter_id: '2' }] },
+  { id: 2, name: 'B', exits: [] },
+  { id: 3, name: 'C', exits: [{ to_encounter_id: '4' }] },
+  { id: 4, name: 'D', exits: [] },
+  { id: 5, name: 'Lone', exits: [] },
+]
+
 test('layerLayout: disconnected components + an isolated node all get positions', () => {
-  // Two disjoint pairs (1↔2, 3↔4) and a lone node (5) with no exits.
-  const disjoint = [
-    { id: 1, name: 'A', exits: [{ to_encounter_id: '2' }] },
-    { id: 2, name: 'B', exits: [] },
-    { id: 3, name: 'C', exits: [{ to_encounter_id: '4' }] },
-    { id: 4, name: 'D', exits: [] },
-    { id: 5, name: 'Lone', exits: [] },
-  ]
   const g = buildChapterGraph(disjoint)
   for (const n of g.nodes) {
     const p = g.layout[n.id]

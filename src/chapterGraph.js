@@ -84,11 +84,7 @@ function markLoopPairs(nodes, pairs) {
 const DX = 170
 const DY = 92
 export function layerLayout(nodes, edges) {
-  const adj = new Map(nodes.map((n) => [n.id, []]))
-  for (const e of edges) {
-    adj.get(e.from).push(e.to)
-    adj.get(e.to).push(e.from)
-  }
+  const adj = adjacency(nodes, edges)
   const inDeg = Object.fromEntries(nodes.map((n) => [n.id, 0]))
   for (const e of edges) inDeg[e.to]++
 
@@ -148,10 +144,23 @@ const NODE_H = 46
 const K = 190 // target edge length — > node diagonal (~140) so connected nodes don't overlap
 export function forceLayout(nodes, edges, { iterations = 400 } = {}) {
   if (nodes.length === 0) return {}
-  const M = 24
+  // Lay each connected component out on its own, measure its box, then pack.
+  const boxes = connectedComponents(nodes, edges).map((comp) => {
+    const pos = simulateComponent(comp, edges, iterations)
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity
+    for (const id in pos) {
+      minx = Math.min(minx, pos[id].x); maxx = Math.max(maxx, pos[id].x)
+      miny = Math.min(miny, pos[id].y); maxy = Math.max(maxy, pos[id].y)
+    }
+    return { pos, minx, miny, w: maxx - minx + NODE_W, h: maxy - miny + NODE_H }
+  })
+  return shelfPack(boxes, { gap: 48, margin: 24 })
+}
 
-  // Split into connected components over the undirected adjacency.
-  const nodeById = new Map(nodes.map((n) => [n.id, n]))
+// Undirected adjacency map (id -> neighbour ids, both directions). Guards against
+// dangling endpoints so it's safe for raw edge lists. Shared by the component
+// split and layerLayout.
+function adjacency(nodes, edges) {
   const adj = new Map(nodes.map((n) => [n.id, []]))
   for (const e of edges) {
     if (adj.has(e.from) && adj.has(e.to)) {
@@ -159,6 +168,14 @@ export function forceLayout(nodes, edges, { iterations = 400 } = {}) {
       adj.get(e.to).push(e.from)
     }
   }
+  return adj
+}
+
+// Connected components over the undirected adjacency, as arrays of node objects,
+// in first-seen (node) order — deterministic.
+export function connectedComponents(nodes, edges) {
+  const nodeById = new Map(nodes.map((n) => [n.id, n]))
+  const adj = adjacency(nodes, edges)
   const seen = new Set()
   const components = []
   for (const n of nodes) {
@@ -173,39 +190,30 @@ export function forceLayout(nodes, edges, { iterations = 400 } = {}) {
     }
     components.push(comp)
   }
+  return components
+}
 
-  // Lay out each component around the origin; capture its size so we can pack.
-  const laid = components.map((comp) => {
-    const pos = simulateComponent(comp, edges, iterations)
-    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity
-    for (const id in pos) {
-      minx = Math.min(minx, pos[id].x); maxx = Math.max(maxx, pos[id].x)
-      miny = Math.min(miny, pos[id].y); maxy = Math.max(maxy, pos[id].y)
-    }
-    return { pos, minx, miny, w: maxx - minx + NODE_W, h: maxy - miny + NODE_H }
-  })
-  // Biggest first — a stable shelf pack reads best with the main hall anchoring
-  // the top-left. Ties broken by node count then first id, so it's deterministic.
-  laid.sort((a, b) => b.w * b.h - a.w * a.h)
-
-  // Shelf-pack the component boxes into rows, wrapping at a target width chosen to
-  // keep the whole map roughly as wide as it is tall (√total-area) — a balanced,
-  // scannable block rather than one long strip.
-  const GAP = 48
-  const totalArea = laid.reduce((s, c) => s + c.w * c.h, 0)
-  const targetW = Math.max(Math.sqrt(totalArea) * 1.3, ...laid.map((c) => c.w))
+// Shelf-pack component boxes ({pos, minx, miny, w, h}) into rows, biggest first, so
+// the main hall anchors the top-left. Wraps at a target width (√total-area) to keep
+// the whole map roughly as wide as it is tall — a balanced, scannable block rather
+// than one long strip. Returns the {id: {x, y}} top-left-corner map. Array.sort is
+// stable, so equal-area boxes keep their input (node) order → deterministic.
+export function shelfPack(boxes, { gap = 48, margin = 24 } = {}) {
+  const sorted = [...boxes].sort((a, b) => b.w * b.h - a.w * a.h)
+  const totalArea = sorted.reduce((s, c) => s + c.w * c.h, 0)
+  const targetW = Math.max(Math.sqrt(totalArea) * 1.3, ...sorted.map((c) => c.w))
   const out = {}
-  let shelfX = M, shelfY = M, rowH = 0
-  for (const comp of laid) {
-    if (shelfX > M && shelfX + comp.w > M + targetW) {
-      shelfX = M // wrap to next shelf
-      shelfY += rowH + GAP
+  let shelfX = margin, shelfY = margin, rowH = 0
+  for (const comp of sorted) {
+    if (shelfX > margin && shelfX + comp.w > margin + targetW) {
+      shelfX = margin // wrap to next shelf
+      shelfY += rowH + gap
       rowH = 0
     }
     for (const id in comp.pos) {
       out[id] = { x: comp.pos[id].x - comp.minx + shelfX, y: comp.pos[id].y - comp.miny + shelfY }
     }
-    shelfX += comp.w + GAP
+    shelfX += comp.w + gap
     rowH = Math.max(rowH, comp.h)
   }
   return out
