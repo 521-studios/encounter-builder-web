@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { errorMessage } from '../api/errors.js'
 import { encounters } from '../api/encounters.js'
+import { flushState, subscribeFlush } from '../store/store.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { settings as settingsApi } from '../api/settings.js'
 import {
@@ -35,27 +36,24 @@ import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
 import EncounterPrintSheet from './EncounterPrintSheet.jsx'
 
-const AUTOSAVE_MS = 800
-
 export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onSaveOk, onOpenEncounter }) {
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
-  const [saveState, setSaveState] = useState('saved') // saved | unsaved | saving | error
   const [releasing, setReleasing] = useState(false)
   const [printing, setPrinting] = useState(false) // full-screen print/PDF sheet overlay
+  // The save indicator now reflects the store's flush layer (rtd8b): edits are
+  // written to the store optimistically and it owns the debounced backend write.
+  const saveState = useSyncExternalStore(subscribeFlush, () => flushState(campaignId, encounterId))
   const [chapters, setChapters] = useState([]) // for the Chapter picker (keyboard-accessible move)
   const [siblingEncounters, setSiblingEncounters] = useState([]) // campaign encounters, for the exit target picker
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
   const [partyContextError, setPartyContextError] = useState(false) // chapters/settings load failed
 
-  // Refs let the debounced autosave read the latest edit without re-subscribing:
-  // encRef is the current working copy; dirtyRef marks unsaved user edits;
-  // savingRef serializes overlapping PUTs; syncedRef is the last sidebar-visible
-  // signature we told the parent about (so we only refresh the tree on real
-  // name/chapter/status changes, not on every keystroke).
+  // encRef exposes the latest working copy to the flush handlers (for the error
+  // label); syncedRef is the last sidebar-visible signature we told the parent
+  // about, so we only refresh the tree on real name/chapter/status changes, not
+  // on every keystroke. Dirty/saving/debounce now live in the store's flush layer.
   const encRef = useRef(null)
-  const dirtyRef = useRef(false)
-  const savingRef = useRef(false)
   const syncedRef = useRef({ name: null, chapter_id: null, status: null })
   encRef.current = enc
 
@@ -88,8 +86,6 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     let alive = true
     setEnc(null)
     setError(null)
-    dirtyRef.current = false
-    setSaveState('saved')
     encounters
       .get(campaignId, encounterId)
       .then((e) => {
@@ -105,64 +101,13 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
   const released = enc?.status === 'released'
 
-  // Autosave: debounce a PUT whenever there are unsaved user edits. Re-runs on
-  // every edit (enc changes) — the pending timer is cleared, so only the last
-  // edit in a burst fires. The while-loop coalesces edits that arrive mid-save,
-  // reading encRef fresh each pass so overlapping PUTs can't reorder.
-  useEffect(() => {
-    if (!enc || released || !dirtyRef.current) return
-    const t = setTimeout(async () => {
-      if (savingRef.current || !dirtyRef.current) return
-      savingRef.current = true
-      setSaveState('saving')
-      try {
-        while (dirtyRef.current) {
-          dirtyRef.current = false
-          const saved = await encounters.update(campaignId, encounterId, buildInput(encRef.current))
-          setError(null)
-          const sig = { name: saved.name, chapter_id: saved.chapter_id || '', status: saved.status }
-          const prev = syncedRef.current
-          if (prev.name !== sig.name || prev.chapter_id !== sig.chapter_id || prev.status !== sig.status) {
-            syncedRef.current = sig
-            onSaved && onSaved(saved)
-          }
-        }
-        setSaveState('saved')
-        // Clear any lingering app-level banner for THIS encounter on ANY successful
-        // save — onSaved above is gated on a sidebar-signature change, so a description/
-        // treasure/monster edit recovering from a failed autosave wouldn't clear it. 3kni.
-        onSaveOk && onSaveOk(encounterId)
-      } catch (e) {
-        setError(errorMessage(e))
-        setSaveState('error')
-        dirtyRef.current = true // ponytail: retry on the next edit, not on a timer
-        // Also surface at the app level, keyed by this encounter's id: if the editor
-        // then unmounts (Close mid-retry) the inline "Save failed" indicator is gone,
-        // and id-keying lets a later successful save of THIS encounter clear the
-        // banner (not a different record's). 3kni — closes the mid-flight-at-Close swallow.
-        onSaveError && onSaveError(`encounter “${encRef.current?.name || 'Untitled encounter'}”`, encounterId)
-      } finally {
-        savingRef.current = false
-      }
-    }, AUTOSAVE_MS)
-    return () => clearTimeout(t)
-  }, [enc, released, campaignId, encounterId, onSaved, onSaveError, onSaveOk])
-
-  // Flush a pending (debounced) autosave when leaving this encounter, so the last
-  // <800ms of edits aren't lost on a quick switch or close. Fire-and-forget: the
-  // editor is going away. Skip if a save is already in flight — its coalescing
-  // loop picks up the dirty edit — to avoid a second concurrent PUT.
+  // Flush any pending (debounced) edit when leaving this encounter, so the last
+  // <800ms aren't lost on a quick switch or close. The store's flush layer owns
+  // the coalescing/retry; a failed flush surfaces via the edit handlers'
+  // onError (the app-level banner), since the inline indicator is gone.
   useEffect(() => {
     return () => {
-      const leaving = encRef.current
-      if (dirtyRef.current && !savingRef.current && leaving && leaving.status !== 'released') {
-        dirtyRef.current = false
-        // The editor is unmounting, so its "Save failed" indicator is gone — a
-        // failed flush must surface at the app level or the edit is lost silently.
-        encounters
-          .update(campaignId, encounterId, buildInput(leaving))
-          .catch(() => onSaveError && onSaveError(`encounter “${leaving.name || 'Untitled encounter'}”`, encounterId))
-      }
+      encounters.flush(campaignId, encounterId)
     }
   }, [campaignId, encounterId])
 
@@ -179,10 +124,35 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   if (error && !enc) return <p className="error" role="alert">{error}</p>
   if (!enc) return <p>Loading encounter…</p>
 
+  // On a successful flush the store hands back the saved record: refresh the
+  // sidebar only on a real name/chapter/status change (not every keystroke), and
+  // clear any lingering app-level banner for THIS encounter (id-keyed). A failed
+  // flush shows the inline "Save failed" and surfaces the app banner, since the
+  // editor may unmount mid-retry. These mirror the old autosave callbacks; only
+  // the write mechanics moved into the store.
+  const onFlushSaved = (saved) => {
+    setError(null)
+    const sig = { name: saved.name, chapter_id: saved.chapter_id || '', status: saved.status }
+    const prev = syncedRef.current
+    if (prev.name !== sig.name || prev.chapter_id !== sig.chapter_id || prev.status !== sig.status) {
+      syncedRef.current = sig
+      onSaved && onSaved(saved)
+    }
+    onSaveOk && onSaveOk(encounterId)
+  }
+  const onFlushError = (e) => {
+    setError(errorMessage(e))
+    onSaveError && onSaveError(`encounter “${encRef.current?.name || 'Untitled encounter'}”`, encounterId)
+  }
+
+  // Optimistic edit: update local state (instant render) and mirror the working
+  // copy into the store, which debounces the backend write. rtd8b's forward-
+  // compatible seam — when the editor goes store-first, `patch` becomes edit()
+  // over the store's record with no local enc.
   const patch = (fields) => {
-    dirtyRef.current = true
-    setSaveState((s) => (s === 'saving' ? s : 'unsaved'))
-    setEnc({ ...enc, ...fields })
+    const next = { ...enc, ...fields }
+    setEnc(next)
+    encounters.edit(campaignId, encounterId, next, { onSaved: onFlushSaved, onError: onFlushError })
   }
   const monsters = enc.monsters || []
   const hazards = enc.hazards || []
@@ -260,14 +230,13 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   // after which the editor renders read-only.
   async function release() {
     if (!window.confirm('Release this encounter to the party? It becomes read-only.')) return
-    dirtyRef.current = false // cancel any pending autosave; we save explicitly here
+    encounters.cancel(campaignId, encounterId) // drop the pending debounced flush; we save explicitly here
     setReleasing(true)
     setError(null)
     try {
       await encounters.update(campaignId, encounterId, buildInput(enc))
       const result = await encounters.release(campaignId, encounterId)
       setEnc(keyed(result))
-      setSaveState('saved')
       onSaved && onSaved(result)
     } catch (e) {
       setError(errorMessage(e))
@@ -280,7 +249,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
   async function del() {
     if (!window.confirm(`Delete encounter "${enc.name || 'Untitled encounter'}"? This can't be undone.`)) return
-    dirtyRef.current = false // cancel any pending autosave; the encounter is going away
+    encounters.cancel(campaignId, encounterId) // drop the pending flush; the encounter is going away
     try {
       await encounters.remove(campaignId, encounterId)
       onDeleted && onDeleted()
