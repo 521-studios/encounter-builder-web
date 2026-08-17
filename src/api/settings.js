@@ -1,19 +1,7 @@
-// Campaign settings CRUD against encounter-builder-api
-// (/api/app/campaigns/:id/settings). Same shape as the chapters/encounters
-// clients — bearer in X-Access-Token via the shared request(). GET returns the
-// campaign's expected-party defaults (an empty object when none saved yet); PUT
-// is a full replace (a nil field clears that default).
-import { request } from './client.js'
-import { isAnon } from './anon.js'
-import { localStore } from '../store/localStore.js'
+// Campaign settings (expected-party defaults) — a thin re-export of the shared
+// store (store/store.js), which routes to the api or local backend by isAnon().
+// GET is read-through; PUT is a full replace. Kept as its own module so component
+// imports are unchanged.
+import { store } from '../store/store.js'
 
-function base(campaignId) {
-  return `/api/app/campaigns/${encodeURIComponent(campaignId)}/settings`
-}
-
-export const settings = {
-  get: (campaignId, opts = {}) =>
-    isAnon() ? Promise.resolve(localStore.settings.get()) : request('GET', base(campaignId), opts),
-  put: (campaignId, input, opts = {}) =>
-    isAnon() ? Promise.resolve(localStore.settings.put(input)) : request('PUT', base(campaignId), { body: input, ...opts }),
-}
+export const settings = store.settings
