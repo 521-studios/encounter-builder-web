@@ -271,11 +271,6 @@ export function emptySkillCheck() {
   return withKey({ skill: '', dc: 0, description: '' })
 }
 
-// Serialize a skill check for the API: drop the client _key, trim the skill, coerce
-// dc to a whole number. Incomplete rows (no skill or dc < 1) are filtered by the
-// caller (the API requires skill + dc >= 1). dc is rounded because the API's Go
-// `int` rejects a fractional JSON number outright — which would fail the whole PUT
-// as an opaque "Save failed" (DCs are always whole anyway).
 export const SKILL_CHECK_DEGREES = ['crit_success', 'success', 'failure', 'crit_failure']
 export const SKILL_CHECK_DEGREE_LABELS = {
   crit_success: 'Critical Success',
@@ -284,6 +279,11 @@ export const SKILL_CHECK_DEGREE_LABELS = {
   crit_failure: 'Critical Failure',
 }
 
+// Serialize a skill check for the API: drop the client _key, trim the skill, coerce
+// dc to a whole number. Incomplete rows (no skill or dc < 1) are filtered by the
+// caller (the API requires skill + dc >= 1). dc is rounded because the API's Go
+// `int` rejects a fractional JSON number outright — which would fail the whole PUT
+// as an opaque "Save failed" (DCs are always whole anyway).
 export function skillCheckInput(s) {
   const { _key, ...rest } = s
   const out = { skill: (rest.skill || '').trim(), dc: Math.round(Number(rest.dc) || 0), description: rest.description || '' }

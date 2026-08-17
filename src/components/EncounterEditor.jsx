@@ -658,8 +658,16 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
             {/* Per-degree-of-success outcomes (native details — open when any is set). */}
             {!released && (
-              <details className="check-outcomes" open={SKILL_CHECK_DEGREES.some((d) => (s.outcomes?.[d] || '').trim())}>
-                <summary>Per-degree outcomes</summary>
+              // Uncontrolled <details> — a native toggle React never re-collapses; the
+              // summary shows how many degrees are set so it's discoverable when closed.
+              <details className="check-outcomes">
+                <summary>
+                  Per-degree outcomes
+                  {(() => {
+                    const n = SKILL_CHECK_DEGREES.filter((d) => (s.outcomes?.[d] || '').trim()).length
+                    return n ? ` (${n} set)` : ''
+                  })()}
+                </summary>
                 {SKILL_CHECK_DEGREES.map((d) => (
                   <label className="outcome field" key={d}>
                     <span>{SKILL_CHECK_DEGREE_LABELS[d]}</span>
