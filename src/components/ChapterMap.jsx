@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { buildChapterGraph } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
@@ -21,7 +21,9 @@ const ROOM_FILL = {
 
 export default function ChapterMap({ encounters, onOpenEncounter }) {
   const [collapsed, setCollapsed] = useState(false)
-  const { nodes, edges, layout, deadEnds, stats } = buildChapterGraph(encounters)
+  // The force layout is an iterative simulation — memoize on the encounters so it
+  // runs once per graph change, not every render (and stays visually stable).
+  const { nodes, edges, layout, deadEnds, stats } = useMemo(() => buildChapterGraph(encounters), [encounters])
 
   const width = Math.max(1, ...nodes.map((n) => layout[n.id].x + NODE_W + 24))
   const height = Math.max(1, ...nodes.map((n) => layout[n.id].y + NODE_H + 24))

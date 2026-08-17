@@ -71,13 +71,32 @@ test('buildChapterGraph: a pure tree (no cycles) reports zero loops', () => {
   assert.ok(g.deadEnds.has('2') && g.deadEnds.has('3'))
 })
 
-test('layerLayout: every node gets a position; a root sits in the first column', () => {
+test('layerLayout: every node gets a position, laid out in BFS columns', () => {
   const g = buildChapterGraph(chapter)
-  for (const n of g.nodes) assert.ok(g.layout[n.id], `no position for ${n.id}`)
-  // A1 has in-degree 1 (from A3) but there's no in-degree-0 node here (it's cyclic) —
-  // just assert positions are finite and distinct enough to render.
-  const xs = new Set(Object.values(g.layout).map((p) => p.x))
-  assert.ok(xs.size >= 1)
+  const pos = layerLayout(g.nodes, g.edges)
+  for (const n of g.nodes) assert.ok(pos[n.id], `no position for ${n.id}`)
+  const xs = new Set(Object.values(pos).map((p) => p.x))
+  assert.ok(xs.size >= 1) // one or more columns
+})
+
+test('forceLayout (the map layout): finite, BOUNDED positions + deterministic across runs', () => {
+  const g1 = buildChapterGraph(chapter)
+  // The frame clamp keeps positions within ~sqrt(N*60000) of the origin — without
+  // it the mutual repulsion balloons the layout to tens of thousands of px. Bound
+  // the assertion tightly so a regression removing the clamp fails here.
+  const bound = Math.sqrt(g1.nodes.length * 60000) + 100
+  for (const n of g1.nodes) {
+    const p = g1.layout[n.id]
+    assert.ok(p && Number.isFinite(p.x) && Number.isFinite(p.y), `bad position for ${n.id}`)
+    assert.ok(p.x >= 0 && p.y >= 0 && p.x <= bound && p.y <= bound, `unbounded position for ${n.id}: ${JSON.stringify(p)}`)
+  }
+  // No RNG → identical layout for identical input, so the map doesn't jitter on re-render.
+  assert.deepEqual(buildChapterGraph(chapter).layout, g1.layout)
+})
+
+test('forceLayout: a single node lays out at the origin margin', () => {
+  const g = buildChapterGraph([{ id: 1, name: 'Solo', exits: [] }])
+  assert.deepEqual(g.layout['1'], { x: 24, y: 24 })
 })
 
 test('layerLayout: disconnected components + an isolated node all get positions', () => {
