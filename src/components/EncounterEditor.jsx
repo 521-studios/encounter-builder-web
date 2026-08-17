@@ -23,6 +23,9 @@ import {
   emptySkillCheck,
   emptyExit,
   keyed,
+  skillCheckLabel,
+  SKILL_CHECK_DEGREES,
+  SKILL_CHECK_DEGREE_LABELS,
 } from '../model.js'
 import { resolveParty } from '../party.js'
 import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
@@ -215,6 +218,14 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     patch({ skill_checks: skillChecks.map((s, j) => (j === i ? { ...s, ...fields } : s)) })
   const addCheck = () => patch({ skill_checks: [...skillChecks, emptySkillCheck()] })
   const removeCheck = (i) => patch({ skill_checks: skillChecks.filter((_, j) => j !== i) })
+  // xhwl: alternative skills (OR) + per-degree outcomes on a check.
+  const addAlt = (i) => setCheck(i, { alternatives: [...(skillChecks[i].alternatives || []), { skill: '', dc: 0 }] })
+  const setAlt = (i, j, fields) =>
+    setCheck(i, { alternatives: (skillChecks[i].alternatives || []).map((a, k) => (k === j ? { ...a, ...fields } : a)) })
+  const removeAlt = (i, j) =>
+    setCheck(i, { alternatives: (skillChecks[i].alternatives || []).filter((_, k) => k !== j) })
+  const setOutcome = (i, degree, text) =>
+    setCheck(i, { outcomes: { ...(skillChecks[i].outcomes || {}), [degree]: text } })
 
   // Exits: the room's connectivity edges. Each targets another encounter (a soft
   // reference) or an external destination named by label. Empty rows drop on save.
@@ -564,32 +575,45 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         </p>
         {skillChecks.map((s, i) => (
           <div className="skill-check" data-testid="skill-check" key={s._key}>
-            <div className="skill-check-head">
-              <input
-                className="check-skill"
-                aria-label="check skill"
-                placeholder="Skill (e.g. Perception)"
-                value={s.skill || ''}
-                disabled={released}
-                onChange={(e) => setCheck(i, { skill: e.target.value })}
-              />
-              <input
-                type="number"
-                min="1"
-                step="1"
-                className="check-dc"
-                aria-label="check DC"
-                placeholder="DC"
-                value={s.dc || ''}
-                disabled={released}
-                onChange={(e) => setCheck(i, { dc: Number(e.target.value) })}
-              />
-              {!released && (
+            {released ? (
+              <div className="skill-check-head">
+                <span className="check-label" data-testid="check-label">{skillCheckLabel(s)}</span>
+              </div>
+            ) : (
+              <div className="skill-check-head">
+                <input
+                  className="check-skill"
+                  aria-label="check skill"
+                  placeholder="Skill (e.g. Perception)"
+                  value={s.skill || ''}
+                  onChange={(e) => setCheck(i, { skill: e.target.value })}
+                />
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="check-dc"
+                  aria-label="check DC"
+                  placeholder="DC"
+                  value={s.dc || ''}
+                  onChange={(e) => setCheck(i, { dc: Number(e.target.value) })}
+                />
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="check-successes"
+                  aria-label="required successes"
+                  title="Required successes to resolve (e.g. 4 successful checks)"
+                  placeholder="×1"
+                  value={s.successes || ''}
+                  onChange={(e) => setCheck(i, { successes: Number(e.target.value) })}
+                />
                 <button type="button" className="link danger" onClick={() => removeCheck(i)}>
                   remove
                 </button>
-              )}
-            </div>
+              </div>
+            )}
             {!released ? (
               <textarea
                 className="check-description"
@@ -601,6 +625,60 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
             ) : s.description ? (
               <WikiMarkdown text={s.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
             ) : null}
+
+            {/* Alternative skills (OR) — a check the party can pass with another skill+DC. */}
+            {!released && (
+              <div className="check-alts">
+                {(s.alternatives || []).map((a, j) => (
+                  <div className="check-alt" data-testid="check-alt" key={j}>
+                    <span className="muted">or</span>
+                    <input
+                      className="check-skill"
+                      aria-label="alternative skill"
+                      placeholder="Skill"
+                      value={a.skill || ''}
+                      onChange={(e) => setAlt(i, j, { skill: e.target.value })}
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      className="check-dc"
+                      aria-label="alternative DC"
+                      placeholder="DC"
+                      value={a.dc || ''}
+                      onChange={(e) => setAlt(i, j, { dc: Number(e.target.value) })}
+                    />
+                    <button type="button" className="link danger" onClick={() => removeAlt(i, j)}>remove</button>
+                  </div>
+                ))}
+                <button type="button" className="link add-alt" onClick={() => addAlt(i)}>+ alternative skill</button>
+              </div>
+            )}
+
+            {/* Per-degree-of-success outcomes (native details — open when any is set). */}
+            {!released && (
+              <details className="check-outcomes" open={SKILL_CHECK_DEGREES.some((d) => (s.outcomes?.[d] || '').trim())}>
+                <summary>Per-degree outcomes</summary>
+                {SKILL_CHECK_DEGREES.map((d) => (
+                  <label className="outcome field" key={d}>
+                    <span>{SKILL_CHECK_DEGREE_LABELS[d]}</span>
+                    <textarea
+                      aria-label={`${SKILL_CHECK_DEGREE_LABELS[d]} outcome`}
+                      value={s.outcomes?.[d] || ''}
+                      onChange={(e) => setOutcome(i, d, e.target.value)}
+                    />
+                  </label>
+                ))}
+              </details>
+            )}
+            {released && s.outcomes && SKILL_CHECK_DEGREES.some((d) => (s.outcomes[d] || '').trim()) && (
+              <ul className="check-outcomes-ro" data-testid="check-outcomes-ro">
+                {SKILL_CHECK_DEGREES.filter((d) => (s.outcomes[d] || '').trim()).map((d) => (
+                  <li key={d}><strong>{SKILL_CHECK_DEGREE_LABELS[d]}</strong> {s.outcomes[d]}</li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
         {!released && (

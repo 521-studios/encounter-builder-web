@@ -276,9 +276,39 @@ export function emptySkillCheck() {
 // caller (the API requires skill + dc >= 1). dc is rounded because the API's Go
 // `int` rejects a fractional JSON number outright — which would fail the whole PUT
 // as an opaque "Save failed" (DCs are always whole anyway).
+export const SKILL_CHECK_DEGREES = ['crit_success', 'success', 'failure', 'crit_failure']
+export const SKILL_CHECK_DEGREE_LABELS = {
+  crit_success: 'Critical Success',
+  success: 'Success',
+  failure: 'Failure',
+  crit_failure: 'Critical Failure',
+}
+
 export function skillCheckInput(s) {
   const { _key, ...rest } = s
-  return { skill: (rest.skill || '').trim(), dc: Math.round(Number(rest.dc) || 0), description: rest.description || '' }
+  const out = { skill: (rest.skill || '').trim(), dc: Math.round(Number(rest.dc) || 0), description: rest.description || '' }
+  // xhwl: richer structure, all optional. Successes only when >1 (1 is the default);
+  // alternatives dropped if incomplete (API requires skill + dc>=1); outcomes keep
+  // only the non-empty degrees.
+  const successes = Math.round(Number(rest.successes) || 0)
+  if (successes > 1) out.successes = successes
+  const alternatives = (rest.alternatives || [])
+    .map((a) => ({ skill: (a.skill || '').trim(), dc: Math.round(Number(a.dc) || 0) }))
+    .filter((a) => a.skill && a.dc >= 1)
+  if (alternatives.length) out.alternatives = alternatives
+  const outcomes = {}
+  for (const k of SKILL_CHECK_DEGREES) if ((rest.outcomes?.[k] || '').trim()) outcomes[k] = rest.outcomes[k]
+  if (Object.keys(outcomes).length) out.outcomes = outcomes
+  return out
+}
+
+// The one-line label for a skill check — "Perception DC 18", "Thievery DC 25 ×4",
+// "Thievery DC 22 or Religion DC 20". Shared by the read-only editor + print sheet.
+export function skillCheckLabel(s) {
+  let base = `${s.skill || 'Skill'}${s.dc ? ` DC ${s.dc}` : ''}`
+  if (Number(s.successes) > 1) base += ` ×${s.successes}`
+  for (const a of s.alternatives || []) if (a.skill && a.dc) base += ` or ${a.skill} DC ${a.dc}`
+  return base
 }
 
 // An exit / connectivity edge: a passage to another encounter (to_encounter_id, a
