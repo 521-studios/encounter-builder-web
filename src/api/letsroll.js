@@ -4,6 +4,8 @@
 // normal `Authorization: Bearer` header. lets-roll CORS allows *.521studios.com.
 import { config } from '../config.js'
 import { getToken } from './token.js'
+import { isAnon } from './anon.js'
+import { localStore } from '../store/localStore.js'
 
 export class LetsRollError extends Error {
   constructor(status, body) {
@@ -30,7 +32,10 @@ async function parseBody(res) {
 }
 
 // GET ${authority}/api/v1/games -> [{ id, name, gm_user_id, am_gm }]
+// In anon mode there's no lets-roll session — return the one synthetic campaign
+// the localStore backs, so CampaignList has something to show.
 export async function fetchGames({ tokenProvider = getToken, fetchImpl = fetch } = {}) {
+  if (isAnon()) return localStore.games()
   const token = await tokenProvider()
   const res = await fetchImpl(`${config.authority}/api/v1/games`, {
     headers: { Accept: 'application/json', ...letsRollHeaders(token) },

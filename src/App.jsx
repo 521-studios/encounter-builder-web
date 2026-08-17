@@ -5,6 +5,8 @@ import { setTokenProvider } from './api/token.js'
 import { fetchGames } from './api/letsroll.js'
 import { chapters as chaptersApi } from './api/chapters.js'
 import { parseLocation, urlFor } from './router.js'
+import { setAnon, isAnon } from './api/anon.js'
+import { LOCAL_CAMPAIGN } from './store/localStore.js'
 import CampaignList from './components/CampaignList.jsx'
 import CampaignSwitcher from './components/CampaignSwitcher.jsx'
 import ChapterTree from './components/ChapterTree.jsx'
@@ -14,6 +16,11 @@ import ChapterDetail from './components/ChapterDetail.jsx'
 
 // The API clients pull the bearer from the live OIDC session.
 setTokenProvider(getAccessToken)
+
+// Remembers that the user is in the no-sign-in ("quick") builder, so a reload
+// drops them back into it (their work lives in localStorage) instead of the
+// sign-in screen.
+const ANON_ACTIVE_KEY = 'eb:anon:active'
 
 export default function App() {
   const [status, setStatus] = useState('loading') // loading | anon | authed
@@ -102,6 +109,33 @@ export default function App() {
     }
   }, [])
 
+  // Enter the no-sign-in builder: flip the anon flag (API clients now delegate to
+  // the localStore), remember it for reload, and land in the single synthetic
+  // campaign's flat encounter list — or, on reload with a deep link, restore that
+  // view. Reuses the 'authed' shell; isAnon() distinguishes anon-only chrome.
+  const enterAnon = useCallback(async (rehydrate) => {
+    setAnon(true)
+    try { localStorage.setItem(ANON_ACTIVE_KEY, '1') } catch { /* storage unavailable — non-fatal */ }
+    const { campaignId } = parseLocation(window.location.search)
+    if (rehydrate && campaignId) {
+      await restoreFromSearch(window.location.search)
+    } else {
+      setCampaign(LOCAL_CAMPAIGN) // skip the campaign picker — quick tool has one
+      setView({ kind: 'empty' })
+    }
+    setStatus('authed')
+  }, [restoreFromSearch])
+
+  // Leave anon mode back to the sign-in screen. Work stays in localStorage, so
+  // re-entering restores it; we only clear the auto-re-enter flag.
+  const exitAnon = () => {
+    setAnon(false)
+    try { localStorage.removeItem(ANON_ACTIVE_KEY) } catch { /* non-fatal */ }
+    setCampaign(null)
+    setView({ kind: 'empty' })
+    setStatus('anon')
+  }
+
   useEffect(() => {
     if (booted.current) return // once, even under StrictMode (the auth code is single-use)
     booted.current = true
@@ -116,7 +150,12 @@ export default function App() {
       }
       const user = await getUser()
       if (!user) {
-        setStatus('anon')
+        // Auto-re-enter the quick builder if that's where the user was; else the
+        // sign-in screen (which also offers the no-sign-in path).
+        let wasAnon = false
+        try { wasAnon = localStorage.getItem(ANON_ACTIVE_KEY) === '1' } catch { /* non-fatal */ }
+        if (wasAnon) await enterAnon(true)
+        else setStatus('anon')
         return
       }
       // Restore the deep-linked view before revealing the app, so a reload lands back
@@ -125,7 +164,7 @@ export default function App() {
       setStatus('authed')
     })()
     return onUserChange((u) => setStatus(u ? 'authed' : 'anon'))
-  }, [restoreFromSearch])
+  }, [restoreFromSearch, enterAnon])
 
   // Reflect the current nav state in the URL so reload/back/forward and shareable
   // deep-links work. Guarded on a real change so restore (which sets state to match
@@ -151,9 +190,11 @@ export default function App() {
     <main className="app">
       <header className="topbar">
         <h1>Encounter Builder</h1>
-        {status === 'authed' && (
+        {isAnon() ? (
+          <button className="link" onClick={exitAnon}>Exit</button>
+        ) : status === 'authed' ? (
           <button className="link" onClick={() => logout()}>Sign out</button>
-        )}
+        ) : null}
       </header>
 
       {saveError && (
@@ -165,7 +206,14 @@ export default function App() {
 
       {status === 'loading' && <p>Loading…</p>}
       {status === 'anon' && (
-        <button className="primary" onClick={() => login()}>Sign in with lets-roll</button>
+        <div className="signin">
+          <button className="primary" onClick={() => login()}>Sign in with lets-roll</button>
+          <button className="link" onClick={() => enterAnon(false)}>Use without signing in</button>
+          <p className="signin-note">
+            No account needed — build an encounter with the full Pathfinder 2e bestiary and stat blocks.
+            Your work is saved in this browser.
+          </p>
+        </div>
       )}
       {status === 'authed' && !campaign && (
         <CampaignList
