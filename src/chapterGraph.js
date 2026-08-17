@@ -214,7 +214,9 @@ export function forceLayout(nodes, edges, { iterations = 400 } = {}) {
     temp = Math.max(temp - cool, k * 0.05)
   }
 
-  // Normalize to positive coords with a margin; convert centers → top-left corners.
+  // Translate to positive coords with a margin (same top-left convention as
+  // layerLayout — a uniform half-node offset from the sim's centres is harmless
+  // since every node + edge endpoint shifts together).
   const M = 24
   const minx = Math.min(...ids.map((id) => pos[id].x))
   const miny = Math.min(...ids.map((id) => pos[id].y))

@@ -79,14 +79,24 @@ test('layerLayout: every node gets a position, laid out in BFS columns', () => {
   assert.ok(xs.size >= 1) // one or more columns
 })
 
-test('forceLayout (the map layout): finite positions + deterministic across runs', () => {
+test('forceLayout (the map layout): finite, BOUNDED positions + deterministic across runs', () => {
   const g1 = buildChapterGraph(chapter)
+  // The frame clamp keeps positions within ~sqrt(N*60000) of the origin — without
+  // it the mutual repulsion balloons the layout to tens of thousands of px. Bound
+  // the assertion tightly so a regression removing the clamp fails here.
+  const bound = Math.sqrt(g1.nodes.length * 60000) + 100
   for (const n of g1.nodes) {
     const p = g1.layout[n.id]
-    assert.ok(p && Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.y >= 0, `bad position for ${n.id}`)
+    assert.ok(p && Number.isFinite(p.x) && Number.isFinite(p.y), `bad position for ${n.id}`)
+    assert.ok(p.x >= 0 && p.y >= 0 && p.x <= bound && p.y <= bound, `unbounded position for ${n.id}: ${JSON.stringify(p)}`)
   }
   // No RNG → identical layout for identical input, so the map doesn't jitter on re-render.
   assert.deepEqual(buildChapterGraph(chapter).layout, g1.layout)
+})
+
+test('forceLayout: a single node lays out at the origin margin', () => {
+  const g = buildChapterGraph([{ id: 1, name: 'Solo', exits: [] }])
+  assert.deepEqual(g.layout['1'], { x: 24, y: 24 })
 })
 
 test('layerLayout: disconnected components + an isolated node all get positions', () => {
