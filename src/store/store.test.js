@@ -68,6 +68,42 @@ test('api backend: remove drops the record from the cache', async () => {
   assert.equal(calls.filter((c) => c.method === 'GET').length, 2)
 })
 
+test('api backend: release writes through — the cache reflects the released status', async () => {
+  const calls = stubFetch((url, o) => {
+    if (o.method === 'POST') return res({ id: 'e1', name: 'A', status: 'released' })
+    return res({ id: 'e1', name: 'A', status: 'draft' }) // GET
+  })
+  await store.encounters.get('c1', 'e1') // caches draft (GET #1)
+  const released = await store.encounters.release('c1', 'e1') // POST /release
+  assert.equal(released.status, 'released')
+  const cached = await store.encounters.get('c1', 'e1') // from cache
+  assert.equal(cached.status, 'released')
+  assert.equal(calls.filter((c) => c.method === 'GET').length, 1, 'release updated the cache — no re-fetch')
+})
+
+test('api backend: list evicts a since-deleted record (map is replaced, not merged)', async () => {
+  let listing = [{ id: 'e1', name: 'A', status: 'draft' }, { id: 'e2', name: 'B', status: 'draft' }]
+  const calls = stubFetch((url, o) => {
+    if (o.method === 'GET' && url.endsWith('/encounters')) return res(listing)
+    return res({ id: 'e1', name: 'A', status: 'draft' }) // single GET
+  })
+  await store.encounters.list('c1') // caches e1, e2
+  listing = [{ id: 'e2', name: 'B', status: 'draft' }] // e1 deleted server-side
+  await store.encounters.list('c1') // cache map REPLACED → e1 gone
+  const before = calls.length
+  await store.encounters.get('c1', 'e1') // must re-fetch, not serve a stale cached e1
+  assert.equal(calls.length, before + 1, 'a since-deleted record does not linger in the cache')
+})
+
+test('cache is isolated per campaign (c1 record is not served for c2)', async () => {
+  const calls = stubFetch((url) => res({ id: 'e1', name: url.includes('/c1/') ? 'from-c1' : 'from-c2', status: 'draft' }))
+  const a = await store.encounters.get('c1', 'e1') // caches under c1
+  const b = await store.encounters.get('c2', 'e1') // different campaign → own fetch
+  assert.equal(a.name, 'from-c1')
+  assert.equal(b.name, 'from-c2')
+  assert.equal(calls.length, 2, 'c2 did not get served c1s cached record')
+})
+
 test('anon: the store routes to the local backend (no network)', async () => {
   setAnon(true)
   // No fetch stub — a network call would throw, proving the local path is taken.
