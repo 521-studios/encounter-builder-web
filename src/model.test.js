@@ -26,6 +26,7 @@ import {
   isCombatRoom,
   emptySkillCheck,
   skillCheckInput,
+  skillCheckLabel,
   emptyExit,
   exitInput,
   clearSaveErrorOnSave,
@@ -270,6 +271,39 @@ test('skillCheckInput trims skill, coerces dc to a whole number, drops _key', ()
   // A fractional DC is rounded — the API's Go int rejects a non-integer JSON number,
   // which would fail the whole PUT as an opaque "Save failed".
   assert.equal(skillCheckInput({ skill: 'Perception', dc: 12.5 }).dc, 13)
+})
+
+test('skillCheckInput serializes the richer fields (xhwl), omitting empties', () => {
+  const out = skillCheckInput({
+    _key: 'k',
+    skill: 'Thievery',
+    dc: 25,
+    successes: 4,
+    alternatives: [
+      { skill: '  Religion ', dc: '20' },
+      { skill: '', dc: 18 }, // incomplete → dropped
+      { skill: 'Arcana', dc: 0 }, // dc<1 → dropped
+    ],
+    outcomes: { crit_success: 'extra clue', success: '', failure: 'alarm', crit_failure: '   ' },
+  })
+  assert.equal(out.successes, 4)
+  assert.deepEqual(out.alternatives, [{ skill: 'Religion', dc: 20 }])
+  assert.deepEqual(out.outcomes, { crit_success: 'extra clue', failure: 'alarm' })
+
+  // Defaults stay absent: successes 1 (or 0), no alternatives, no outcomes.
+  const bare = skillCheckInput({ skill: 'Perception', dc: 12, successes: 1 })
+  assert.equal('successes' in bare, false)
+  assert.equal('alternatives' in bare, false)
+  assert.equal('outcomes' in bare, false)
+})
+
+test('skillCheckLabel renders base, successes, and alternatives', () => {
+  assert.equal(skillCheckLabel({ skill: 'Perception', dc: 18 }), 'Perception DC 18')
+  assert.equal(skillCheckLabel({ skill: 'Thievery', dc: 25, successes: 4 }), 'Thievery DC 25 ×4')
+  assert.equal(
+    skillCheckLabel({ skill: 'Thievery', dc: 22, alternatives: [{ skill: 'Religion', dc: 20 }] }),
+    'Thievery DC 22 or Religion DC 20',
+  )
 })
 
 test('toEncounterInput sends complete skill checks, drops rows missing skill or dc', () => {

@@ -7,6 +7,9 @@ import {
   isCustomTreasure,
   REWARD_KIND_LABELS,
   CURRENCIES,
+  skillCheckLabel,
+  SKILL_CHECK_DEGREES,
+  SKILL_CHECK_DEGREE_LABELS,
 } from '../model.js'
 import { BAND_LABELS } from '../pf2eRules.js'
 import { creatureHeader } from '../creatureHeader.js'
@@ -232,8 +235,15 @@ export default function EncounterPrintSheet({ enc, budget, effectiveParty, sibli
           <h2>Skill Checks</h2>
           {skillChecks.map((s, i) => (
             <div className="print-skill-check" key={s._key || i}>
-              <h3 className="print-entry-head">{s.skill || 'Skill'}{s.dc ? ` DC ${s.dc}` : ''}</h3>
+              <h3 className="print-entry-head">{skillCheckLabel(s)}</h3>
               {s.description && <WikiMarkdown text={s.description} encounters={siblings} onOpenEncounter={noop} />}
+              {s.outcomes && SKILL_CHECK_DEGREES.some((d) => (s.outcomes[d] || '').trim()) && (
+                <ul className="print-outcomes">
+                  {SKILL_CHECK_DEGREES.filter((d) => (s.outcomes[d] || '').trim()).map((d) => (
+                    <li key={d}><strong>{SKILL_CHECK_DEGREE_LABELS[d]}</strong> {s.outcomes[d]}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           ))}
         </section>

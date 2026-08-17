@@ -111,6 +111,21 @@ test('EncounterPrintSheet renders XP awards, rewards, skill checks, and exits re
   assert.match(document.body.textContent, /Exterior/)                        // external exit by label
 })
 
+test('EncounterPrintSheet renders rich skill checks (successes, alternatives, per-degree outcomes)', () => {
+  const enc = {
+    ...baseEnc,
+    skill_checks: [{
+      skill: 'Thievery', dc: 25, successes: 4,
+      alternatives: [{ skill: 'Religion', dc: 20 }],
+      outcomes: { crit_success: 'opens silently', failure: 'the lock jams' },
+    }],
+  }
+  render(<EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
+  assert.match(document.body.textContent, /Thievery DC 25 ×4 or Religion DC 20/) // label with successes + alt
+  assert.match(document.body.textContent, /Critical Success\s*opens silently/)
+  assert.match(document.body.textContent, /Failure\s*the lock jams/)
+})
+
 test('EncounterPrintSheet omits entity sections entirely when empty (no lazy stat-block fetch)', () => {
   render(<EncounterPrintSheet enc={baseEnc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
   assert.equal(screen.queryByTestId('print-monster'), null)
