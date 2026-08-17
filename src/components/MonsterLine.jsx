@@ -4,15 +4,18 @@ import { pfsrd2 } from '../api/pfsrd2.js'
 import { gameIdOf } from '../model.js'
 import { creatureHeader } from '../creatureHeader.js'
 import MonsterView from './MonsterView.jsx'
+import LoadoutView from './LoadoutView.jsx'
 
 // One monster row. Before a monster is chosen, a pfsrd2 search picker fills the
 // ref (and seeds the nickname with the monster's name). Once chosen it reads like
 // the book's creature stat header — name (+count), CREATURE level, source book +
 // page, Perception-based initiative — over the count/nickname/stat-block controls.
-export default function MonsterLine({ monster, entryOf, disabled, onChange, onRemove }) {
+export default function MonsterLine({ monster, entryOf, disabled, onChange, onRemove, onAddToTreasure }) {
   const set = (fields) => onChange({ ...monster, ...fields })
   const gameId = gameIdOf(monster) // pristine game_id, or a templated ref's base.game_id
   const [showBlock, setShowBlock] = useState(false)
+  const [showLoadout, setShowLoadout] = useState(false)
+  const loadoutCount = (monster.loadout || []).filter(gameIdOf).length
 
   if (!gameId) {
     return (
@@ -89,11 +92,22 @@ export default function MonsterLine({ monster, entryOf, disabled, onChange, onRe
         <button type="button" className="link" onClick={() => setShowBlock((s) => !s)}>
           {showBlock ? 'hide' : 'stat block'}
         </button>
+        <button type="button" className="link" onClick={() => setShowLoadout((s) => !s)}>
+          {showLoadout ? 'hide equipment' : `equipment${loadoutCount ? ` (${loadoutCount})` : ''}`}
+        </button>
         {!disabled && (
           <button type="button" className="link danger" onClick={onRemove}>Remove</button>
         )}
       </div>
       {showBlock && <MonsterView monster={monster} onChange={onChange} disabled={disabled} />}
+      {showLoadout && (
+        <LoadoutView
+          loadout={monster.loadout || []}
+          disabled={disabled}
+          onChange={(lo) => set({ loadout: lo })}
+          onSendToTreasure={(items) => onAddToTreasure && onAddToTreasure(items)}
+        />
+      )}
     </div>
   )
 }

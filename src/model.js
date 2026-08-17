@@ -81,7 +81,7 @@ export function keyed(e) {
   }
   return {
     ...e,
-    monsters: (e.monsters || []).map(withKey),
+    monsters: (e.monsters || []).map((m) => withKey({ ...m, loadout: (m.loadout || []).map(withKey) })),
     hazards: (e.hazards || []).map(withKey),
     afflictions: (e.afflictions || []).map(withKey),
     treasure,
@@ -190,7 +190,7 @@ export function toEncounterInput(enc) {
     chapter_id: enc.chapter_id || '',
     description: enc.description || '',
     notes: enc.notes || '',
-    monsters: (enc.monsters || []).filter(hasRef).map(stripKey),
+    monsters: (enc.monsters || []).filter(hasRef).map(monsterInput),
     hazards: (enc.hazards || []).filter(hasRef).map(stripKey),
     afflictions: (enc.afflictions || []).filter(hasRef).map(stripKey),
     treasure: (enc.treasure || []).filter(hasTreasureContent).map(treasureLineInput),
@@ -221,7 +221,33 @@ export function buildInput(enc) {
 }
 
 export function emptyMonster() {
-  return withKey({ ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '' })
+  return withKey({ ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '', loadout: [] })
+}
+
+// One piece of a monster's equipment loadout (0o77): a catalog or composed (runed)
+// item ref + qty (+ variant). Same ref shape as treasure — ItemComposeView authors
+// it, budget.js prices it, and "send to treasure" copies it into the loot.
+export function emptyLoadoutItem() {
+  return withKey({ ref: { game_id: '' }, qty: 1, variant: '' })
+}
+
+// Serialize a loadout item for the API: drop _key, keep ref opaque, floor qty at 1,
+// include variant only when set.
+export function loadoutItemInput(item) {
+  const { _key, ...rest } = item
+  return {
+    ref: rest.ref,
+    qty: Math.max(1, Math.round(Number(rest.qty) || 1)),
+    ...(rest.variant ? { variant: rest.variant } : {}),
+  }
+}
+
+// Serialize a monster line: drop _key and clean its loadout (drop ref-less rows +
+// their _keys). Loadout is omitted when empty so the wire stays minimal.
+export function monsterInput(m) {
+  const { _key, loadout, ...rest } = m
+  const lo = (loadout || []).filter(hasRef).map(loadoutItemInput)
+  return lo.length ? { ...rest, loadout: lo } : rest
 }
 
 // A hazard row: ref + count (a haunt/hazard has no elite/weak, so no adjustment).
