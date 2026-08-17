@@ -26,5 +26,9 @@ for (const key of [
 ]) {
   if (window[key] !== undefined && globalThis[key] === undefined) globalThis[key] = window[key]
 }
+// localStorage is a bare global in the browser; expose jsdom's so code that
+// persists to it (e.g. the anon localStore) exercises the real path in tests.
+if (globalThis.localStorage === undefined) globalThis.localStorage = window.localStorage
+
 // React 18 wants this flag set to route state updates through act() cleanly.
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
