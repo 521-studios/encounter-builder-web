@@ -16,6 +16,7 @@
 import { request } from '../api/client.js'
 import { isAnon } from '../api/anon.js'
 import { localStore } from './localStore.js'
+import { buildInput } from '../model.js'
 
 const enc = encodeURIComponent
 const encBase = (cid) => `/api/app/campaigns/${enc(cid)}/encounters`
@@ -90,6 +91,84 @@ export function resetStore(cid) {
   else cache.delete(String(cid))
 }
 
+// ─── flush layer (rtd8b): optimistic write-behind over the working set ───
+//
+// edit(cid, id, record, handlers) writes the (rich, keyed) record into the cache
+// — the WORKING COPY — marks it dirty, and debounces a backend write. This is the
+// forward-compatible store-first seam: today the editor mirrors its local `enc`
+// into edit() on each keystroke; later the editor drops local state and `patch`
+// IS edit(), with the flush layer unchanged. buildInput() is applied at flush
+// time, so the store holds exactly the record the editor will one day render from.
+//
+// Per-record flush state (saved|unsaved|saving|error) is observable via
+// subscribeFlush + flushState, for the editor's Saving… indicator today and the
+// record itself under store-first later. handlers.{onSaved,onError} carry the
+// app-callback logic (sidebar refresh / error banner) that stays in the editor
+// for now; the flush mechanics (debounce, mid-flight coalescing, retry-on-next-
+// edit, flush-on-leave) live here.
+const AUTOSAVE_MS = 800
+const meta = new Map() // `${cid}::${id}` -> { dirty, saving, state, timer, handlers }
+const flushListeners = new Set()
+const mkey = (cid, id) => `${String(cid)}::${String(id)}`
+function metaOf(cid, id) {
+  const k = mkey(cid, id)
+  let x = meta.get(k)
+  if (!x) {
+    x = { dirty: false, saving: false, state: 'saved', timer: null, handlers: {} }
+    meta.set(k, x)
+  }
+  return x
+}
+function notifyFlush() {
+  for (const l of flushListeners) l()
+}
+function setFlushState(x, state) {
+  if (x.state !== state) {
+    x.state = state
+    notifyFlush()
+  }
+}
+
+export function subscribeFlush(listener) {
+  flushListeners.add(listener)
+  return () => flushListeners.delete(listener)
+}
+export function flushState(cid, id) {
+  return meta.get(mkey(cid, id))?.state || 'saved'
+}
+// Test isolation: drop timers + flush metadata.
+export function resetFlush() {
+  for (const x of meta.values()) if (x.timer) clearTimeout(x.timer)
+  meta.clear()
+}
+
+// The coalescing save loop, lifted verbatim in spirit from EncounterEditor: read
+// the freshest working copy each pass so overlapping edits can't reorder; on
+// failure keep dirty (retry on the next edit) and surface via handlers.onError.
+async function runFlush(cid, id) {
+  const x = metaOf(cid, id)
+  if (x.saving || !x.dirty) return
+  x.saving = true
+  setFlushState(x, 'saving')
+  try {
+    while (x.dirty) {
+      x.dirty = false
+      const rec = slice(cid).encounters.get(String(id))
+      if (!rec) break // removed mid-flush — nothing to persist
+      const saved = await backend().encounters.update(cid, id, buildInput(rec))
+      x.handlers.onSaved && x.handlers.onSaved(saved)
+    }
+    setFlushState(x, 'saved')
+  } catch (e) {
+    x.dirty = true // retry on the next edit, not on a timer
+    setFlushState(x, 'error')
+    x.handlers.onError && x.handlers.onError(e)
+  } finally {
+    x.saving = false
+    notifyFlush()
+  }
+}
+
 export const store = {
   encounters: {
     // Fresh from the backend; replaces the cached working set for this campaign.
@@ -127,6 +206,44 @@ export const store = {
       const rec = await backend().encounters.release(cid, id, opts)
       slice(cid).encounters.set(String(id), rec)
       return rec
+    },
+
+    // Optimistic edit: update the working copy now (instant UI), debounce the
+    // backend write. handlers.{onSaved,onError} are refreshed each call so the
+    // flush always uses the latest closures. rtd8b's write path — the editor
+    // calls this on every change instead of PUTting on a timer itself.
+    edit(cid, id, record, handlers = {}) {
+      slice(cid).encounters.set(String(id), record)
+      const x = metaOf(cid, id)
+      x.handlers = handlers
+      x.dirty = true
+      if (x.state !== 'saving') setFlushState(x, 'unsaved')
+      if (x.timer) clearTimeout(x.timer)
+      x.timer = setTimeout(() => runFlush(cid, id), AUTOSAVE_MS)
+    },
+
+    // Flush any pending edit now (leaving the editor). Returns the flush promise
+    // so a caller can await it; safe to call when nothing is pending.
+    flush(cid, id) {
+      const x = metaOf(cid, id)
+      if (x.timer) {
+        clearTimeout(x.timer)
+        x.timer = null
+      }
+      return runFlush(cid, id)
+    },
+
+    // Drop a pending debounced flush without persisting — for callers that take
+    // over the write explicitly (release, which saves-then-releases) or make it
+    // moot (delete). Clears the timer + dirty so the flush-on-leave can't re-fire.
+    cancel(cid, id) {
+      const x = metaOf(cid, id)
+      if (x.timer) {
+        clearTimeout(x.timer)
+        x.timer = null
+      }
+      x.dirty = false
+      setFlushState(x, 'saved')
     },
   },
   // Chapters have no per-record read (only list), so they pass through — list is
