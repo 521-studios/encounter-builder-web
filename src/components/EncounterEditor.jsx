@@ -28,6 +28,7 @@ import {
   SKILL_CHECK_DEGREE_LABELS,
 } from '../model.js'
 import { resolveParty } from '../party.js'
+import { naturalSort } from '../sort.js'
 import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
 import MonsterLine from './MonsterLine.jsx'
@@ -241,7 +242,12 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   // Exits: the room's connectivity edges. Each targets another encounter (a soft
   // reference) or an external destination named by label. Empty rows drop on save.
   const exits = enc.exits || []
-  const exitTargets = siblingEncounters.filter((e) => String(e.id) !== String(encounterId)) // not self
+  // Sibling encounters for the exit-destination picker — natural-sorted (A1, A2,
+  // A3, A10, A25 — not lexical/creation order), matching the sidebar + rollup.
+  const exitTargets = naturalSort(
+    siblingEncounters.filter((e) => String(e.id) !== String(encounterId)), // not self
+    (e) => e.name || '',
+  )
   const setExit = (i, fields) =>
     patch({ exits: exits.map((e, j) => (j === i ? { ...e, ...fields } : e)) })
   const addExit = () => patch({ exits: [...exits, emptyExit()] })
