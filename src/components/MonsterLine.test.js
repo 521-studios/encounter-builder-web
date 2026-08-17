@@ -1,6 +1,6 @@
 import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import MonsterLine from './MonsterLine.jsx'
 
 afterEach(() => cleanup())
@@ -88,4 +88,22 @@ test('MonsterLine falls back to snapshot.stat_block.name when the snapshot has n
   const { container } = render(<MonsterLine monster={monster} entryOf={entryOf} onChange={noop} onRemove={noop} />)
   assert.match(container.textContent, /Weak Slurk/) // from stat_block.name
   assert.doesNotMatch(container.textContent, /Monsters:99/) // never the raw base game_id
+})
+
+// 0o77: the equipment (loadout) toggle + a count badge, and "+ equipment" adds a row.
+test('MonsterLine toggles a loadout editor and "+ equipment" adds an item row', () => {
+  let captured = null
+  const monster = { ref: { game_id: 'Monsters:1' }, count: 1, nickname: '', adjustment: 'none', loadout: [] }
+  render(<MonsterLine monster={monster} entryOf={entryOf} onChange={(m) => (captured = m)} onRemove={noop} onAddToTreasure={noop} />)
+  fireEvent.click(screen.getByRole('button', { name: /^equipment/ }))
+  assert.ok(screen.getByTestId('loadout'), 'loadout editor shows on toggle')
+  fireEvent.click(screen.getByRole('button', { name: /\+ equipment/ }))
+  assert.equal(captured.loadout.length, 1, '+ equipment appended a loadout row')
+})
+
+test('MonsterLine shows a loadout count badge on the equipment toggle', () => {
+  const monster = { ref: { game_id: 'Monsters:1' }, count: 1, nickname: '', adjustment: 'none', loadout: [{ ref: { game_id: 'shortsword' } }] }
+  // Don't open the editor (that would mount ItemComposeView + fetch) — the badge is on the button.
+  render(<MonsterLine monster={monster} entryOf={entryOf} onChange={noop} onRemove={noop} onAddToTreasure={noop} />)
+  assert.ok(screen.getByRole('button', { name: /equipment \(1\)/ }))
 })
