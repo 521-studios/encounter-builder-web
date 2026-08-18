@@ -92,10 +92,11 @@ test('buildChapterGraph: reciprocal doors collapse to one two-way passage; corri
   assert.deepEqual([...g.deadEnds].sort(), ['1', '3']) // A and C
 })
 
-test('buildChapterGraph: a self-exit and an empty exit are dropped (no passage, no port)', () => {
-  const g = buildChapterGraph([{ id: 1, name: 'A', exits: [{ to_encounter_id: '1' }, {}] }]) // self-ref + empty
-  assert.equal(g.passages.length, 0)
-  assert.equal(g.exitPorts.length, 0)
+test('buildChapterGraph: a self-exit is dropped; a blank exit becomes a boundary port', () => {
+  const g = buildChapterGraph([{ id: 1, name: 'A', exits: [{ to_encounter_id: '1' }, {}] }]) // self-ref + blank
+  assert.equal(g.passages.length, 0) // the self-reference makes no passage
+  assert.equal(g.exitPorts.length, 1) // the blank "— External —" placeholder shows as a port
+  assert.equal(g.exitPorts[0].name, 'Exit') // unlabeled → falls back to "Exit"
 })
 
 test('boundaryPoint: crosses the box edge nearest the incoming direction; centre on coincidence', () => {
