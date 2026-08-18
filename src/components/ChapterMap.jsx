@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { ReactFlow, Background, Controls, MiniMap, Handle, Position, MarkerType, useNodesState } from '@xyflow/react'
+import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { buildChapterGraph } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
@@ -21,10 +21,22 @@ const ROOM_FILL = {
   empty: '#e6e6e6',
 }
 
-// A room card node. Handles are centred + hidden so edges draw room-to-room like the
-// old SVG (the opaque card hides the stub under it); click opens the encounter.
+// A room card node. Both handles sit at the node's EXACT centre (hidden), so a
+// straight edge runs centre-to-centre and the opaque card hides the stub under it —
+// no curve pulling toward a top/side handle. Click opens the encounter.
 function RoomNode({ data }) {
-  const centred = { left: '50%', top: '50%', opacity: 0, pointerEvents: 'none' }
+  const centred = {
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 1,
+    height: 1,
+    minWidth: 1,
+    minHeight: 1,
+    border: 'none',
+    opacity: 0,
+    pointerEvents: 'none',
+  }
   return (
     <div
       className="map-room"
@@ -71,8 +83,8 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
         id: `e${i}`,
         source: e.from,
         target: e.to,
+        type: 'straight', // straight centre-to-centre line, not a bezier curving to a handle
         label: e.label || undefined,
-        markerEnd: { type: MarkerType.ArrowClosed, color: e.isLoop ? '#b8860b' : '#8a8f98', width: 18, height: 18 },
         style: { stroke: e.isLoop ? '#b8860b' : '#8a8f98', strokeWidth: e.isLoop ? 2.5 : 1.6 },
         labelStyle: { fill: '#cbd0d6', fontSize: 11 },
         labelBgStyle: { fill: '#1b1f22', fillOpacity: 0.85 },
@@ -121,7 +133,7 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
               </ReactFlow>
             </div>
             <p className="map-legend muted">
-              Lines are <strong>exits</strong> between rooms (arrow = direction) · <span style={{ color: '#b8860b' }}>gold</span> = a loop ·
+              Lines are <strong>exits</strong> between rooms · <span style={{ color: '#b8860b' }}>gold</span> = a loop ·
               red outline = dead-end. Drag the canvas to pan, scroll to zoom, drag a room to rearrange, click a room to open it.
             </p>
           </>
