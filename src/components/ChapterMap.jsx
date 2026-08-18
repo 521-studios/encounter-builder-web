@@ -74,10 +74,18 @@ function PassageEdge({ source, target, data }) {
   const sc = boxOf(s)
   const tc = boxOf(t)
   const [path] = getStraightPath({ sourceX: sc.x, sourceY: sc.y, targetX: tc.x, targetY: tc.y })
-  const tb = boundaryPoint(sc, tc) // target card edge — arrow + target label
-  const sb = boundaryPoint(tc, sc) // source card edge — source label
+  const tb = boundaryPoint(sc, tc) // target card edge — arrow sits here
+  const sb = boundaryPoint(tc, sc) // source card edge
   const secret = data.sourceSecret || data.targetSecret
   const ang = (Math.atan2(tb.y - sc.y, tb.x - sc.x) * 180) / Math.PI
+  // Push each label a bit off its own card, into the open gap along the line, so the
+  // node doesn't cover it. Unit vector source→target.
+  const len = Math.hypot(tc.x - sc.x, tc.y - sc.y) || 1
+  const ux = (tc.x - sc.x) / len
+  const uy = (tc.y - sc.y) / len
+  const OFF = 20
+  const sLabel = { x: sb.x + ux * OFF, y: sb.y + uy * OFF } // just past the source card
+  const tLabel = { x: tb.x - ux * OFF, y: tb.y - uy * OFF } // just past the target card
   return (
     <>
       <path className="react-flow__edge-path" d={path} fill="none" stroke={EDGE_COLOR} strokeWidth={1.6} strokeDasharray={secret ? '6 4' : undefined} />
@@ -88,13 +96,13 @@ function PassageEdge({ source, target, data }) {
       )}
       <EdgeLabelRenderer>
         {data.sourceLabel && (
-          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${sb.x}px, ${sb.y}px)` }}>
+          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${sLabel.x}px, ${sLabel.y}px)` }}>
             {data.sourceSecret ? '🔒 ' : ''}
             {data.sourceLabel}
           </div>
         )}
         {data.targetLabel && (
-          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${tb.x}px, ${tb.y}px)` }}>
+          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${tLabel.x}px, ${tLabel.y}px)` }}>
             {data.targetSecret ? '🔒 ' : ''}
             {data.targetLabel}
           </div>

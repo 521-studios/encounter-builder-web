@@ -194,7 +194,9 @@ button.encounter { flex: 1; text-align: left; }
 .chapter-map { display: grid; gap: 0.5rem; min-width: 0; }
 /* Fill most of the viewport below the top chrome (topbar + sticky chapter header +
    map title) instead of a fixed 60vh that left a big empty buffer at the bottom. */
-.map-canvas { height: calc(100vh - 210px); min-height: 420px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+/* Height leaves room for the top chrome + the map title + the legend line below, so
+   the pane doesn't overflow into a scrollbar (the fixed chrome doesn't scale with vh). */
+.map-canvas { height: calc(100vh - 300px); min-height: 380px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .map-room {
   width: 132px;
   padding: 6px 8px;
