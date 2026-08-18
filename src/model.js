@@ -227,7 +227,10 @@ export function toEncounterInput(enc) {
     room_type: enc.room_type || 'combat',
     rewards: (enc.rewards || []).map(rewardInput).filter((r) => r.label),
     skill_checks: (enc.skill_checks || []).map(skillCheckInput).filter((s) => s.skill && s.dc >= 1),
-    exits: (enc.exits || []).map(exitInput).filter((e) => e.to_encounter_id || e.label),
+    // Keep every exit row, INCLUDING blank ones — a "+ exit" placeholder must persist
+    // so it survives a navigate-away before the GM fills in the target/label (the map
+    // ignores empty exits; the API accepts them). Don't filter here.
+    exits: (enc.exits || []).map(exitInput),
     currency: enc.currency || {},
   }
   // Party overrides use the shared clear-encoding: set when overridden, omitted
