@@ -4,7 +4,7 @@
 // without fetching; the TreasureBudget component wires the real fetched entries.
 import { itemPriceCp, creatureLevel, coinsToCp } from '@521studios/pfsrd2-display'
 import { creatureXp, encounterThreat, treasureBudget } from './pf2eRules.js'
-import { isCustomTreasure, isCombatRoom } from './model.js'
+import { isCustomTreasure, isCombatRoom, challengeMonsters, challengeHazards, challengeAfflictions } from './model.js'
 
 // refGameId: the game_id a monster/treasure ref resolves to — a pristine ref, or
 // a derived (templated/runed) ref's base.game_id.
@@ -165,9 +165,9 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
   for (const enc of encounters || []) {
     const { level, size } = partyFor(enc)
     const { cp, unpriced } = treasureValueCp(enc.treasure, enc.currency, entryOf)
-    const { xp: mXp, unknown: mUnknown } = encounterXp(enc.monsters, level, entryOf)
-    const { xp: hXp, unknown: hUnknown } = hazardXp(enc.hazards, level, entryOf)
-    const { xp: aXp, unknown: aUnknown } = afflictionXp(enc.afflictions, level, entryOf)
+    const { xp: mXp, unknown: mUnknown } = encounterXp(challengeMonsters(enc), level, entryOf)
+    const { xp: hXp, unknown: hUnknown } = hazardXp(challengeHazards(enc), level, entryOf)
+    const { xp: aXp, unknown: aUnknown } = afflictionXp(challengeAfflictions(enc), level, entryOf)
     const xp = mXp + hXp + aXp
     const unknown = [...mUnknown, ...hUnknown, ...aUnknown]
     // Non-combat rooms (hazard/haunt/social/knowledge/…) have no meaningful combat
@@ -235,17 +235,17 @@ export function rollupByChapter(chapters, encounters, entryOf, partyFor) {
 // destroyed treasure). Used to batch the entry fetches.
 export function gameIdsInEncounter(enc) {
   const ids = new Set()
-  for (const m of enc?.monsters || []) {
+  for (const m of challengeMonsters(enc)) {
     if (!isDerived(m.ref)) {
       const g = refGameId(m.ref)
       if (g) ids.add(g)
     }
   }
-  for (const h of enc?.hazards || []) {
+  for (const h of challengeHazards(enc)) {
     const g = refGameId(h.ref)
     if (g) ids.add(g)
   }
-  for (const a of enc?.afflictions || []) {
+  for (const a of challengeAfflictions(enc)) {
     const g = refGameId(a.ref)
     if (g) ids.add(g)
   }

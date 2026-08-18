@@ -14,32 +14,23 @@ import {
   REWARD_KIND_LABELS,
   buildInput,
   encounterBlocks,
-  challengeBlocks,
   reindexEditingAfterRemove,
-  emptyMonster,
-  emptyHazard,
-  emptyAffliction,
+  reorderById,
   emptyTreasure,
   emptyPool,
   emptyAward,
   emptyReward,
-  emptySkillCheck,
   emptyExit,
   incomingLinks,
   keyed,
-  skillCheckLabel,
-  SKILL_CHECK_DEGREES,
-  SKILL_CHECK_DEGREE_LABELS,
 } from '../model.js'
 import { resolveParty } from '../party.js'
 import { naturalSort } from '../sort.js'
 import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
-import MonsterLine from './MonsterLine.jsx'
-import HazardLine from './HazardLine.jsx'
-import AfflictionLine from './AfflictionLine.jsx'
 import WikiMarkdown from './WikiMarkdown.jsx'
 import MarkdownSections from './MarkdownSections.jsx'
+import ChallengeList from './ChallengeList.jsx'
 import TreasurePoolSection from './TreasurePoolSection.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
@@ -68,7 +59,6 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
   const [partyContextError, setPartyContextError] = useState(false) // chapters/settings load failed
   const [descEditing, setDescEditing] = useState(() => new Set()) // Description blocks in edit (vs preview) mode
-  const [chalEditing, setChalEditing] = useState(() => new Set()) // Challenges blocks in edit mode
 
   // encRef exposes the latest working copy to the flush handlers (for the error
   // label); syncedRef is the last sidebar-visible signature we told the parent
@@ -179,13 +169,11 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     setEnc(next)
     encounters.edit(campaignId, encounterId, next, { onSaved: onFlushSaved, onError: onFlushError })
   }
-  const monsters = enc.monsters || []
-  const hazards = enc.hazards || []
-  const afflictions = enc.afflictions || []
   const treasure = enc.treasure || []
-  // A room with no monsters/hazards/afflictions has no combat difficulty to show —
+  const challenges = enc.challenges || []
+  // A room with no monster/hazard/affliction challenge has no combat difficulty to show —
   // suppress the "Trivial 1" band and fall back to the room-type label.
-  const hasChallenges = monsters.length > 0 || hazards.length > 0 || afflictions.length > 0
+  const hasChallenges = challenges.some((c) => c.type === 'monster' || c.type === 'hazard' || c.type === 'affliction')
 
   // Titled markdown blocks. Two independent lists — text_blocks (Description) and
   // challenge_blocks (Challenges) — each with its own edit-set; a factory keeps their
@@ -201,13 +189,15 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     remove: (i) => { patch({ [field]: list.filter((_, j) => j !== i) }); setEditing((s) => reindexEditingAfterRemove(s, i)) },
   })
   const descBlocks = encounterBlocks(enc)
-  const chalBlocks = challengeBlocks(enc)
   const descH = blockHandlers('text_blocks', descBlocks, setDescEditing)
-  const chalH = blockHandlers('challenge_blocks', chalBlocks, setChalEditing)
 
-  const setMonster = (i, m) => patch({ monsters: monsters.map((x, j) => (j === i ? m : x)) })
-  const setHazard = (i, h) => patch({ hazards: hazards.map((x, j) => (j === i ? h : x)) })
-  const setAffliction = (i, a) => patch({ afflictions: afflictions.map((x, j) => (j === i ? a : x)) })
+  // Unified Challenges list handlers (monster/hazard/affliction/skill-check/markdown,
+  // one ordered array). Adding takes a ready-built item so ChallengeList owns its id.
+  const setChallengeItem = (id, fields) => patch({ challenges: challenges.map((c) => (c.id === id ? { ...c, ...fields } : c)) })
+  const addChallengeItem = (item) => patch({ challenges: [...challenges, item] })
+  const removeChallengeItem = (id) => patch({ challenges: challenges.filter((c) => c.id !== id) })
+  const reorderChallenges = (fromId, toId) => patch({ challenges: reorderById(challenges, fromId, toId) })
+
   const setTreasure = (i, t) => patch({ treasure: treasure.map((x, j) => (j === i ? t : x)) })
 
   // Treasure pools: loot grouped by where it's found. Every encounter with treasure
@@ -264,22 +254,6 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     patch({ rewards: rewards.map((r, j) => (j === i ? { ...r, ...fields } : r)) })
   const addReward = () => patch({ rewards: [...rewards, emptyReward()] })
   const removeReward = (i) => patch({ rewards: rewards.filter((_, j) => j !== i) })
-
-  // Structured skill checks / discovery entries (skill + DC + effect). Rows missing
-  // a skill or DC are dropped on save (model.js).
-  const skillChecks = enc.skill_checks || []
-  const setCheck = (i, fields) =>
-    patch({ skill_checks: skillChecks.map((s, j) => (j === i ? { ...s, ...fields } : s)) })
-  const addCheck = () => patch({ skill_checks: [...skillChecks, emptySkillCheck()] })
-  const removeCheck = (i) => patch({ skill_checks: skillChecks.filter((_, j) => j !== i) })
-  // xhwl: alternative skills (OR) + per-degree outcomes on a check.
-  const addAlt = (i) => setCheck(i, { alternatives: [...(skillChecks[i].alternatives || []), { skill: '', dc: 0 }] })
-  const setAlt = (i, j, fields) =>
-    setCheck(i, { alternatives: (skillChecks[i].alternatives || []).map((a, k) => (k === j ? { ...a, ...fields } : a)) })
-  const removeAlt = (i, j) =>
-    setCheck(i, { alternatives: (skillChecks[i].alternatives || []).filter((_, k) => k !== j) })
-  const setOutcome = (i, degree, text) =>
-    setCheck(i, { outcomes: { ...(skillChecks[i].outcomes || {}), [degree]: text } })
 
   // Exits: the room's connectivity edges. Each targets another encounter (a soft
   // reference) or an external destination named by label. Empty rows drop on save.
@@ -479,201 +453,17 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
         {tab === 'challenges' && (
           <div role="tabpanel" id="encpanel-challenges" aria-labelledby="enctab-challenges">
-            <fieldset>
-              <legend>Monsters</legend>
-              {monsters.map((m, i) => (
-                <MonsterLine
-                  key={m._key}
-                  monster={m}
-                  entryOf={budget.entryOf}
-                  disabled={released}
-                  onChange={(m2) => setMonster(i, m2)}
-                  onRemove={() => patch({ monsters: monsters.filter((_, j) => j !== i) })}
-                  onAddToTreasure={addLoadoutToTreasure}
-                />
-              ))}
-              {!released && (
-                <button type="button" onClick={() => patch({ monsters: [...monsters, emptyMonster()] })}>
-                  + monster
-                </button>
-              )}
-            </fieldset>
-
-            <fieldset>
-              <legend>Hazards</legend>
-              {hazards.map((h, i) => (
-                <HazardLine
-                  key={h._key}
-                  hazard={h}
-                  entryOf={budget.entryOf}
-                  disabled={released}
-                  onChange={(h2) => setHazard(i, h2)}
-                  onRemove={() => patch({ hazards: hazards.filter((_, j) => j !== i) })}
-                />
-              ))}
-              {!released && (
-                <button type="button" onClick={() => patch({ hazards: [...hazards, emptyHazard()] })}>
-                  + hazard
-                </button>
-              )}
-            </fieldset>
-
-            <fieldset>
-              <legend>Afflictions</legend>
-              {afflictions.map((a, i) => (
-                <AfflictionLine
-                  key={a._key}
-                  affliction={a}
-                  entryOf={budget.entryOf}
-                  disabled={released}
-                  onChange={(a2) => setAffliction(i, a2)}
-                  onRemove={() => patch({ afflictions: afflictions.filter((_, j) => j !== i) })}
-                />
-              ))}
-              {!released && (
-                <button type="button" onClick={() => patch({ afflictions: [...afflictions, emptyAffliction()] })}>
-                  + affliction
-                </button>
-              )}
-            </fieldset>
-
-            <fieldset>
-              <legend>Skill checks</legend>
-              <p className="muted">
-                Structured discovery checks — skill + DC + what it reveals. Surfaced at the
-                table instead of buried in the description.
-              </p>
-              {skillChecks.map((s, i) => (
-                <div className="skill-check" data-testid="skill-check" key={s._key}>
-                  {released ? (
-                    <div className="skill-check-head">
-                      <span className="check-label" data-testid="check-label">{skillCheckLabel(s)}</span>
-                    </div>
-                  ) : (
-                    <div className="skill-check-head">
-                      <input
-                        className="check-skill"
-                        aria-label="check skill"
-                        placeholder="Skill (e.g. Perception)"
-                        value={s.skill || ''}
-                        onChange={(e) => setCheck(i, { skill: e.target.value })}
-                      />
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        className="check-dc"
-                        aria-label="check DC"
-                        placeholder="DC"
-                        value={s.dc || ''}
-                        onChange={(e) => setCheck(i, { dc: Number(e.target.value) })}
-                      />
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        className="check-successes"
-                        aria-label="required successes"
-                        title="Required successes to resolve (e.g. 4 successful checks)"
-                        placeholder="×1"
-                        value={s.successes || ''}
-                        onChange={(e) => setCheck(i, { successes: Number(e.target.value) })}
-                      />
-                      <button type="button" className="link danger" onClick={() => removeCheck(i)}>
-                        remove
-                      </button>
-                    </div>
-                  )}
-                  {!released ? (
-                    <textarea
-                      className="check-description"
-                      aria-label="check effect"
-                      placeholder="What it reveals / does (markdown)"
-                      value={s.description || ''}
-                      onChange={(e) => setCheck(i, { description: e.target.value })}
-                    />
-                  ) : s.description ? (
-                    <WikiMarkdown text={s.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
-                  ) : null}
-
-                  {/* Alternative skills (OR) — a check the party can pass with another skill+DC. */}
-                  {!released && (
-                    <div className="check-alts">
-                      {(s.alternatives || []).map((a, j) => (
-                        <div className="check-alt" data-testid="check-alt" key={j}>
-                          <span className="muted">or</span>
-                          <input
-                            className="check-skill"
-                            aria-label="alternative skill"
-                            placeholder="Skill"
-                            value={a.skill || ''}
-                            onChange={(e) => setAlt(i, j, { skill: e.target.value })}
-                          />
-                          <input
-                            type="number"
-                            min="1"
-                            step="1"
-                            className="check-dc"
-                            aria-label="alternative DC"
-                            placeholder="DC"
-                            value={a.dc || ''}
-                            onChange={(e) => setAlt(i, j, { dc: Number(e.target.value) })}
-                          />
-                          <button type="button" className="link danger" onClick={() => removeAlt(i, j)}>remove</button>
-                        </div>
-                      ))}
-                      <button type="button" className="link add-alt" onClick={() => addAlt(i)}>+ alternative skill</button>
-                    </div>
-                  )}
-
-                  {/* Per-degree-of-success outcomes (native details — open when any is set). */}
-                  {!released && (
-                    // Uncontrolled <details> — a native toggle React never re-collapses; the
-                    // summary shows how many degrees are set so it's discoverable when closed.
-                    <details className="check-outcomes">
-                      <summary>
-                        Per-degree outcomes
-                        {(() => {
-                          const n = SKILL_CHECK_DEGREES.filter((d) => (s.outcomes?.[d] || '').trim()).length
-                          return n ? ` (${n} set)` : ''
-                        })()}
-                      </summary>
-                      {SKILL_CHECK_DEGREES.map((d) => (
-                        <label className="outcome field" key={d}>
-                          <span>{SKILL_CHECK_DEGREE_LABELS[d]}</span>
-                          <textarea
-                            aria-label={`${SKILL_CHECK_DEGREE_LABELS[d]} outcome`}
-                            value={s.outcomes?.[d] || ''}
-                            onChange={(e) => setOutcome(i, d, e.target.value)}
-                          />
-                        </label>
-                      ))}
-                    </details>
-                  )}
-                  {released && s.outcomes && SKILL_CHECK_DEGREES.some((d) => (s.outcomes[d] || '').trim()) && (
-                    <ul className="check-outcomes-ro" data-testid="check-outcomes-ro">
-                      {SKILL_CHECK_DEGREES.filter((d) => (s.outcomes[d] || '').trim()).map((d) => (
-                        <li key={d}><strong>{SKILL_CHECK_DEGREE_LABELS[d]}</strong> {s.outcomes[d]}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-              {!released && (
-                <button type="button" className="add-skill-check" onClick={addCheck}>
-                  + skill check
-                </button>
-              )}
-            </fieldset>
-
-            <MarkdownSections
-              name="challenge"
-              blocks={chalBlocks}
-              editing={chalEditing}
+            <ChallengeList
+              challenges={challenges}
+              entryOf={budget.entryOf}
               released={released}
               siblings={siblingEncounters}
               onOpenEncounter={onOpenEncounter}
-              h={chalH}
+              onSetItem={setChallengeItem}
+              onAdd={addChallengeItem}
+              onRemove={removeChallengeItem}
+              onReorder={reorderChallenges}
+              onAddLoadoutToTreasure={addLoadoutToTreasure}
             />
           </div>
         )}

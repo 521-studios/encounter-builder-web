@@ -79,16 +79,20 @@ export function keyed(e) {
       for (const t of treasure) if (orphaned(t)) t.pool_id = def.id
     }
   }
+  // Unified Challenges list: migrate the legacy arrays in (if `challenges` is absent),
+  // and give each monster-type payload's loadout React keys for its inline editor.
+  const challenges = migrateChallenges(e).map((c) =>
+    c.type === 'monster' || c.type === 'hazard' || c.type === 'affliction'
+      ? { ...c, monster: { ...c.monster, loadout: (c.monster?.loadout || []).map(withKey) } }
+      : c,
+  )
   return {
     ...e,
-    monsters: (e.monsters || []).map((m) => withKey({ ...m, loadout: (m.loadout || []).map(withKey) })),
-    hazards: (e.hazards || []).map(withKey),
-    afflictions: (e.afflictions || []).map(withKey),
+    challenges,
     treasure,
     treasure_pools: pools,
     xp_awards: (e.xp_awards || []).map(withKey),
     rewards: (e.rewards || []).map(withKey),
-    skill_checks: (e.skill_checks || []).map(withKey),
     exits: (e.exits || []).map(withKey),
   }
 }
@@ -194,18 +198,104 @@ export function encounterBlocks(enc) {
   return []
 }
 
-// Challenges-tab markdown sections — tactics/setup prose distinct from the
-// Description read-aloud. No legacy source (new field), so just the array.
-export function challengeBlocks(enc) {
-  return enc?.challenge_blocks || []
-}
-
 // A block list → its serialized form: trim titles, drop rows with neither title
 // nor body. Shared by text_blocks and challenge_blocks so they never diverge.
 function blocksInput(blocks) {
   return (blocks || [])
     .map((b) => ({ title: (b.title || '').trim(), body: b.body || '' }))
     .filter((b) => b.title || b.body)
+}
+
+// ── Unified Challenges list ────────────────────────────────────────────────────
+// One ordered, drag-reorderable list interleaving monster / hazard / affliction /
+// skill-check / markdown items. Supersedes the separate monsters/hazards/afflictions/
+// skill_checks/challenge_blocks arrays: those are migrated in on load (keyed) and
+// cleared on save, so `challenges` becomes authoritative — the description→text_blocks
+// pattern. Each item is { id, type, monster? | skill_check? | markdown? } (monster
+// carries monster/hazard/affliction, distinguished by type); id is the stable reorder key.
+export const CHALLENGE_TYPES = ['monster', 'hazard', 'affliction', 'skill_check', 'markdown']
+export const CHALLENGE_TYPE_LABELS = {
+  monster: 'Monster',
+  hazard: 'Hazard',
+  affliction: 'Affliction',
+  skill_check: 'Skill check',
+  markdown: 'Markdown section',
+}
+
+export function emptyChallenge(type) {
+  const id = crypto.randomUUID()
+  if (type === 'monster' || type === 'hazard' || type === 'affliction')
+    return { id, type, monster: { ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '', loadout: [] } }
+  if (type === 'skill_check') return { id, type, skill_check: { skill: '', dc: 0, description: '' } }
+  return { id, type: 'markdown', markdown: { title: '', body: '' } }
+}
+
+// Build the unified list from a raw encounter: its `challenges` if present, else the
+// legacy arrays in their old section order (monsters, hazards, afflictions, skill
+// checks, then challenge markdown). Every item gets a stable id.
+export function migrateChallenges(e) {
+  if (e?.challenges?.length) return e.challenges.map((c) => ({ ...c, id: c.id || crypto.randomUUID() }))
+  const out = []
+  for (const m of e?.monsters || []) out.push({ id: crypto.randomUUID(), type: 'monster', monster: m })
+  for (const h of e?.hazards || []) out.push({ id: crypto.randomUUID(), type: 'hazard', monster: h })
+  for (const a of e?.afflictions || []) out.push({ id: crypto.randomUUID(), type: 'affliction', monster: a })
+  for (const s of e?.skill_checks || []) out.push({ id: crypto.randomUUID(), type: 'skill_check', skill_check: s })
+  for (const b of e?.challenge_blocks || []) out.push({ id: crypto.randomUUID(), type: 'markdown', markdown: b })
+  return out
+}
+
+export function challengeItems(enc) {
+  return enc?.challenges || []
+}
+
+// Move item `fromId` to sit where `toId` is (drag-reorder). Pure so the splice
+// arithmetic is testable. Unknown ids or a no-op move return the list unchanged.
+export function reorderById(list, fromId, toId) {
+  if (fromId === toId) return list
+  const from = (list || []).findIndex((c) => c.id === fromId)
+  const to = (list || []).findIndex((c) => c.id === toId)
+  if (from < 0 || to < 0) return list
+  const arr = [...list]
+  const [moved] = arr.splice(from, 1)
+  arr.splice(to, 0, moved)
+  return arr
+}
+// Typed views for the difficulty budget + entry prefetch. Prefer the unified list;
+// fall back to a legacy array for an encounter not yet migrated (e.g. a raw rollup
+// sibling that never passed through keyed()).
+export function challengeMonsters(enc) {
+  return enc?.challenges ? enc.challenges.filter((c) => c.type === 'monster').map((c) => c.monster || {}) : enc?.monsters || []
+}
+export function challengeHazards(enc) {
+  return enc?.challenges ? enc.challenges.filter((c) => c.type === 'hazard').map((c) => c.monster || {}) : enc?.hazards || []
+}
+export function challengeAfflictions(enc) {
+  return enc?.challenges ? enc.challenges.filter((c) => c.type === 'affliction').map((c) => c.monster || {}) : enc?.afflictions || []
+}
+export function challengeSkillChecks(enc) {
+  return enc?.challenges ? enc.challenges.filter((c) => c.type === 'skill_check').map((c) => c.skill_check || {}) : enc?.skill_checks || []
+}
+
+// Serialize the unified list for a save: drop incomplete placeholders (a monster with
+// no ref, a skill check without skill + DC≥1, an empty markdown), cleaning each payload
+// through its existing serializer. Keeps id + type so reorder identity is stable.
+export function challengesInput(enc) {
+  const out = []
+  for (const c of enc?.challenges || []) {
+    if (c.type === 'monster' || c.type === 'hazard' || c.type === 'affliction') {
+      if (!hasRef(c.monster || {})) continue
+      out.push({ id: c.id, type: c.type, monster: monsterInput(c.monster) })
+    } else if (c.type === 'skill_check') {
+      const s = skillCheckInput(c.skill_check || {})
+      if (!(s.skill && s.dc >= 1)) continue
+      out.push({ id: c.id, type: c.type, skill_check: s })
+    } else if (c.type === 'markdown') {
+      const [md] = blocksInput([c.markdown || {}])
+      if (!md) continue
+      out.push({ id: c.id, type: c.type, markdown: md })
+    }
+  }
+  return out
 }
 
 // When markdown block `removed` is deleted, every higher block shifts down one, so the
@@ -228,18 +318,16 @@ export function toEncounterInput(enc) {
     // into an untitled block (encounterBlocks) and description clears here, so it's
     // written once and never double-counted. Empty blocks (no title + no body) drop.
     text_blocks: blocksInput(encounterBlocks(enc)),
-    challenge_blocks: blocksInput(challengeBlocks(enc)),
     description: '',
     notes: enc.notes || '',
-    monsters: (enc.monsters || []).filter(hasRef).map(monsterInput),
-    hazards: (enc.hazards || []).filter(hasRef).map(stripKey),
-    afflictions: (enc.afflictions || []).filter(hasRef).map(stripKey),
+    // Unified Challenges list (supersedes monsters/hazards/afflictions/skill_checks/
+    // challenge_blocks — those are omitted here so the full-replace PUT clears them).
+    challenges: challengesInput(enc),
     treasure: (enc.treasure || []).filter(hasTreasureContent).map(treasureLineInput),
     treasure_pools: treasurePoolsInput(enc),
     xp_awards: (enc.xp_awards || []).map(awardInput).filter((a) => a.amount > 0),
     room_type: enc.room_type || 'combat',
     rewards: (enc.rewards || []).map(rewardInput).filter((r) => r.label),
-    skill_checks: (enc.skill_checks || []).map(skillCheckInput).filter((s) => s.skill && s.dc >= 1),
     // Keep every exit row, INCLUDING blank ones — a "+ exit" placeholder must persist
     // so it survives a navigate-away before the GM fills in the target/label (the map
     // ignores empty exits; the API accepts them). Don't filter here.

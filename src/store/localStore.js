@@ -27,14 +27,11 @@ const uuid = () => crypto.randomUUID()
 const encounterDefaults = () => ({
   status: 'draft',
   currency: {},
-  monsters: [],
-  hazards: [],
-  afflictions: [],
+  challenges: [], // unified monster/hazard/affliction/skill-check/markdown list
   treasure: [],
   treasure_pools: [],
   xp_awards: [],
   rewards: [],
-  skill_checks: [],
   exits: [],
 })
 

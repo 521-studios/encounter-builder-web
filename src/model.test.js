@@ -10,8 +10,16 @@ import {
   emptyTreasure,
   toEncounterInput,
   encounterBlocks,
-  challengeBlocks,
   reindexEditingAfterRemove,
+  migrateChallenges,
+  emptyChallenge,
+  challengeMonsters,
+  challengeHazards,
+  challengeAfflictions,
+  challengeSkillChecks,
+  challengesInput,
+  reorderById,
+  CHALLENGE_TYPES,
   hasRef,
   gameIdOf,
   buildInput,
@@ -38,38 +46,38 @@ import {
   clearSaveErrorOnSave,
 } from './model.js'
 
-test('keyed stamps a _key on every monster and treasure line', () => {
+test('keyed migrates legacy monsters into challenges (with ids) and keys treasure lines', () => {
   const out = keyed({
     name: 'x',
     monsters: [{ ref: { game_id: 'g' }, count: 1 }, { ref: { game_id: 'h' }, count: 2 }],
     treasure: [{ ref: { game_id: 't' }, qty: 1 }],
   })
   assert.equal(out.name, 'x')
-  assert.ok(out.monsters.every((m) => typeof m._key === 'string' && m._key.length > 0))
+  assert.equal(out.challenges.length, 2)
+  assert.ok(out.challenges.every((c) => c.type === 'monster' && typeof c.id === 'string' && c.id.length > 0))
+  assert.equal(out.challenges[0].monster.ref.game_id, 'g')
   assert.ok(out.treasure.every((t) => typeof t._key === 'string' && t._key.length > 0))
-  // keys are distinct
-  const keys = [...out.monsters, ...out.treasure].map((l) => l._key)
-  assert.equal(new Set(keys).size, keys.length)
+  const ids = out.challenges.map((c) => c.id)
+  assert.equal(new Set(ids).size, ids.length) // distinct ids
 })
 
-test('keyed tolerates missing monsters/treasure arrays', () => {
+test('keyed tolerates missing arrays: challenges + treasure default to []', () => {
   const out = keyed({ name: 'x' })
-  assert.deepEqual(out.monsters, [])
+  assert.deepEqual(out.challenges, [])
   assert.deepEqual(out.treasure, [])
 })
 
-test('hazards round-trip: keyed stamps _key; toEncounterInput strips it, drops empty refs', () => {
-  const out = keyed({ name: 'x', hazards: [{ ref: { game_id: 'Hazards:1' }, count: 2 }] })
-  assert.ok(out.hazards.every((h) => typeof h._key === 'string' && h._key.length > 0))
-  // emptyHazard is a ref-less row; toEncounterInput must drop it and strip _key.
+test('hazards migrate into challenges; toEncounterInput drops the ref-less placeholder', () => {
   const enc = keyed({
     name: 'x',
     hazards: [{ ref: { game_id: 'Hazards:1' }, count: 2 }, emptyHazard()],
   })
+  assert.ok(enc.challenges.every((c) => c.type === 'hazard' && typeof c.id === 'string'))
   const input = toEncounterInput(enc)
-  assert.equal(input.hazards.length, 1) // the ref-less empty row is dropped
-  assert.equal(input.hazards[0].ref.game_id, 'Hazards:1')
-  assert.ok(!('_key' in input.hazards[0]))
+  const hazards = input.challenges.filter((c) => c.type === 'hazard')
+  assert.equal(hazards.length, 1) // the ref-less empty row is dropped
+  assert.equal(hazards[0].monster.ref.game_id, 'Hazards:1')
+  assert.ok(!('_key' in hazards[0].monster))
 })
 
 test('emptyHazard is a ref-less count-1 row (no elite/weak adjustment)', () => {
@@ -79,16 +87,16 @@ test('emptyHazard is a ref-less count-1 row (no elite/weak adjustment)', () => {
   assert.ok(!('adjustment' in h)) // a hazard has no elite/weak
 })
 
-test('afflictions round-trip: keyed stamps _key; toEncounterInput strips it + drops empty', () => {
+test('afflictions migrate into challenges; toEncounterInput drops the empty one', () => {
   const enc = keyed({
     name: 'x',
     afflictions: [{ ref: { game_id: 'Diseases:1' }, count: 1 }, emptyAffliction()],
   })
-  assert.ok(enc.afflictions.every((a) => typeof a._key === 'string'))
+  assert.ok(enc.challenges.every((c) => c.type === 'affliction' && typeof c.id === 'string'))
   const input = toEncounterInput(enc)
-  assert.equal(input.afflictions.length, 1) // ref-less empty dropped
-  assert.equal(input.afflictions[0].ref.game_id, 'Diseases:1')
-  assert.ok(!('_key' in input.afflictions[0]))
+  const affl = input.challenges.filter((c) => c.type === 'affliction')
+  assert.equal(affl.length, 1) // ref-less empty dropped
+  assert.equal(affl[0].monster.ref.game_id, 'Diseases:1')
 })
 
 test('stripKey(withKey(x)) removes only _key and preserves the rest incl. nested ref', () => {
@@ -127,9 +135,10 @@ test('toEncounterInput echoes every field for a full PUT, strips _key, keeps cha
   assert.equal(input.status, 'draft')
   assert.deepEqual(input.currency, { gp: 5 })
   // lines are sent without the client-only _key
-  assert.ok(input.monsters.every((m) => !('_key' in m)))
+  const monster = input.challenges.find((c) => c.type === 'monster')
+  assert.ok(monster && !('_key' in monster.monster))
   assert.ok(input.treasure.every((t) => !('_key' in t)))
-  assert.equal(input.monsters[0].ref.game_id, 'Monsters:1')
+  assert.equal(monster.monster.ref.game_id, 'Monsters:1')
 })
 
 test('encounterBlocks: text_blocks is authoritative; a legacy description surfaces as one untitled block', () => {
@@ -169,22 +178,82 @@ test('toEncounterInput serializes text_blocks (trimmed titles), drops empty bloc
   assert.equal(input.description, '') // never re-sent once blocks exist
 })
 
-test('challengeBlocks + toEncounterInput serializes challenge_blocks independently of text_blocks (no legacy fallback)', () => {
-  assert.deepEqual(challengeBlocks({ challenge_blocks: [{ title: 'Tactics', body: 'They flee.' }] }), [
-    { title: 'Tactics', body: 'They flee.' },
-  ])
-  assert.deepEqual(challengeBlocks({ description: 'x' }), []) // no legacy source — new field
-  assert.deepEqual(challengeBlocks({}), [])
-  const input = toEncounterInput({
-    name: 'A1',
-    text_blocks: [{ title: 'Read-aloud', body: 'Mildew.' }],
-    challenge_blocks: [
-      { title: '  Tactics  ', body: 'Three mitflits lurk.' },
-      { title: '', body: '' }, // empty → dropped
-    ],
+test('migrateChallenges: uses `challenges` when present (ids filled), else legacy arrays in section order', () => {
+  // Present → passthrough, filling any missing id.
+  const present = migrateChallenges({ challenges: [{ type: 'markdown', markdown: { body: 'x' } }, { id: 'k', type: 'skill_check', skill_check: {} }] })
+  assert.equal(present.length, 2)
+  assert.ok(present[0].id) // minted
+  assert.equal(present[1].id, 'k') // kept
+  // Absent → build from legacy arrays: monsters, hazards, afflictions, skill_checks, then markdown.
+  const migrated = migrateChallenges({
+    monsters: [{ ref: { game_id: 'M:1' }, count: 1 }],
+    hazards: [{ ref: { game_id: 'H:1' }, count: 1 }],
+    afflictions: [{ ref: { game_id: 'A:1' }, count: 1 }],
+    skill_checks: [{ skill: 'Perception', dc: 12 }],
+    challenge_blocks: [{ title: 'Tactics', body: 'They lurk.' }],
   })
-  assert.deepEqual(input.challenge_blocks, [{ title: 'Tactics', body: 'Three mitflits lurk.' }])
-  assert.deepEqual(input.text_blocks, [{ title: 'Read-aloud', body: 'Mildew.' }]) // the two lists stay separate
+  assert.deepEqual(migrated.map((c) => c.type), ['monster', 'hazard', 'affliction', 'skill_check', 'markdown'])
+  assert.ok(migrated.every((c) => c.id))
+  assert.equal(migrated[4].markdown.title, 'Tactics')
+})
+
+test('emptyChallenge builds a typed, id-bearing item with the right empty payload', () => {
+  for (const t of ['monster', 'hazard', 'affliction']) {
+    const c = emptyChallenge(t)
+    assert.equal(c.type, t)
+    assert.ok(c.id)
+    assert.equal(c.monster.ref.game_id, '')
+    assert.equal(c.monster.count, 1)
+  }
+  assert.deepEqual(emptyChallenge('skill_check').skill_check, { skill: '', dc: 0, description: '' })
+  assert.deepEqual(emptyChallenge('markdown').markdown, { title: '', body: '' })
+  assert.deepEqual(CHALLENGE_TYPES, ['monster', 'hazard', 'affliction', 'skill_check', 'markdown'])
+})
+
+test('challenge selectors filter the unified list by type; fall back to legacy arrays when un-migrated', () => {
+  const enc = {
+    challenges: [
+      { id: '1', type: 'monster', monster: { ref: { game_id: 'M:1' }, count: 2 } },
+      { id: '2', type: 'hazard', monster: { ref: { game_id: 'H:1' }, count: 1 } },
+      { id: '3', type: 'skill_check', skill_check: { skill: 'Perception', dc: 12 } },
+      { id: '4', type: 'markdown', markdown: { body: 'x' } },
+    ],
+  }
+  assert.deepEqual(challengeMonsters(enc), [{ ref: { game_id: 'M:1' }, count: 2 }])
+  assert.deepEqual(challengeHazards(enc), [{ ref: { game_id: 'H:1' }, count: 1 }])
+  assert.deepEqual(challengeAfflictions(enc), []) // none of this type
+  assert.deepEqual(challengeSkillChecks(enc), [{ skill: 'Perception', dc: 12 }])
+  // affliction fallback to the legacy array when un-migrated
+  assert.deepEqual(challengeAfflictions({ afflictions: [{ ref: { game_id: 'D:1' }, count: 1 }] }), [{ ref: { game_id: 'D:1' }, count: 1 }])
+  // No `challenges` → fall back to the legacy array (a raw rollup sibling).
+  assert.deepEqual(challengeMonsters({ monsters: [{ ref: { game_id: 'L:1' }, count: 1 }] }), [{ ref: { game_id: 'L:1' }, count: 1 }])
+})
+
+test('challengesInput drops incomplete items and cleans each payload by type', () => {
+  const enc = {
+    challenges: [
+      { id: '1', type: 'monster', monster: { _key: 'k', ref: { game_id: 'M:1' }, count: 2, adjustment: 'elite' } },
+      { id: '2', type: 'monster', monster: { ref: { game_id: '' }, count: 1 } }, // no ref → dropped
+      { id: '3', type: 'skill_check', skill_check: { skill: '  Nature ', dc: '15', description: 'd' } },
+      { id: '4', type: 'skill_check', skill_check: { skill: '', dc: 10 } }, // no skill → dropped
+      { id: '5', type: 'markdown', markdown: { title: '  Tactics  ', body: 'lurk' } },
+      { id: '6', type: 'markdown', markdown: { title: '', body: '' } }, // empty → dropped
+    ],
+  }
+  const out = challengesInput(enc)
+  assert.deepEqual(out.map((c) => [c.id, c.type]), [['1', 'monster'], ['3', 'skill_check'], ['5', 'markdown']])
+  assert.ok(!('_key' in out[0].monster)) // cleaned
+  assert.equal(out[0].monster.adjustment, 'elite')
+  assert.deepEqual(out[1].skill_check, { skill: 'Nature', dc: 15, description: 'd' })
+  assert.deepEqual(out[2].markdown, { title: 'Tactics', body: 'lurk' })
+})
+
+test('reorderById moves an item to another item’s slot; unknown ids / no-op return the list', () => {
+  const list = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+  assert.deepEqual(reorderById(list, 'a', 'c').map((x) => x.id), ['b', 'c', 'a'])
+  assert.deepEqual(reorderById(list, 'c', 'a').map((x) => x.id), ['c', 'a', 'b'])
+  assert.equal(reorderById(list, 'a', 'a'), list) // no-op
+  assert.equal(reorderById(list, 'a', 'z'), list) // unknown target
 })
 
 test('gameIdOf resolves a line to its game_id — direct, or a templated ref base', () => {
@@ -222,8 +291,9 @@ test('toEncounterInput drops half-filled rows (autosave fires mid-edit)', () => 
     ],
   })
   const input = toEncounterInput(enc)
-  assert.equal(input.monsters.length, 1)
-  assert.equal(input.monsters[0].ref.game_id, 'Monsters:1')
+  const monsters = input.challenges.filter((c) => c.type === 'monster')
+  assert.equal(monsters.length, 1)
+  assert.equal(monsters[0].monster.ref.game_id, 'Monsters:1')
   assert.equal(input.treasure.length, 1)
   assert.equal(input.treasure[0].ref.game_id, 'Weapons:1')
 })
@@ -319,9 +389,10 @@ test('toEncounterInput defaults room_type to combat when unset', () => {
   assert.equal(toEncounterInput(keyed({ name: 'x' })).room_type, 'combat')
 })
 
-test('keyed stamps a _key on every skill check; emptySkillCheck strips cleanly', () => {
+test('keyed migrates skill checks into challenges; emptySkillCheck strips cleanly', () => {
   const out = keyed({ skill_checks: [{ skill: 'Perception', dc: 12 }] })
-  assert.ok(out.skill_checks[0]._key)
+  const s = out.challenges.find((c) => c.type === 'skill_check')
+  assert.ok(s && s.skill_check.skill === 'Perception')
   assert.deepEqual(stripKey(emptySkillCheck()), { skill: '', dc: 0, description: '' })
 })
 
@@ -391,12 +462,13 @@ test('monsterInput cleans the loadout (drops ref-less rows + _keys, omits when e
   assert.equal('loadout' in none, false)
 })
 
-test('keyed stamps a _key on every loadout item (LoadoutView keys rows on it)', () => {
+test('keyed keys loadout items inside migrated monster challenges (LoadoutView keys rows on it)', () => {
   const out = keyed({ monsters: [{ ref: { game_id: 'M:1' }, count: 1, loadout: [{ ref: { game_id: 'shortsword' }, qty: 3 }] }] })
-  assert.ok(out.monsters[0]._key)
-  assert.ok(out.monsters[0].loadout[0]._key, 'loadout item got a _key')
+  const m = out.challenges[0]
+  assert.equal(m.type, 'monster')
+  assert.ok(m.monster.loadout[0]._key, 'loadout item got a _key')
   // A monster with no loadout survives keyed() without a crash (empty array).
-  assert.deepEqual(keyed({ monsters: [{ ref: { game_id: 'M:1' }, count: 1 }] }).monsters[0].loadout, [])
+  assert.deepEqual(keyed({ monsters: [{ ref: { game_id: 'M:1' }, count: 1 }] }).challenges[0].monster.loadout, [])
 })
 
 test('skillCheckLabel renders base, successes, and alternatives', () => {
@@ -418,7 +490,8 @@ test('toEncounterInput sends complete skill checks, drops rows missing skill or 
     ],
   })
   const input = toEncounterInput(enc)
-  assert.deepEqual(input.skill_checks, [{ skill: 'Perception', dc: 12, description: 'spot the planks' }])
+  const checks = input.challenges.filter((c) => c.type === 'skill_check').map((c) => c.skill_check)
+  assert.deepEqual(checks, [{ skill: 'Perception', dc: 12, description: 'spot the planks' }])
 })
 
 test('incomingLinks: siblings pointing here, deduped, with connected status + label', () => {
@@ -586,8 +659,9 @@ test('toEncounterInput keeps a templated (derived) monster whose ref carries bas
     monsters: [{ ref: { base: { game_id: 'Monsters:1' } }, patches: [], count: 1 }],
   })
   const input = toEncounterInput(enc)
-  assert.equal(input.monsters.length, 1)
-  assert.equal(input.monsters[0].ref.base.game_id, 'Monsters:1')
+  const monsters = input.challenges.filter((c) => c.type === 'monster')
+  assert.equal(monsters.length, 1)
+  assert.equal(monsters[0].monster.ref.base.game_id, 'Monsters:1')
 })
 
 test('buildInput keeps status for a draft (a normal save echoes it)', () => {
@@ -606,7 +680,7 @@ test('toEncounterInput defaults chapter_id to "" (Unsorted) and omits absent sta
   const input = toEncounterInput({ name: 'x' })
   assert.equal(input.chapter_id, '') // moving to Unsorted / no chapter
   assert.ok(!('status' in input)) // status omitted when the encounter has none
-  assert.deepEqual(input.monsters, [])
+  assert.deepEqual(input.challenges, [])
   assert.deepEqual(input.treasure, [])
 })
 

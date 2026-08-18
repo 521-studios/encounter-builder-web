@@ -10,6 +10,10 @@ import {
   skillCheckLabel,
   SKILL_CHECK_DEGREES,
   SKILL_CHECK_DEGREE_LABELS,
+  challengeMonsters,
+  challengeHazards,
+  challengeAfflictions,
+  challengeSkillChecks,
 } from '../model.js'
 import { BAND_LABELS } from '../pf2eRules.js'
 import { creatureHeader } from '../creatureHeader.js'
@@ -64,13 +68,13 @@ function afflictionLabel(gid, entryOf) {
 }
 
 export default function EncounterPrintSheet({ enc, budget, effectiveParty, siblings = [], onClose }) {
-  const monsters = enc.monsters || []
-  const hazards = enc.hazards || []
-  const afflictions = enc.afflictions || []
+  const monsters = challengeMonsters(enc)
+  const hazards = challengeHazards(enc)
+  const afflictions = challengeAfflictions(enc)
   const treasure = enc.treasure || []
   const awards = enc.xp_awards || []
   const rewards = enc.rewards || []
-  const skillChecks = enc.skill_checks || []
+  const skillChecks = challengeSkillChecks(enc)
   const exits = enc.exits || []
   const combat = isCombatRoom(budget.roomType)
 
