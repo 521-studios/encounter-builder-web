@@ -105,11 +105,6 @@ button.campaign.selected {
 
 .empty { opacity: 0.8; }
 
-/* The sidebar "selected" separator. Scoped away from React Flow, which adds a bare
-   `selected` class to a dragged/selected map node — the unscoped rule was leaking a
-   top margin/padding onto the node, making it jump ~10px on drag. */
-.selected:not(.react-flow__node) { margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem; }
-
 input, textarea, select {
   font: inherit;
   padding: 0.4rem 0.5rem;
@@ -310,15 +305,22 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
 
 .monster-line-wrap,
 .hazard-line-wrap,
-.affliction-line-wrap { display: grid; gap: 0.5rem; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.7rem; }
+.affliction-line-wrap,
+.creature-card { position: relative; display: grid; gap: 0.5rem; background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.7rem; }
 /* The monster picker now renders the library CreatureSearch (.CreatureSearch__*,
    styled by the lib's style.css); the old .monster-search/.suggestions rules
    for the hand-rolled dropdown are gone with MonsterSearch.jsx. */
 .picked { font-weight: 600; }
 /* Book-style creature stat header (name + CREATURE level / source / initiative). */
 .monster-header { display: grid; gap: 0.1rem; font-weight: 400; }
-.monster-header-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.monster-header-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; padding-right: 1.4rem; }
 .monster-header-name { font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+/* The creature's book name, shown as a line above the source when a custom name is set. */
+.monster-header-realname { font-size: 0.85em; color: var(--muted); font-style: italic; }
+/* Name/count editors (revealed by the lower-left "edit" link). */
+.monster-name-input { flex: 1; min-width: 8rem; font-weight: 700; }
+.monster-count-input { width: 4rem; }
+.monster-edit { justify-self: start; font-size: 0.85em; }
 /* Standard delete control: an × in an item's title bar. Inline by default (sits at the
    end of a header row); .remove-x-abs pins it to a block's upper-right corner. */
 .remove-x { background: none; border: none; padding: 0 0.3rem; color: var(--muted); font-size: 1.3rem; line-height: 1; cursor: pointer; }
@@ -729,6 +731,8 @@ button.chapter-name:hover { color: var(--gold); }
 .signin-note { color: var(--muted); font-size: 0.9rem; margin: 0.25rem 0 0; }
 
 /* Richer skill checks (xhwl): successes input, alternative-skill rows, per-degree outcomes. */
+.skill-check { position: relative; }
+.skill-check .skill-check-head { padding-right: 1.5rem; } /* clear the corner × */
 .check-successes { width: 3.5rem; }
 .check-successes-field { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted); font-size: 0.85rem; cursor: help; }
 .check-alts { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.3rem 0 0 1rem; }

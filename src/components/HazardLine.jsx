@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { CreatureSearch } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import { gameIdOf } from '../model.js'
 import HazardView from './HazardView.jsx'
 import RemoveButton from './RemoveButton.jsx'
+import CreatureCard from './CreatureCard.jsx'
 
 // One hazard row — the encounter's SEPARATE "add hazard" slot (not the monster
 // search). Before a hazard is chosen, a pfsrd2 search over hazards + weather hazards
@@ -14,7 +14,6 @@ import RemoveButton from './RemoveButton.jsx'
 export default function HazardLine({ hazard, entryOf, disabled, onChange, onRemove }) {
   const set = (fields) => onChange({ ...hazard, ...fields })
   const gameId = gameIdOf(hazard)
-  const [showBlock, setShowBlock] = useState(false)
 
   if (!gameId) {
     return (
@@ -41,44 +40,26 @@ export default function HazardLine({ hazard, entryOf, disabled, onChange, onRemo
   }
 
   const entry = entryOf ? entryOf(gameId) : null
-  const count = hazard.count || 1
-  const name = hazard.nickname || entry?.name || gameId
+  const bookName = entry?.name || ''
   // The full entry is flat under `hazard` (not stat_block); level lives there.
   const level = entry ? (entry.hazard || entry).level : undefined
 
   return (
-    <div className="hazard-line-wrap">
-      <div className="line hazard-line">
-        <div className="picked grow monster-header" data-testid="hazard-header">
-          <div className="monster-header-top">
-            <button
-              type="button"
-              className="monster-header-name monster-expand"
-              aria-expanded={showBlock}
-              aria-label={`${showBlock ? 'hide' : 'show'} stat block for ${name}`}
-              onClick={() => setShowBlock((s) => !s)}
-            >
-              <span className="chapter-caret" aria-hidden="true">{showBlock ? '▾' : '▸'}</span> {name}{count > 1 ? ` (${count})` : ''}
-            </button>
-            {level != null && (
-              <span className="monster-header-level" data-testid="hazard-header-level">HAZARD {level}</span>
-            )}
-          </div>
-          {entry == null && <div className="muted monster-header-loading">Loading…</div>}
-        </div>
-        <input
-          type="number"
-          min="1"
-          aria-label="count"
-          value={hazard.count}
-          disabled={disabled}
-          onChange={(e) => set({ count: Number(e.target.value) })}
-        />
-        {!disabled && (
-          <RemoveButton label="hazard" onRemove={onRemove} />
-        )}
-      </div>
-      {showBlock && <HazardView gameId={gameId} />}
-    </div>
+    <CreatureCard
+      entity={hazard}
+      bookName={bookName}
+      fallbackTitle={gameId}
+      label="hazard"
+      disabled={disabled}
+      onChange={onChange}
+      onRemove={onRemove}
+      levelNode={
+        level != null && (
+          <span className="monster-header-level" data-testid="hazard-header-level">HAZARD {level}</span>
+        )
+      }
+      lines={entry == null && <div className="muted monster-header-loading">Loading…</div>}
+      statView={<HazardView gameId={gameId} />}
+    />
   )
 }
