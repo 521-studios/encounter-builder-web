@@ -83,7 +83,7 @@ function PassageEdge({ source, target, data }) {
   const len = Math.hypot(tc.x - sc.x, tc.y - sc.y) || 1
   const ux = (tc.x - sc.x) / len
   const uy = (tc.y - sc.y) / len
-  const OFF = 20
+  const OFF = 40
   const sLabel = { x: sb.x + ux * OFF, y: sb.y + uy * OFF } // just past the source card
   const tLabel = { x: tb.x - ux * OFF, y: tb.y - uy * OFF } // just past the target card
   return (
