@@ -137,7 +137,7 @@ button.danger { color: var(--danger); }
 .encounter-list li { display: flex; align-items: center; gap: 0.5rem; }
 button.encounter { flex: 1; text-align: left; }
 
-.editor { display: grid; gap: 1rem; }
+.editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
 .actions { display: flex; align-items: center; gap: 0.75rem; }
 /* Autosave status indicator (replaces the old Save button). */
 .save-state { color: var(--muted); font-size: 0.85rem; }
@@ -162,6 +162,30 @@ button.encounter { flex: 1; text-align: left; }
 }
 
 .field { display: grid; gap: 0.25rem; }
+
+/* Chapter detail: the title row + tabs pin together as one sticky header; only the
+   active tab panel scrolls under them. `.main` has no top padding, so top:0 pins the
+   header flush; a side-only negative margin bleeds it over the horizontal padding. */
+.chapter-detail .detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--panel);
+  margin: 0 -1.5rem;
+  padding: 1.25rem 1.5rem 0;
+  display: grid;
+  gap: 0.5rem;
+}
+/* Inside the sticky wrapper the title row is not independently sticky (the wrapper is). */
+.chapter-detail .detail-header .detail-head {
+  position: static;
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
+}
+/* Isolate the panel's width so a wide tab (the map) scrolls inside its own box and
+   can't stretch the pane — which was pushing the sticky header off to the right. */
+.tab-panel { min-width: 0; }
 
 /* Tabbed detail sections (chapter Config / Summary / Map). */
 .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); }
@@ -391,7 +415,7 @@ button.chapter-name:hover { color: var(--gold); }
 }
 
 /* Campaign/chapter detail pages + expected-party override fields (Slice 3). */
-.detail { display: grid; gap: 1rem; }
+.detail { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
 .detail-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .detail-head h2 { margin: 0; }
 .party-fields .line { gap: 1rem; align-items: flex-start; }
