@@ -376,6 +376,26 @@ export function emptyExit() {
   return withKey({ to_encounter_id: '', label: '', secret: false, skill: '', dc: 0 })
 }
 
+// Incoming connectivity for the exits editor: sibling encounters whose exits point AT
+// `encounterId`. One entry per source (deduped), each with its `label` and a
+// `connected` flag — true when this room already links back (the passage is two-way).
+// Pure/testable; the editor renders these + a "connect" that adds the reciprocal exit.
+export function incomingLinks(encounterId, siblingEncounters, currentExits) {
+  const id = String(encounterId)
+  const backLinks = new Set((currentExits || []).map((e) => String(e.to_encounter_id)).filter(Boolean))
+  const out = []
+  const seen = new Set()
+  for (const s of siblingEncounters || []) {
+    const sid = String(s.id)
+    if (sid === id || seen.has(sid)) continue
+    const hit = (s.exits || []).find((x) => String(x.to_encounter_id) === id)
+    if (!hit) continue
+    seen.add(sid)
+    out.push({ id: sid, name: s.name || 'Untitled', label: hit.label || '', connected: backLinks.has(sid) })
+  }
+  return out
+}
+
 // Serialize an exit for the API: drop the client _key, trim the label/skill, round DC.
 export function exitInput(e) {
   const { _key, ...rest } = e
