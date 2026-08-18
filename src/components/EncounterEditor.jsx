@@ -375,21 +375,37 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         {released && <p className="muted">Released — read-only.</p>}
         {error && <p className="error" role="alert">{error}</p>}
 
-        <div className="tabs" role="tablist" aria-label="Encounter sections">
-          {ENCOUNTER_TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              id={`enctab-${t.id}`}
-              aria-controls={`encpanel-${t.id}`}
-              aria-selected={tab === t.id}
-              className={`tab${tab === t.id ? ' tab--active' : ''}`}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="editor-tabrow">
+          <div className="tabs" role="tablist" aria-label="Encounter sections">
+            {ENCOUNTER_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                id={`enctab-${t.id}`}
+                aria-controls={`encpanel-${t.id}`}
+                aria-selected={tab === t.id}
+                className={`tab${tab === t.id ? ' tab--active' : ''}`}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {!released && (
+            <div className="editor-release">
+              <span
+                className={`save-state${saveState === 'error' ? ' save-state--error' : ''}`}
+                data-testid="save-state"
+                aria-live="polite"
+              >
+                {saveLabel}
+              </span>
+              <button onClick={release} disabled={releasing || saveState === 'saving'}>
+                {releasing ? 'Releasing…' : 'Release to party'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -918,21 +934,6 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           siblings={siblingEncounters}
           onClose={() => setPrinting(false)}
         />
-      )}
-
-      {!released && (
-        <div className="actions">
-          <span
-            className={`save-state${saveState === 'error' ? ' save-state--error' : ''}`}
-            data-testid="save-state"
-            aria-live="polite"
-          >
-            {saveLabel}
-          </span>
-          <button onClick={release} disabled={releasing || saveState === 'saving'}>
-            {releasing ? 'Releasing…' : 'Release to party'}
-          </button>
-        </div>
       )}
     </section>
   )
