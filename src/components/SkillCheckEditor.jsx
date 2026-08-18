@@ -36,17 +36,22 @@ export default function SkillCheckEditor({ value, disabled, siblings, onOpenEnco
             value={s.dc || ''}
             onChange={(e) => set({ dc: Number(e.target.value) })}
           />
-          <input
-            type="number"
-            min="1"
-            step="1"
-            className="check-successes"
-            aria-label="required successes"
-            title="Required successes to resolve (e.g. 4 successful checks)"
-            placeholder="×1"
-            value={s.successes || ''}
-            onChange={(e) => set({ successes: Number(e.target.value) })}
-          />
+          <label
+            className="check-successes-field"
+            title="Required successful checks to resolve — for complex checks that need more than one (e.g. 4 successes to disable a complex hazard). Applies to the whole check: any listed skill counts toward it. Leave blank for a normal one-and-done check."
+          >
+            <span>successes</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              className="check-successes"
+              aria-label="required successes"
+              placeholder="1"
+              value={s.successes || ''}
+              onChange={(e) => set({ successes: Number(e.target.value) })}
+            />
+          </label>
           <button type="button" className="link danger" onClick={onRemove}>
             remove
           </button>
