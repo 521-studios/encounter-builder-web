@@ -247,6 +247,18 @@ button.encounter { flex: 1; text-align: left; }
 .map-legend { font-size: 12px; }
 .map-legend-dash { letter-spacing: -1px; }
 
+/* React Flow's Controls default to a light button, but the app's global
+   `button { color: var(--fg) }` (light) leaks onto the icon (svg fill: currentColor),
+   giving light-on-light. Re-theme the buttons to the app's dark panel. Scoped under
+   .chapter-map so it out-specifies React Flow's own stylesheet regardless of import order. */
+.chapter-map .react-flow__controls-button {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+}
+.chapter-map .react-flow__controls-button svg { fill: currentColor; }
+.chapter-map .react-flow__controls-button:hover { background: color-mix(in srgb, var(--fg) 12%, var(--panel)); }
+
 /* Tabbed detail sections (chapter Config / Summary / Map). */
 .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); }
 .tab {
