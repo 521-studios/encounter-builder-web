@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText } from './chapterGraph.js'
 
 // A1→A2→A3→A1→A4 (all one-directional). One exit is external (no target) and one is
 // dangling (target not in the chapter) — both become boundary exit ports, not passages.
@@ -97,6 +97,15 @@ test('buildChapterGraph: a self-exit is dropped; a blank exit becomes a boundary
   assert.equal(g.passages.length, 0) // the self-reference makes no passage
   assert.equal(g.exitPorts.length, 1) // the blank "— External —" placeholder shows as a port
   assert.equal(g.exitPorts[0].name, 'Exit') // unlabeled → falls back to "Exit"
+})
+
+test('sideText: composes 🔒 / label / skill check for an edge caption', () => {
+  assert.equal(sideText(true, 'hidden panel', 'Perception', 18), '🔒 hidden panel · Perception DC 18')
+  assert.equal(sideText(false, 'north door', '', 0), 'north door') // label only
+  assert.equal(sideText(false, '', 'Athletics', 15), 'Athletics DC 15') // check, no label
+  assert.equal(sideText(false, '', '', 15), 'DC 15') // DC without a skill
+  assert.equal(sideText(true, '', '', 0), '🔒') // secret with nothing else
+  assert.equal(sideText(false, '', '', 0), '') // nothing → no caption
 })
 
 test('boundaryPoint: crosses the box edge nearest the incoming direction; centre on coincidence', () => {

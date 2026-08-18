@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, getStraightPath, EdgeLabelRenderer } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { buildChapterGraph, boundaryPoint } from '../chapterGraph.js'
+import { buildChapterGraph, boundaryPoint, sideText } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
 // 8hda: an INTERACTIVE node-link map of a chapter — pan (drag canvas), zoom (scroll),
@@ -20,16 +20,6 @@ const ROOM_FILL = {
   empty: '#e6e6e6',
 }
 const EDGE_COLOR = '#8a8f98'
-
-// One side's edge caption: a 🔒 (secret from this side), the label, and any skill check
-// (Skill DC N), joined with · — e.g. "🔒 hidden panel · Perception DC 18". Empty → no label.
-function sideText(secret, label, skill, dc) {
-  const bits = [label, skill && dc ? `${skill} DC ${dc}` : dc ? `DC ${dc}` : '']
-    .filter(Boolean)
-    .join(' · ')
-  if (secret) return bits ? `🔒 ${bits}` : '🔒'
-  return bits
-}
 
 // Handles sit at the node's exact centre (hidden) so passages run centre-to-centre
 // and the opaque card hides the stub; edges attach at the card edge via geometry below.

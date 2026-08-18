@@ -100,6 +100,16 @@ export function pairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`
 }
 
+// One side's edge caption for the map: a 🔒 (secret from this side), the label, and
+// any skill check (Skill DC N), joined with " · " — e.g. "🔒 hidden panel · Perception
+// DC 18". A DC with no skill shows "DC N"; secret with nothing else is just "🔒";
+// nothing set → "" (no caption rendered).
+export function sideText(secret, label, skill, dc) {
+  const bits = [label, skill && dc ? `${skill} DC ${dc}` : dc ? `DC ${dc}` : ''].filter(Boolean).join(' · ')
+  if (secret) return bits ? `🔒 ${bits}` : '🔒'
+  return bits
+}
+
 // Where the segment from point `from` toward box centre `c` ({x, y, hw, hh}) crosses
 // the box boundary — used by the map to place an arrowhead / label at a card's EDGE
 // rather than its (hidden) centre. Scales the direction vector to the nearer of the
