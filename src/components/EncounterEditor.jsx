@@ -52,6 +52,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const saveState = useSyncExternalStore(subscribeFlush, () => flushState(encKey(campaignId, encounterId)))
   const [chapters, setChapters] = useState([]) // for the Chapter picker (keyboard-accessible move)
   const [siblingEncounters, setSiblingEncounters] = useState([]) // campaign encounters, for the exit target picker
+  const [siblingsLoaded, setSiblingsLoaded] = useState(false) // the picker list finished loading (so an unresolved exit is genuinely deleted, not just still-loading)
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
   const [partyContextError, setPartyContextError] = useState(false) // chapters/settings load failed
   const [editingBlocks, setEditingBlocks] = useState(() => new Set()) // which markdown blocks are in edit (vs preview) mode
@@ -74,8 +75,12 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       .catch(() => alive && setPartyContextError(true))
     encounters
       .list(campaignId)
-      .then((es) => alive && setSiblingEncounters(es))
-      .catch(() => {}) // exit target picker just falls back to external-only
+      .then((es) => {
+        if (!alive) return
+        setSiblingEncounters(es)
+        setSiblingsLoaded(true) // only now can an unresolved exit be called "deleted"
+      })
+      .catch(() => {}) // load failed → stays not-loaded, so we never falsely cry "deleted"
     settingsApi
       .get(campaignId)
       .then((s) => alive && setCampaignSettings(s))
@@ -795,10 +800,12 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               {exitTargets.map((t) => (
                 <option key={t.id} value={t.id}>{t.name || 'Untitled'}</option>
               ))}
-              {/* A soft reference to a since-deleted encounter shows honestly as broken
-                  (not silently as "— External —") so the GM can re-point or remove it. */}
+              {/* An id not in the picker is either a since-deleted encounter (shown
+                  honestly as broken so the GM can re-point it) OR the picker just hasn't
+                  loaded yet — in which case show a neutral placeholder, never a false
+                  "(deleted encounter)" that makes a valid saved link look lost. */}
               {ex.to_encounter_id && !exitTargets.some((t) => String(t.id) === String(ex.to_encounter_id)) && (
-                <option value={ex.to_encounter_id}>(deleted encounter)</option>
+                <option value={ex.to_encounter_id}>{siblingsLoaded ? '(deleted encounter)' : 'Linked encounter…'}</option>
               )}
             </select>
             <input
