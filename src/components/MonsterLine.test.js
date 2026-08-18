@@ -104,6 +104,16 @@ test('MonsterLine: a custom name becomes the title (+count); the book name drops
   assert.equal(container.querySelector('.monster-header-realname').textContent, 'Goblin Warrior') // book name below
 })
 
+test('MonsterLine: a nickname does not flash as a real-name line while the entry is still loading', () => {
+  // Entry unresolved (entryOf → null for Monsters:99) + a nickname set: bookName is empty,
+  // so the name must NOT read as custom — otherwise the game_id would flash as a real-name
+  // line under the title until the entry loads.
+  const monster = { ref: { game_id: 'Monsters:99' }, count: 1, nickname: 'Chief', adjustment: 'none' }
+  const { container } = render(<MonsterLine monster={monster} entryOf={entryOf} onChange={noop} onRemove={noop} />)
+  assert.equal(container.querySelector('.monster-header-realname'), null) // no real-name line while loading
+  assert.match(container.textContent, /Loading…/)
+})
+
 test('MonsterLine: the edit link reveals a name field that writes the nickname', () => {
   let captured = null
   const monster = { ref: { game_id: 'Monsters:1' }, count: 1, nickname: '', adjustment: 'none' }
