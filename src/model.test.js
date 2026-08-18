@@ -9,6 +9,7 @@ import {
   emptyAffliction,
   emptyTreasure,
   toEncounterInput,
+  encounterBlocks,
   hasRef,
   gameIdOf,
   buildInput,
@@ -116,7 +117,9 @@ test('toEncounterInput echoes every field for a full PUT, strips _key, keeps cha
   const input = toEncounterInput(enc)
   assert.equal(input.name, 'Ambush')
   assert.equal(input.chapter_id, 'ch-1')
-  assert.equal(input.description, '# Scene')
+  // A legacy single description migrates into an untitled text block, and description clears.
+  assert.equal(input.description, '')
+  assert.deepEqual(input.text_blocks, [{ title: '', body: '# Scene' }])
   assert.equal(input.notes, 'gm note')
   assert.equal(input.status, 'draft')
   assert.deepEqual(input.currency, { gp: 5 })
@@ -124,6 +127,32 @@ test('toEncounterInput echoes every field for a full PUT, strips _key, keeps cha
   assert.ok(input.monsters.every((m) => !('_key' in m)))
   assert.ok(input.treasure.every((t) => !('_key' in t)))
   assert.equal(input.monsters[0].ref.game_id, 'Monsters:1')
+})
+
+test('encounterBlocks: text_blocks is authoritative; a legacy description surfaces as one untitled block', () => {
+  assert.deepEqual(encounterBlocks({ text_blocks: [{ title: 'Tactics', body: 'x' }], description: 'ignored' }), [
+    { title: 'Tactics', body: 'x' },
+  ])
+  assert.deepEqual(encounterBlocks({ description: '# Scene' }), [{ title: '', body: '# Scene' }])
+  assert.deepEqual(encounterBlocks({}), [])
+  assert.deepEqual(encounterBlocks({ text_blocks: [] }), []) // empty list → no legacy fallback needed
+})
+
+test('toEncounterInput serializes text_blocks (trimmed titles), drops empty blocks, always clears description', () => {
+  const input = toEncounterInput({
+    name: 'A2',
+    text_blocks: [
+      { title: '  Read-aloud  ', body: 'The bridge sags.' },
+      { title: '', body: '' }, // empty → dropped
+      { title: 'Tactics', body: '' }, // title-only → kept
+    ],
+    description: 'stale', // superseded by text_blocks → must not leak
+  })
+  assert.deepEqual(input.text_blocks, [
+    { title: 'Read-aloud', body: 'The bridge sags.' },
+    { title: 'Tactics', body: '' },
+  ])
+  assert.equal(input.description, '') // never re-sent once blocks exist
 })
 
 test('gameIdOf resolves a line to its game_id — direct, or a templated ref base', () => {

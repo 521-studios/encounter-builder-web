@@ -347,6 +347,13 @@ button.chapter-name:hover { color: var(--gold); }
 
 /* Encounter description (markdown, rendered by the pfsrd2-display Markdown export). */
 .description-input { min-height: 4rem; }
+
+/* Titled markdown blocks (encounter body). Each block: optional title + markdown
+   body + live preview, in a bordered card; "+ Add section" appends another. */
+.text-blocks { display: grid; gap: 0.75rem; }
+.field-label { font-weight: 500; opacity: 0.9; }
+.text-block { display: grid; gap: 0.35rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem; }
+.text-block-title { font-weight: 600; }
 .description-preview {
   background: var(--card);
   border-radius: var(--radius);
