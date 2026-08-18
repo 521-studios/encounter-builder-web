@@ -38,6 +38,17 @@ test('buildChapterGraph: loop count = cyclomatic number (independent cycles), no
     { id: 3, name: 'L2', exits: [] },
   ])
   assert.equal(tree.stats.loops, 0)
+  // Two disjoint triangles → 2 independent loops (6 passages − 6 rooms + 2 components);
+  // verifies the count exceeds 1 and keeps disjoint components separate in union-find.
+  const twoLoops = buildChapterGraph([
+    { id: 1, name: 'A', exits: [{ to_encounter_id: '2' }] },
+    { id: 2, name: 'B', exits: [{ to_encounter_id: '3' }] },
+    { id: 3, name: 'C', exits: [{ to_encounter_id: '1' }] },
+    { id: 4, name: 'D', exits: [{ to_encounter_id: '5' }] },
+    { id: 5, name: 'E', exits: [{ to_encounter_id: '6' }] },
+    { id: 6, name: 'F', exits: [{ to_encounter_id: '4' }] },
+  ])
+  assert.equal(twoLoops.stats.loops, 2)
 })
 
 test('buildChapterGraph: dead-ends are rooms with ≤1 connected room', () => {
