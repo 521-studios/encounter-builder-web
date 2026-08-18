@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
+import { ReactFlow, Background, Controls, MiniMap, Handle, Position, MarkerType, useNodesState } from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
 import { buildChapterGraph } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
-// 8hda: a dependency-free node-link map of a chapter's connectivity (encounters =
-// nodes, 3qq7 exits = directed edges). Renders the Jaquays structure — loops,
-// dead-ends — as plain SVG. Always-visible, collapsible by its title (per the
-// rollup UX law). Click a node to open that encounter.
-const NODE_W = 132
-const NODE_H = 46
-// Light pastel fills keyed by room type, with dark text — nodes coloured by type.
+// 8hda: an INTERACTIVE node-link map of a chapter's connectivity (encounters = nodes,
+// 3qq7 exits = edges), built on React Flow — pan (drag the canvas), zoom (scroll), and
+// drag a room to rearrange it. The force layout (chapterGraph.forceLayout) seeds the
+// initial positions; the Jaquays structure (loops in gold, dead-ends outlined) and the
+// exit labels read directly off the edges. Always-visible, collapsible by its title.
+// (Node positions are session-only for now; persisting a GM's manual layout is the next
+// step — a positions blob on the chapter.)
 const ROOM_FILL = {
   combat: '#f3d4d4',
   hazard: '#f6e3c2',
@@ -19,15 +21,67 @@ const ROOM_FILL = {
   empty: '#e6e6e6',
 }
 
+// A room card node. Handles are centred + hidden so edges draw room-to-room like the
+// old SVG (the opaque card hides the stub under it); click opens the encounter.
+function RoomNode({ data }) {
+  const centred = { left: '50%', top: '50%', opacity: 0, pointerEvents: 'none' }
+  return (
+    <div
+      className="map-room"
+      data-dead-end={data.dead || undefined}
+      style={{ background: ROOM_FILL[data.roomType] || ROOM_FILL.empty, borderColor: data.dead ? '#c0392b' : '#556' }}
+      title={data.name}
+    >
+      <Handle type="target" position={Position.Top} style={centred} />
+      <Handle type="source" position={Position.Top} style={centred} />
+      <div className="map-room-name">{data.name}</div>
+      <div className="map-room-type">
+        {ROOM_TYPE_LABELS[data.roomType] || data.roomType}
+        {data.dead ? ' · dead-end' : ''}
+      </div>
+    </div>
+  )
+}
+const nodeTypes = { room: RoomNode }
+
 export default function ChapterMap({ encounters, onOpenEncounter }) {
   const [collapsed, setCollapsed] = useState(false)
-  // The force layout is an iterative simulation — memoize on the encounters so it
-  // runs once per graph change, not every render (and stays visually stable).
-  const { nodes, edges, layout, deadEnds, stats } = useMemo(() => buildChapterGraph(encounters), [encounters])
+  // buildChapterGraph is a memoized pure derivation: nodes/edges/force-layout/stats.
+  const { nodes: gnodes, edges: gedges, layout, deadEnds, stats } = useMemo(() => buildChapterGraph(encounters), [encounters])
 
-  const width = Math.max(1, ...nodes.map((n) => layout[n.id].x + NODE_W + 24))
-  const height = Math.max(1, ...nodes.map((n) => layout[n.id].y + NODE_H + 24))
-  const center = (id) => ({ x: layout[id].x + NODE_W / 2, y: layout[id].y + NODE_H / 2 })
+  // React Flow node state — draggable within the session. Re-seeded from the force
+  // layout whenever the graph changes (add/remove/rename a room, edit an exit).
+  const [nodes, setNodes, onNodesChange] = useNodesState([])
+  useEffect(() => {
+    setNodes(
+      gnodes.map((n) => ({
+        id: n.id,
+        type: 'room',
+        position: layout[n.id] || { x: 0, y: 0 },
+        data: { name: n.name, roomType: n.roomType, dead: deadEnds.has(n.id) },
+      })),
+    )
+  }, [gnodes, layout, deadEnds, setNodes])
+
+  // Exits → edges. Labeled with the exit label; gold + thicker when the passage closes
+  // a loop (the Jaquays highlight); an arrowhead shows direction.
+  const edges = useMemo(
+    () =>
+      gedges.map((e, i) => ({
+        id: `e${i}`,
+        source: e.from,
+        target: e.to,
+        label: e.label || undefined,
+        markerEnd: { type: MarkerType.ArrowClosed, color: e.isLoop ? '#b8860b' : '#8a8f98', width: 18, height: 18 },
+        style: { stroke: e.isLoop ? '#b8860b' : '#8a8f98', strokeWidth: e.isLoop ? 2.5 : 1.6 },
+        labelStyle: { fill: '#cbd0d6', fontSize: 11 },
+        labelBgStyle: { fill: '#1b1f22', fillOpacity: 0.85 },
+        labelBgPadding: [4, 2],
+      })),
+    [gedges],
+  )
+
+  const onNodeClick = useCallback((_, node) => onOpenEncounter(node.id), [onOpenEncounter])
 
   return (
     <section className="chapter-map" data-testid="chapter-map">
@@ -43,88 +97,34 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
       </button>
 
       {!collapsed &&
-        (edges.length === 0 ? (
+        (gedges.length === 0 ? (
           <p className="muted">
-            {nodes.length ? 'No exits linked between these rooms yet — add Exits on an encounter.' : 'No encounters in this chapter yet.'}
+            {gnodes.length ? 'No exits linked between these rooms yet — add Exits on an encounter.' : 'No encounters in this chapter yet.'}
           </p>
         ) : (
-          <div className="map-scroll" style={{ overflowX: 'auto' }}>
-            <svg width={width} height={height} data-testid="map-svg" role="group" aria-label="Chapter connectivity map">
-              <defs>
-                <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-                  <path d="M0,0 L7,3 L0,6 Z" fill="#888" />
-                </marker>
-                <marker id="arrow-loop" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-                  <path d="M0,0 L7,3 L0,6 Z" fill="#b8860b" />
-                </marker>
-              </defs>
-
-              {edges.map((e, i) => {
-                const a = center(e.from)
-                const b = center(e.to)
-                const loop = e.isLoop
-                return (
-                  <g key={i} data-testid="map-edge" data-loop={loop || undefined}>
-                    <line
-                      x1={a.x}
-                      y1={a.y}
-                      x2={b.x}
-                      y2={b.y}
-                      stroke={loop ? '#b8860b' : '#999'}
-                      strokeWidth={loop ? 2 : 1.5}
-                      markerEnd={loop ? 'url(#arrow-loop)' : 'url(#arrow)'}
-                    />
-                    {e.label && (
-                      <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 4} fontSize="11" fill="#555" textAnchor="middle">
-                        {e.label}
-                      </text>
-                    )}
-                  </g>
-                )
-              })}
-
-              {nodes.map((n) => {
-                const p = layout[n.id]
-                const dead = deadEnds.has(n.id)
-                return (
-                  <g
-                    key={n.id}
-                    data-testid="map-node"
-                    data-dead-end={dead || undefined}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Open ${n.name}`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => onOpenEncounter(n.id)}
-                    onKeyDown={(ev) => {
-                      if (ev.key === 'Enter' || ev.key === ' ') {
-                        ev.preventDefault() // Space would otherwise scroll the page
-                        onOpenEncounter(n.id)
-                      }
-                    }}
-                  >
-                    <rect
-                      x={p.x}
-                      y={p.y}
-                      width={NODE_W}
-                      height={NODE_H}
-                      rx="6"
-                      fill={ROOM_FILL[n.roomType] || ROOM_FILL.empty}
-                      stroke={dead ? '#c0392b' : '#556'}
-                      strokeWidth={dead ? 2.5 : 1}
-                    />
-                    <text x={p.x + NODE_W / 2} y={p.y + 20} fontSize="13" fill="#222" textAnchor="middle" fontWeight="600">
-                      {n.name.length > 16 ? n.name.slice(0, 15) + '…' : n.name}
-                    </text>
-                    <text x={p.x + NODE_W / 2} y={p.y + 37} fontSize="10" fill="#556" textAnchor="middle">
-                      {ROOM_TYPE_LABELS[n.roomType] || n.roomType}
-                      {dead ? ' · dead-end' : ''}
-                    </text>
-                  </g>
-                )
-              })}
-            </svg>
-          </div>
+          <>
+            <div className="map-canvas" data-testid="map-canvas">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                nodeTypes={nodeTypes}
+                onNodesChange={onNodesChange}
+                onNodeClick={onNodeClick}
+                fitView
+                minZoom={0.1}
+                nodesConnectable={false}
+                proOptions={{ hideAttribution: false }}
+              >
+                <Background gap={20} color="#2a3033" />
+                <Controls showInteractive={false} />
+                <MiniMap pannable zoomable nodeColor={(n) => ROOM_FILL[n.data?.roomType] || ROOM_FILL.empty} />
+              </ReactFlow>
+            </div>
+            <p className="map-legend muted">
+              Lines are <strong>exits</strong> between rooms (arrow = direction) · <span style={{ color: '#b8860b' }}>gold</span> = a loop ·
+              red outline = dead-end. Drag the canvas to pan, scroll to zoom, drag a room to rearrange, click a room to open it.
+            </p>
+          </>
         ))}
     </section>
   )

@@ -20,6 +20,11 @@ export async function resolve(specifier, context, nextResolve) {
 }
 
 export async function load(url, context, nextLoad) {
+  // CSS imports (e.g. React Flow's dist/style.css) are bundler concerns — stub them
+  // as an empty module so `node --test` doesn't choke on the unknown extension.
+  if (url.endsWith('.css')) {
+    return { format: 'module', source: 'export default {}', shortCircuit: true }
+  }
   // Only app source — never a dep (some ship a `src/` dir, e.g. debug/src/*.js,
   // which is CommonJS and must NOT be forced to ESM).
   if (

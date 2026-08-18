@@ -187,6 +187,24 @@ button.encounter { flex: 1; text-align: left; }
    can't stretch the pane — which was pushing the sticky header off to the right. */
 .tab-panel { min-width: 0; }
 
+/* Chapter connectivity map (React Flow canvas). */
+.chapter-map { display: grid; gap: 0.5rem; min-width: 0; }
+.map-canvas { height: 60vh; min-height: 360px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.map-room {
+  width: 132px;
+  padding: 6px 8px;
+  border: 1px solid #556;
+  border-radius: 6px;
+  text-align: center;
+  color: #222;
+  cursor: pointer;
+  font-size: 13px;
+}
+.map-room[data-dead-end] { border-width: 2px; }
+.map-room-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-room-type { font-size: 10px; color: #556; }
+.map-legend { font-size: 12px; }
+
 /* Tabbed detail sections (chapter Config / Summary / Map). */
 .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); }
 .tab {
