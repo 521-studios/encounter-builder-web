@@ -2,6 +2,7 @@ import { ItemSearch } from '@521studios/pfsrd2-display'
 import { SALE_CLASSES, TREASURE_STATES, gameIdOf, customTreasureRef, isCustomTreasure, gpToCp, cpToGp } from '../model.js'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import ItemComposeView from './ItemComposeView.jsx'
+import RemoveButton from './RemoveButton.jsx'
 
 // One treasure row. Before an item is chosen, the library ItemSearch picks it by
 // name (no more typing raw game_ids). Once chosen: the ItemCard preview (masked-
@@ -104,7 +105,7 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
         </span>
       )}
       {!disabled && (
-        <button type="button" className="link danger" onClick={onRemove}>Remove</button>
+        <RemoveButton label="treasure" onRemove={onRemove} />
       )}
     </div>
   )
@@ -178,7 +179,7 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
           </>
         )}
         {!disabled && (
-          <button type="button" className="link danger" onClick={onRemove}>Remove</button>
+          <RemoveButton label="treasure" onRemove={onRemove} />
         )}
       </div>
     )

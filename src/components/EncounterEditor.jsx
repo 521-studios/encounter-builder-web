@@ -35,6 +35,7 @@ import TreasurePoolSection from './TreasurePoolSection.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
 import EncounterPrintSheet from './EncounterPrintSheet.jsx'
+import RemoveButton from './RemoveButton.jsx'
 
 const ENCOUNTER_TABS = [
   { id: 'config', label: 'Config' },
@@ -538,9 +539,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
                     onChange={(e) => setAward(i, { reason: e.target.value })}
                   />
                   {!released && (
-                    <button type="button" className="link danger" onClick={() => removeAward(i)}>
-                      remove
-                    </button>
+                    <RemoveButton label="XP award" onRemove={() => removeAward(i)} />
                   )}
                 </div>
               ))}
@@ -579,9 +578,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
                       onChange={(e) => setReward(i, { label: e.target.value })}
                     />
                     {!released && (
-                      <button type="button" className="link danger" onClick={() => removeReward(i)}>
-                        remove
-                      </button>
+                      <RemoveButton label="reward" onRemove={() => removeReward(i)} />
                     )}
                   </div>
                   {!released ? (
@@ -678,9 +675,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
                     onChange={(e) => setExit(i, { dc: Number(e.target.value) })}
                   />
                   {!released && (
-                    <button type="button" className="link danger" onClick={() => removeExit(i)}>
-                      remove
-                    </button>
+                    <RemoveButton label="exit" onRemove={() => removeExit(i)} />
                   )}
                 </div>
               ))}

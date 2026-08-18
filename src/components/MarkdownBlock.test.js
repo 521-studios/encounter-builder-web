@@ -32,10 +32,25 @@ test('MarkdownBlock renders an empty section placeholder when there is no body',
   assert.match(container.textContent, /\(empty section\)/)
 })
 
+test('MarkdownBlock × removes after a confirm', () => {
+  const orig = window.confirm
+  window.confirm = () => true
+  try {
+    let removed = false
+    render(
+      <MarkdownBlock block={{ title: 'T', body: 'x' }} editing={false} ariaLabel="challenge section" siblings={[]} onSet={noop} onEdit={noop} onDone={noop} onRemove={() => (removed = true)} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Remove section' }))
+    assert.ok(removed)
+  } finally {
+    window.confirm = orig
+  }
+})
+
 test('MarkdownBlock released is preview-only: no edit/remove affordance', () => {
   render(
     <MarkdownBlock block={{ body: 'z' }} editing released ariaLabel="challenge section" siblings={[]} onSet={noop} onEdit={noop} onDone={noop} onRemove={noop} />,
   )
   assert.equal(screen.queryByRole('button', { name: 'edit challenge section' }), null)
-  assert.equal(screen.queryByRole('button', { name: 'remove challenge section' }), null)
+  assert.equal(screen.queryByRole('button', { name: 'Remove section' }), null)
 })

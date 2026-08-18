@@ -319,6 +319,11 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
 .monster-header { display: grid; gap: 0.1rem; font-weight: 400; }
 .monster-header-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
 .monster-header-name { font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+/* Standard delete control: an × in an item's title bar. Inline by default (sits at the
+   end of a header row); .remove-x-abs pins it to a block's upper-right corner. */
+.remove-x { background: none; border: none; padding: 0 0.3rem; color: var(--muted); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+.remove-x:hover { color: var(--danger); }
+.remove-x-abs { position: absolute; top: 0.3rem; right: 0.3rem; }
 /* The name doubles as the stat-block toggle: a caret + name, styled as text not a button. */
 .monster-expand { background: none; border: none; padding: 0; margin: 0; color: inherit; font-family: inherit; font-size: inherit; cursor: pointer; text-align: left; }
 .monster-expand:hover { color: var(--accent); }
@@ -480,7 +485,9 @@ button.chapter-name:hover { color: var(--gold); }
    body + live preview, in a bordered card; "+ Add section" appends another. */
 .text-blocks { display: grid; gap: 0.75rem; }
 .field-label { font-weight: 500; opacity: 0.9; }
-.text-block { display: grid; gap: 0.35rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem; }
+.text-block { position: relative; display: grid; gap: 0.35rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem; }
+/* Leave room for the corner × so a title doesn't run under it. */
+.text-block > .text-block-title, .text-block > .text-block-heading { padding-right: 1.5rem; }
 .text-block-title { font-weight: 600; }
 .text-block-heading { margin: 0; font-size: 1rem; }
 .text-block-actions { display: flex; gap: 0.75rem; }
