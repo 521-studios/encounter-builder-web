@@ -100,6 +100,18 @@ export function pairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`
 }
 
+// Seed the map's room positions, reconciling a GM's saved layout against the current
+// rooms: a stored {x,y} wins; a room with no stored position (added since the last
+// save) falls back to the force-layout position, so it auto-places. Rooms removed
+// since the save simply aren't in `rooms`, so their stale stored entries are ignored
+// (and pruned on the next save, which rebuilds from the live rooms). Exit ports are
+// derived, not persisted, so they always use the force layout.
+export function seedPositions(rooms, stored, layout) {
+  const out = {}
+  for (const r of rooms || []) out[r.id] = (stored && stored[r.id]) || layout[r.id] || { x: 0, y: 0 }
+  return out
+}
+
 // One side's edge caption for the map: a 🔒 (secret from this side), the label, and
 // any skill check (Skill DC N), joined with " · " — e.g. "🔒 hidden panel · Perception
 // DC 18". A DC with no skill shows "DC N"; secret with nothing else is just "🔒";
