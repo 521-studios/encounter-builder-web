@@ -140,6 +140,8 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
             key={t.id}
             type="button"
             role="tab"
+            id={`chtab-${t.id}`}
+            aria-controls={`chpanel-${t.id}`}
             aria-selected={tab === t.id}
             className={`tab${tab === t.id ? ' tab--active' : ''}`}
             onClick={() => setTab(t.id)}
@@ -150,7 +152,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
       </div>
 
       {tab === 'config' && (
-        <div role="tabpanel">
+        <div role="tabpanel" id="chpanel-config" aria-labelledby="chtab-config">
           <p className="muted">
             Expected party for this chapter. Its encounters inherit these unless they set their
             own; leave a field empty to inherit from the campaign.
@@ -165,7 +167,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
       )}
 
       {tab === 'summary' && (
-        <div role="tabpanel">
+        <div role="tabpanel" id="chpanel-summary" aria-labelledby="chtab-summary">
           <TreasureRollup
             rollup={rollup}
             title="Chapter treasure"
@@ -180,7 +182,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
       )}
 
       {tab === 'map' && (
-        <div role="tabpanel">
+        <div role="tabpanel" id="chpanel-map" aria-labelledby="chtab-map">
           <ChapterMap encounters={chapterEncounters} onOpenEncounter={onOpenEncounter} />
         </div>
       )}
