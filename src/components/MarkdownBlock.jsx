@@ -1,4 +1,5 @@
 import WikiMarkdown from './WikiMarkdown.jsx'
+import RemoveButton from './RemoveButton.jsx'
 
 // One titled markdown block: EITHER an editor (title input + markdown textarea) or its
 // rendered preview — never both. Released encounters are always preview. Shared by
@@ -10,6 +11,7 @@ export default function MarkdownBlock({ block, editing, ariaLabel, released, sib
   const isEditing = !released && editing
   return (
     <div className="text-block" data-editing={isEditing || undefined}>
+      {!released && <RemoveButton className="remove-x-abs" label="section" onRemove={onRemove} />}
       {isEditing ? (
         <>
           <input
@@ -28,7 +30,6 @@ export default function MarkdownBlock({ block, editing, ariaLabel, released, sib
           />
           <div className="text-block-actions">
             <button type="button" className="link" onClick={onDone}>Done</button>
-            <button type="button" className="link danger" aria-label={`remove ${ariaLabel}`} onClick={onRemove}>Remove</button>
           </div>
         </>
       ) : (
@@ -44,7 +45,6 @@ export default function MarkdownBlock({ block, editing, ariaLabel, released, sib
           {!released && (
             <div className="text-block-actions">
               <button type="button" className="link" aria-label={`edit ${ariaLabel}`} onClick={onEdit}>Edit</button>
-              <button type="button" className="link danger" aria-label={`remove ${ariaLabel}`} onClick={onRemove}>Remove</button>
             </div>
           )}
         </>

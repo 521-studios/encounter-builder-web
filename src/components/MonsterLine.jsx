@@ -5,6 +5,7 @@ import { gameIdOf } from '../model.js'
 import { creatureHeader } from '../creatureHeader.js'
 import MonsterView from './MonsterView.jsx'
 import LoadoutView from './LoadoutView.jsx'
+import RemoveButton from './RemoveButton.jsx'
 
 // One monster row. Before a monster is chosen, a pfsrd2 search picker fills the
 // ref (and seeds the nickname with the monster's name). Once chosen it reads like
@@ -37,7 +38,7 @@ export default function MonsterLine({ monster, entryOf, disabled, onChange, onRe
           </div>
         )}
         {!disabled && (
-          <button type="button" className="link danger" onClick={onRemove}>Remove</button>
+          <RemoveButton label="monster" onRemove={onRemove} />
         )}
       </div>
     )
@@ -96,7 +97,7 @@ export default function MonsterLine({ monster, entryOf, disabled, onChange, onRe
           {showLoadout ? 'hide equipment' : `equipment${loadoutCount ? ` (${loadoutCount})` : ''}`}
         </button>
         {!disabled && (
-          <button type="button" className="link danger" onClick={onRemove}>Remove</button>
+          <RemoveButton label="monster" onRemove={onRemove} />
         )}
       </div>
       {showBlock && <MonsterView monster={monster} onChange={onChange} disabled={disabled} />}

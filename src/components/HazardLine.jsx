@@ -3,6 +3,7 @@ import { CreatureSearch } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import { gameIdOf } from '../model.js'
 import HazardView from './HazardView.jsx'
+import RemoveButton from './RemoveButton.jsx'
 
 // One hazard row — the encounter's SEPARATE "add hazard" slot (not the monster
 // search). Before a hazard is chosen, a pfsrd2 search over hazards + weather hazards
@@ -33,7 +34,7 @@ export default function HazardLine({ hazard, entryOf, disabled, onChange, onRemo
           </div>
         )}
         {!disabled && (
-          <button type="button" className="link danger" onClick={onRemove}>Remove</button>
+          <RemoveButton label="hazard" onRemove={onRemove} />
         )}
       </div>
     )
@@ -74,7 +75,7 @@ export default function HazardLine({ hazard, entryOf, disabled, onChange, onRemo
           onChange={(e) => set({ count: Number(e.target.value) })}
         />
         {!disabled && (
-          <button type="button" className="link danger" onClick={onRemove}>Remove</button>
+          <RemoveButton label="hazard" onRemove={onRemove} />
         )}
       </div>
       {showBlock && <HazardView gameId={gameId} />}

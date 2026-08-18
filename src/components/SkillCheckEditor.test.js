@@ -43,9 +43,15 @@ test('SkillCheckEditor opens the effect in edit mode when empty', () => {
   assert.ok(screen.getByLabelText('check effect')) // textarea visible for a fresh check
 })
 
-test('SkillCheckEditor remove button calls onRemove', () => {
-  let removed = false
-  render(<SkillCheckEditor value={{ skill: 'Perception', dc: 12 }} siblings={[]} onChange={noop} onRemove={() => (removed = true)} />)
-  fireEvent.click(screen.getByRole('button', { name: 'remove' }))
-  assert.ok(removed)
+test('SkillCheckEditor × removes after a confirm', () => {
+  const orig = window.confirm
+  window.confirm = () => true
+  try {
+    let removed = false
+    render(<SkillCheckEditor value={{ skill: 'Perception', dc: 12 }} siblings={[]} onChange={noop} onRemove={() => (removed = true)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove skill check' }))
+    assert.ok(removed)
+  } finally {
+    window.confirm = orig
+  }
 })

@@ -3,6 +3,7 @@ import { CreatureSearch } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import { gameIdOf } from '../model.js'
 import AfflictionView from './AfflictionView.jsx'
+import RemoveButton from './RemoveButton.jsx'
 
 // One affliction row — the encounter's SEPARATE "add affliction" slot (its own thing,
 // not the monster/hazard search). Before an affliction is chosen, a pfsrd2 search over
@@ -30,7 +31,7 @@ export default function AfflictionLine({ affliction, entryOf, disabled, onChange
           </div>
         )}
         {!disabled && (
-          <button type="button" className="link danger" onClick={onRemove}>Remove</button>
+          <RemoveButton label="affliction" onRemove={onRemove} />
         )}
       </div>
     )
@@ -73,7 +74,7 @@ export default function AfflictionLine({ affliction, entryOf, disabled, onChange
           onChange={(e) => set({ count: Number(e.target.value) })}
         />
         {!disabled && (
-          <button type="button" className="link danger" onClick={onRemove}>Remove</button>
+          <RemoveButton label="affliction" onRemove={onRemove} />
         )}
       </div>
       {showBlock && <AfflictionView gameId={gameId} />}

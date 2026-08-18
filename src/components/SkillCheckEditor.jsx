@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { skillCheckLabel, SKILL_CHECK_DEGREES, SKILL_CHECK_DEGREE_LABELS } from '../model.js'
 import WikiMarkdown from './WikiMarkdown.jsx'
+import RemoveButton from './RemoveButton.jsx'
 
 // One structured skill check: skill + DC (+ required successes), an effect (markdown),
 // optional alternative skills (OR), and per-degree outcomes. Edits flow through onChange
@@ -56,9 +57,7 @@ export default function SkillCheckEditor({ value, disabled, siblings, onOpenEnco
               onChange={(e) => set({ successes: Number(e.target.value) })}
             />
           </label>
-          <button type="button" className="link danger" onClick={onRemove}>
-            remove
-          </button>
+          <RemoveButton label="skill check" onRemove={onRemove} />
         </div>
       )}
       {!disabled ? (

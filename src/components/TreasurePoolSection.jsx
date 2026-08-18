@@ -1,5 +1,6 @@
 import { Markdown } from '@521studios/pfsrd2-display'
 import TreasureLine from './TreasureLine.jsx'
+import RemoveButton from './RemoveButton.jsx'
 
 // One treasure pool: where a group of loot is found. Carries an editable name, a
 // GM markdown description, and an optional discovery gate (skill + DC — informational
@@ -29,11 +30,7 @@ export default function TreasurePoolSection({
           disabled={disabled}
           onChange={(e) => onPoolChange({ name: e.target.value })}
         />
-        {canRemove && !disabled && (
-          <button type="button" className="link danger" onClick={onPoolRemove}>
-            remove pool
-          </button>
-        )}
+        {canRemove && !disabled && <RemoveButton label="pool" onRemove={onPoolRemove} />}
       </div>
 
       {!disabled ? (
