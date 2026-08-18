@@ -105,7 +105,10 @@ button.campaign.selected {
 
 .empty { opacity: 0.8; }
 
-.selected { margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+/* The sidebar "selected" separator. Scoped away from React Flow, which adds a bare
+   `selected` class to a dragged/selected map node — the unscoped rule was leaking a
+   top margin/padding onto the node, making it jump ~10px on drag. */
+.selected:not(.react-flow__node) { margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem; }
 
 input, textarea, select {
   font: inherit;
@@ -189,7 +192,9 @@ button.encounter { flex: 1; text-align: left; }
 
 /* Chapter connectivity map (React Flow canvas). */
 .chapter-map { display: grid; gap: 0.5rem; min-width: 0; }
-.map-canvas { height: 60vh; min-height: 360px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+/* Fill most of the viewport below the top chrome (topbar + sticky chapter header +
+   map title) instead of a fixed 60vh that left a big empty buffer at the bottom. */
+.map-canvas { height: calc(100vh - 210px); min-height: 420px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .map-room {
   width: 132px;
   padding: 6px 8px;
