@@ -184,11 +184,27 @@ function treasurePoolsInput(enc) {
   return out
 }
 
+// The encounter's markdown body as titled blocks. text_blocks is authoritative; a
+// legacy single `description` (pre-blocks) surfaces as ONE untitled block so it stays
+// visible and migrates into text_blocks on the next save. Used by both the editor
+// (display) and toEncounterInput (serialization) so the two never diverge.
+export function encounterBlocks(enc) {
+  if (enc?.text_blocks?.length) return enc.text_blocks
+  if (enc?.description) return [{ title: '', body: enc.description }]
+  return []
+}
+
 export function toEncounterInput(enc) {
   const input = {
     name: enc.name,
     chapter_id: enc.chapter_id || '',
-    description: enc.description || '',
+    // Markdown body: titled blocks. Migrate-on-save — a legacy `description` folds
+    // into an untitled block (encounterBlocks) and description clears here, so it's
+    // written once and never double-counted. Empty blocks (no title + no body) drop.
+    text_blocks: encounterBlocks(enc)
+      .map((b) => ({ title: (b.title || '').trim(), body: b.body || '' }))
+      .filter((b) => b.title || b.body),
+    description: '',
     notes: enc.notes || '',
     monsters: (enc.monsters || []).filter(hasRef).map(monsterInput),
     hazards: (enc.hazards || []).filter(hasRef).map(stripKey),
