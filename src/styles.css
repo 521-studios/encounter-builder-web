@@ -208,7 +208,12 @@ button.encounter { flex: 1; text-align: left; }
 .map-room[data-dead-end] { border-width: 2px; }
 .map-room-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .map-room-type { font-size: 10px; color: #556; }
+/* Boundary-exit port: a small circle hung off a room. */
+.map-exit { width: 18px; height: 18px; border-radius: 50%; background: #2a3033; border: 2px solid #8a8f98; }
+/* Passage labels, positioned at each side's card edge via EdgeLabelRenderer. */
+.map-edge-label { position: absolute; pointer-events: none; background: rgba(27, 31, 34, 0.85); color: #cbd0d6; font-size: 10px; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
 .map-legend { font-size: 12px; }
+.map-legend-dash { letter-spacing: -1px; }
 
 /* Tabbed detail sections (chapter Config / Summary / Map). */
 .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); }
