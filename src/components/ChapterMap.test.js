@@ -45,3 +45,9 @@ test('ChapterMap: no linked exits shows a hint, not an empty canvas', () => {
   assert.equal(screen.queryByTestId('map-canvas'), null)
   assert.match(screen.getByText(/No exits linked/).textContent, /add Exits/)
 })
+
+test('ChapterMap: an empty chapter (no rooms) shows the no-encounters hint', () => {
+  render(<ChapterMap encounters={[]} onOpenEncounter={() => {}} />)
+  assert.equal(screen.queryByTestId('map-canvas'), null)
+  assert.match(screen.getByText(/No encounters in this chapter/).textContent, /No encounters/)
+})
