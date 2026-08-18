@@ -13,6 +13,7 @@ import {
   REWARD_KINDS,
   REWARD_KIND_LABELS,
   buildInput,
+  encounterBlocks,
   emptyMonster,
   emptyHazard,
   emptyAffliction,
@@ -162,6 +163,14 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const hazards = enc.hazards || []
   const afflictions = enc.afflictions || []
   const treasure = enc.treasure || []
+
+  // Titled markdown blocks (a legacy single description surfaces as one untitled
+  // block via encounterBlocks; edits persist text_blocks, and the save clears the
+  // legacy description). (markdown-blocks)
+  const blocks = encounterBlocks(enc)
+  const setBlock = (i, fields) => patch({ text_blocks: blocks.map((b, j) => (j === i ? { ...b, ...fields } : b)) })
+  const addBlock = () => patch({ text_blocks: [...blocks, { title: '', body: '' }] })
+  const removeBlock = (i) => patch({ text_blocks: blocks.filter((_, j) => j !== i) })
 
   const setMonster = (i, m) => patch({ monsters: monsters.map((x, j) => (j === i ? m : x)) })
   const setHazard = (i, h) => patch({ hazards: hazards.map((x, j) => (j === i ? h : x)) })
@@ -368,21 +377,44 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         onChange={(next) => patch({ party_level: next.party_level, party_size: next.party_size })}
       />
 
-      <label className="field">
-        <span>Description</span>
-        <textarea
-          className="description-input"
-          value={enc.description || ''}
-          disabled={released}
-          onChange={(e) => patch({ description: e.target.value })}
-          placeholder="Scene-setting, read-aloud text, GM notes… (markdown)"
-        />
-      </label>
-      {enc.description && (
-        <div className="description-preview" data-testid="description-preview">
-          <WikiMarkdown text={enc.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
-        </div>
-      )}
+      <div className="text-blocks" data-testid="text-blocks">
+        <span className="field-label">Description</span>
+        {blocks.map((b, i) => (
+          <div className="text-block" key={i}>
+            <input
+              className="text-block-title"
+              aria-label={`section ${i + 1} title`}
+              value={b.title || ''}
+              disabled={released}
+              placeholder="Section title (optional)"
+              onChange={(e) => setBlock(i, { title: e.target.value })}
+            />
+            <textarea
+              className="description-input"
+              aria-label={`section ${i + 1} body`}
+              value={b.body || ''}
+              disabled={released}
+              onChange={(e) => setBlock(i, { body: e.target.value })}
+              placeholder="Scene-setting, read-aloud text, GM notes… (markdown)"
+            />
+            {b.body && (
+              <div className="description-preview" data-testid="description-preview">
+                <WikiMarkdown text={b.body} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
+              </div>
+            )}
+            {!released && (
+              <button type="button" className="link danger" aria-label={`remove section ${i + 1}`} onClick={() => removeBlock(i)}>
+                Remove section
+              </button>
+            )}
+          </div>
+        ))}
+        {!released && (
+          <button type="button" className="link" data-testid="add-section" onClick={addBlock}>
+            + Add section
+          </button>
+        )}
+      </div>
 
       <label className="field">
         <span>Notes</span>
