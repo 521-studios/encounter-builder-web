@@ -40,6 +40,11 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
   const [encountersError, setEncountersError] = useState(false) // encounters list failed to load (rollup is unreliable)
   const [error, setError] = useState(null)
   const [reloadKey, setReloadKey] = useState(0) // bump to re-fetch the encounters list on retry
+  // The saved map layout, held locally so an in-session drag-save is reflected when the
+  // map remounts (e.g. switching away from the Map tab and back) — the `chapter` prop
+  // isn't refreshed after a save, so seeding off it would revert to the last page-load.
+  const [mapPositions, setMapPositions] = useState(chapter.map_positions)
+  useEffect(() => setMapPositions(chapter.map_positions), [chapter.id]) // re-init when a different chapter opens
 
   // Autosave now runs through the store's flush layer (rtd8b-2): the indicator
   // reads flush state; commit() mirrors the built input into the store, which
@@ -107,6 +112,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
   function savePositions(map_positions) {
     const name = value.name.trim() || chapter.name
     if (!name) return
+    setMapPositions(map_positions) // reflect locally so a map remount seeds off the fresh layout
     chaptersApi.edit(
       campaignId,
       chapter.id,
@@ -208,7 +214,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
           <ChapterMap
             encounters={chapterEncounters}
             onOpenEncounter={onOpenEncounter}
-            positions={chapter.map_positions}
+            positions={mapPositions}
             onPositionsChange={savePositions}
           />
         </div>

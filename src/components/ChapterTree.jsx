@@ -39,8 +39,13 @@ export default function ChapterTree({ campaignId, onEdit, onEditChapter, reloadK
     }
   }, [campaignId])
 
+  // Blank to the loading state only when the campaign changes (a different tree). A
+  // reloadKey bump (any save) refetches IN PLACE — the current tree stays on screen and
+  // is swapped on success, so an unrelated save doesn't flash the whole sidebar.
   useEffect(() => {
     setChapters(null)
+  }, [campaignId])
+  useEffect(() => {
     load()
   }, [load, reloadKey])
 

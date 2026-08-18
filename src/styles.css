@@ -211,7 +211,7 @@ button.encounter { flex: 1; text-align: left; }
 .map-room-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .map-room-type { font-size: 10px; color: #556; }
 /* Boundary-exit port: a small circle hung off a room. */
-.map-exit { width: 18px; height: 18px; border-radius: 50%; background: #2a3033; border: 2px solid #8a8f98; }
+.map-exit { width: 36px; height: 36px; border-radius: 50%; background: #2a3033; border: 2px solid #8a8f98; }
 
 /* Exit editor row: target · label · secret · skill · DC · remove (wraps when narrow). */
 .exit { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
