@@ -281,6 +281,21 @@ button.encounter { flex: 1; text-align: left; }
 .editor-tabrow .tabs { flex: 1; }
 .editor-release { display: flex; align-items: center; gap: 0.75rem; padding-bottom: 0.3rem; white-space: nowrap; }
 
+/* Unified Challenges list: each item is a row = drag handle + its type-specific editor. */
+.challenge-list { display: grid; gap: 0.75rem; }
+.challenge-row { display: flex; align-items: flex-start; gap: 0.5rem; }
+.challenge-row[data-dragging] { opacity: 0.5; }
+.challenge-body { flex: 1; min-width: 0; }
+.drag-handle { cursor: grab; color: var(--muted); user-select: none; padding: 0.35rem 0.2rem; line-height: 1; font-size: 1.15rem; }
+.drag-handle:active { cursor: grabbing; }
+.add-challenge { align-self: start; }
+/* + Add type-picker dialog */
+.challenge-dialog { border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--panel); color: var(--fg); padding: 1.25rem; min-width: 260px; }
+.challenge-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+.challenge-dialog-title { margin: 0 0 0.75rem; font-size: 1rem; }
+.challenge-type-grid { display: grid; gap: 0.4rem; margin-bottom: 0.75rem; }
+.challenge-type { text-align: left; }
+
 fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.5rem; }
 legend { padding: 0 0.4rem; opacity: 0.8; }
 
