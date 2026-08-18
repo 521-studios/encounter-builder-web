@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint } from './chapterGraph.js'
 
 // A1→A2→A3→A1→A4 (all one-directional). One exit is external (no target) and one is
 // dangling (target not in the chapter) — both become boundary exit ports, not passages.
@@ -67,6 +67,23 @@ test('buildChapterGraph: reciprocal doors collapse to one two-way passage; corri
   assert.ok(g.passages.every((p) => p.twoWay))
   assert.equal(g.stats.connections, 2)
   assert.deepEqual([...g.deadEnds].sort(), ['1', '3']) // A and C
+})
+
+test('buildChapterGraph: a self-exit and an empty exit are dropped (no passage, no port)', () => {
+  const g = buildChapterGraph([{ id: 1, name: 'A', exits: [{ to_encounter_id: '1' }, {}] }]) // self-ref + empty
+  assert.equal(g.passages.length, 0)
+  assert.equal(g.exitPorts.length, 0)
+})
+
+test('boundaryPoint: crosses the box edge nearest the incoming direction; centre on coincidence', () => {
+  // Horizontal approach → crosses the vertical (hw) edge.
+  assert.deepEqual(boundaryPoint({ x: 0, y: 50 }, { x: 100, y: 50, hw: 10, hh: 20 }), { x: 90, y: 50 })
+  // Vertical approach → crosses the horizontal (hh) edge.
+  assert.deepEqual(boundaryPoint({ x: 50, y: 0 }, { x: 50, y: 100, hw: 40, hh: 10 }), { x: 50, y: 90 })
+  // 45° into a square → the corner (both scales equal).
+  assert.deepEqual(boundaryPoint({ x: 0, y: 0 }, { x: 100, y: 100, hw: 10, hh: 10 }), { x: 90, y: 90 })
+  // `from` at the centre → the centre (no direction).
+  assert.deepEqual(boundaryPoint({ x: 50, y: 50 }, { x: 50, y: 50, hw: 10, hh: 10 }), { x: 50, y: 50 })
 })
 
 test('buildChapterGraph: a duplicate exit does not invent a second passage', () => {

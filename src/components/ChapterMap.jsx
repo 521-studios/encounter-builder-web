@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, getStraightPath, EdgeLabelRenderer } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { buildChapterGraph } from '../chapterGraph.js'
+import { buildChapterGraph, boundaryPoint } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
 // 8hda: an INTERACTIVE node-link map of a chapter — pan (drag canvas), zoom (scroll),
@@ -62,16 +62,6 @@ function boxOf(n) {
   const x = n.internals.positionAbsolute.x + w / 2
   const y = n.internals.positionAbsolute.y + h / 2
   return { x, y, hw: w / 2, hh: h / 2 }
-}
-
-// Where the segment from `from` toward box centre `c` crosses the box boundary — so an
-// arrow / label sits at the card edge, not hidden under the centre.
-function boundaryPoint(from, c) {
-  const dx = c.x - from.x
-  const dy = c.y - from.y
-  if (dx === 0 && dy === 0) return { x: c.x, y: c.y }
-  const s = Math.min(dx !== 0 ? c.hw / Math.abs(dx) : Infinity, dy !== 0 ? c.hh / Math.abs(dy) : Infinity)
-  return { x: c.x - dx * s, y: c.y - dy * s }
 }
 
 // A passage between two rooms (or a room and an exit port). Line runs centre-to-centre;

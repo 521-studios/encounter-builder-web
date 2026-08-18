@@ -44,14 +44,14 @@ export function buildChapterGraph(encounters) {
     seen.add(pk)
     neighbors[a].add(b)
     neighbors[b].add(a)
+    // `ab` is the currently-iterated key, so it always exists; `ba` is the reverse.
+    // Both present → two-way (each side keeps its own label/secret); only `ab` → one-way.
     const ab = directed.get(`${a}>${b}`)
     const ba = directed.get(`${b}>${a}`)
-    if (ab && ba) {
+    if (ba) {
       passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: true, sourceLabel: ab.label, targetLabel: ba.label, sourceSecret: ab.secret, targetSecret: ba.secret })
-    } else if (ab) {
-      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: false, sourceLabel: ab.label, targetLabel: '', sourceSecret: ab.secret, targetSecret: false })
     } else {
-      passages.push({ id: `p:${pk}`, source: b, target: a, twoWay: false, sourceLabel: ba.label, targetLabel: '', sourceSecret: ba.secret, targetSecret: false })
+      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: false, sourceLabel: ab.label, targetLabel: '', sourceSecret: ab.secret, targetSecret: false })
     }
   }
 
@@ -71,6 +71,19 @@ export function buildChapterGraph(encounters) {
 // Canonical undirected key for a node pair (order-independent).
 export function pairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
+// Where the segment from point `from` toward box centre `c` ({x, y, hw, hh}) crosses
+// the box boundary — used by the map to place an arrowhead / label at a card's EDGE
+// rather than its (hidden) centre. Scales the direction vector to the nearer of the
+// box's vertical (hw) / horizontal (hh) half-extents; returns the centre when `from`
+// coincides with it.
+export function boundaryPoint(from, c) {
+  const dx = c.x - from.x
+  const dy = c.y - from.y
+  if (dx === 0 && dy === 0) return { x: c.x, y: c.y }
+  const s = Math.min(dx !== 0 ? c.hw / Math.abs(dx) : Infinity, dy !== 0 ? c.hh / Math.abs(dy) : Infinity)
+  return { x: c.x - dx * s, y: c.y - dy * s }
 }
 
 // Dependency-free layered layout: BFS distance from each component's roots (lowest
