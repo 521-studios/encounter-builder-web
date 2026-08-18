@@ -414,19 +414,20 @@ test('exitInput keeps the target, trims the label, drops _key', () => {
   })
 })
 
-test('toEncounterInput sends exits with a target or label, drops fully-empty rows', () => {
+test('toEncounterInput keeps every exit row, including a blank placeholder (trimmed)', () => {
   const enc = keyed({
     name: 'x',
     exits: [
       { to_encounter_id: 'a2', label: 'north door' }, // internal
       { to_encounter_id: '', label: 'Exterior' }, // external
-      { to_encounter_id: '', label: '  ' }, // empty → dropped
+      { to_encounter_id: '', label: '  ' }, // blank placeholder — kept (label trimmed to '')
     ],
   })
   const input = toEncounterInput(enc)
   assert.deepEqual(input.exits, [
     { to_encounter_id: 'a2', label: 'north door' },
     { to_encounter_id: '', label: 'Exterior' },
+    { to_encounter_id: '', label: '' },
   ])
 })
 
