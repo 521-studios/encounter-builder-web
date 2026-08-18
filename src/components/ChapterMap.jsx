@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState } from '@xyflow/react'
+import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, getStraightPath, EdgeLabelRenderer } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { buildChapterGraph } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
-// 8hda: an INTERACTIVE node-link map of a chapter's connectivity (encounters = nodes,
-// 3qq7 exits = edges), built on React Flow — pan (drag the canvas), zoom (scroll), and
-// drag a room to rearrange it. The force layout (chapterGraph.forceLayout) seeds the
-// initial positions; the Jaquays structure (loops in gold, dead-ends outlined) and the
-// exit labels read directly off the edges. Always-visible, collapsible by its title.
-// (Node positions are session-only for now; persisting a GM's manual layout is the next
-// step — a positions blob on the chapter.)
+// 8hda: an INTERACTIVE node-link map of a chapter — pan (drag canvas), zoom (scroll),
+// drag a room to rearrange. Rooms are cards; a PASSAGE is a straight centre-to-centre
+// line (one-way = arrow toward the target at its card edge, two-way = plain line);
+// each side's label sits at its own end so a two-way passage's two labels don't
+// overlap; a secret passage is dashed with a lock at the secret end; and an exit that
+// leaves the chapter hangs off its room as a small circle. Collapsible by its title.
 const ROOM_FILL = {
   combat: '#f3d4d4',
   hazard: '#f6e3c2',
@@ -20,23 +19,13 @@ const ROOM_FILL = {
   knowledge: '#cfe8ec',
   empty: '#e6e6e6',
 }
+const EDGE_COLOR = '#8a8f98'
 
-// A room card node. Both handles sit at the node's EXACT centre (hidden), so a
-// straight edge runs centre-to-centre and the opaque card hides the stub under it —
-// no curve pulling toward a top/side handle. Click opens the encounter.
+// Handles sit at the node's exact centre (hidden) so passages run centre-to-centre
+// and the opaque card hides the stub; edges attach at the card edge via geometry below.
+const CENTRED_HANDLE = { left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 1, height: 1, minWidth: 1, minHeight: 1, border: 'none', opacity: 0, pointerEvents: 'none' }
+
 function RoomNode({ data }) {
-  const centred = {
-    left: '50%',
-    top: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: 1,
-    height: 1,
-    minWidth: 1,
-    minHeight: 1,
-    border: 'none',
-    opacity: 0,
-    pointerEvents: 'none',
-  }
   return (
     <div
       className="map-room"
@@ -44,8 +33,8 @@ function RoomNode({ data }) {
       style={{ background: ROOM_FILL[data.roomType] || ROOM_FILL.empty, borderColor: data.dead ? '#c0392b' : '#556' }}
       title={data.name}
     >
-      <Handle type="target" position={Position.Top} style={centred} />
-      <Handle type="source" position={Position.Top} style={centred} />
+      <Handle type="target" position={Position.Top} style={CENTRED_HANDLE} />
+      <Handle type="source" position={Position.Top} style={CENTRED_HANDLE} />
       <div className="map-room-name">{data.name}</div>
       <div className="map-room-type">
         {ROOM_TYPE_LABELS[data.roomType] || data.roomType}
@@ -54,65 +43,113 @@ function RoomNode({ data }) {
     </div>
   )
 }
-const nodeTypes = { room: RoomNode }
+
+// A boundary exit: a small circle hung off the room; the exit label rides on its edge.
+function ExitNode() {
+  return (
+    <div className="map-exit" title="Exit leaving the chapter">
+      <Handle type="target" position={Position.Top} style={CENTRED_HANDLE} />
+      <Handle type="source" position={Position.Top} style={CENTRED_HANDLE} />
+    </div>
+  )
+}
+const nodeTypes = { room: RoomNode, exit: ExitNode }
+
+// The centre + half-extents of an internal React Flow node (measured, with fallbacks).
+function boxOf(n) {
+  const w = n.measured?.width || (n.type === 'exit' ? 18 : 132)
+  const h = n.measured?.height || (n.type === 'exit' ? 18 : 46)
+  const x = n.internals.positionAbsolute.x + w / 2
+  const y = n.internals.positionAbsolute.y + h / 2
+  return { x, y, hw: w / 2, hh: h / 2 }
+}
+
+// Where the segment from `from` toward box centre `c` crosses the box boundary — so an
+// arrow / label sits at the card edge, not hidden under the centre.
+function boundaryPoint(from, c) {
+  const dx = c.x - from.x
+  const dy = c.y - from.y
+  if (dx === 0 && dy === 0) return { x: c.x, y: c.y }
+  const s = Math.min(dx !== 0 ? c.hw / Math.abs(dx) : Infinity, dy !== 0 ? c.hh / Math.abs(dy) : Infinity)
+  return { x: c.x - dx * s, y: c.y - dy * s }
+}
+
+// A passage between two rooms (or a room and an exit port). Line runs centre-to-centre;
+// a one-way passage adds an arrowhead at the target's card edge; each side's label sits
+// at its own card edge; a secret side is dashed with a lock.
+function PassageEdge({ source, target, data }) {
+  const s = useInternalNode(source)
+  const t = useInternalNode(target)
+  if (!s || !t) return null
+  const sc = boxOf(s)
+  const tc = boxOf(t)
+  const [path] = getStraightPath({ sourceX: sc.x, sourceY: sc.y, targetX: tc.x, targetY: tc.y })
+  const tb = boundaryPoint(sc, tc) // target card edge — arrow + target label
+  const sb = boundaryPoint(tc, sc) // source card edge — source label
+  const secret = data.sourceSecret || data.targetSecret
+  const ang = (Math.atan2(tb.y - sc.y, tb.x - sc.x) * 180) / Math.PI
+  return (
+    <>
+      <path className="react-flow__edge-path" d={path} fill="none" stroke={EDGE_COLOR} strokeWidth={1.6} strokeDasharray={secret ? '6 4' : undefined} />
+      {!data.twoWay && (
+        <g transform={`translate(${tb.x} ${tb.y}) rotate(${ang})`}>
+          <polygon points="0,0 -10,-4.5 -10,4.5" fill={EDGE_COLOR} />
+        </g>
+      )}
+      <EdgeLabelRenderer>
+        {data.sourceLabel && (
+          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${sb.x}px, ${sb.y}px)` }}>
+            {data.sourceSecret ? '🔒 ' : ''}
+            {data.sourceLabel}
+          </div>
+        )}
+        {data.targetLabel && (
+          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${tb.x}px, ${tb.y}px)` }}>
+            {data.targetSecret ? '🔒 ' : ''}
+            {data.targetLabel}
+          </div>
+        )}
+      </EdgeLabelRenderer>
+    </>
+  )
+}
+const edgeTypes = { passage: PassageEdge }
 
 export default function ChapterMap({ encounters, onOpenEncounter }) {
   const [collapsed, setCollapsed] = useState(false)
-  // buildChapterGraph is a memoized pure derivation: nodes/edges/force-layout/stats.
-  const { nodes: gnodes, edges: gedges, layout, deadEnds, stats } = useMemo(() => buildChapterGraph(encounters), [encounters])
+  const { nodes: rooms, exitPorts, passages, exitEdges, layout, deadEnds, stats } = useMemo(() => buildChapterGraph(encounters), [encounters])
 
-  // React Flow node state — draggable within the session. Re-seeded from the force
-  // layout whenever the graph changes (add/remove/rename a room, edit an exit).
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   useEffect(() => {
-    setNodes(
-      gnodes.map((n) => ({
-        id: n.id,
-        type: 'room',
-        position: layout[n.id] || { x: 0, y: 0 },
-        data: { name: n.name, roomType: n.roomType, dead: deadEnds.has(n.id) },
-      })),
-    )
-  }, [gnodes, layout, deadEnds, setNodes])
+    setNodes([
+      ...rooms.map((n) => ({ id: n.id, type: 'room', position: layout[n.id] || { x: 0, y: 0 }, data: { name: n.name, roomType: n.roomType, dead: deadEnds.has(n.id) } })),
+      ...exitPorts.map((p) => ({ id: p.id, type: 'exit', position: layout[p.id] || { x: 0, y: 0 }, data: {}, draggable: true })),
+    ])
+  }, [rooms, exitPorts, layout, deadEnds, setNodes])
 
-  // Exits → edges. Labeled with the exit label; gold + thicker when the passage closes
-  // a loop (the Jaquays highlight); an arrowhead shows direction.
+  // Passages (rooms) + boundary exits (room → port) both render via PassageEdge.
   const edges = useMemo(
-    () =>
-      gedges.map((e, i) => ({
-        id: `e${i}`,
-        source: e.from,
-        target: e.to,
-        type: 'straight', // straight centre-to-centre line, not a bezier curving to a handle
-        label: e.label || undefined,
-        style: { stroke: e.isLoop ? '#b8860b' : '#8a8f98', strokeWidth: e.isLoop ? 2.5 : 1.6 },
-        labelStyle: { fill: '#cbd0d6', fontSize: 11 },
-        labelBgStyle: { fill: '#1b1f22', fillOpacity: 0.85 },
-        labelBgPadding: [4, 2],
-      })),
-    [gedges],
+    () => [
+      ...passages.map((p) => ({ id: p.id, source: p.source, target: p.target, type: 'passage', data: { twoWay: p.twoWay, sourceLabel: p.sourceLabel, targetLabel: p.targetLabel, sourceSecret: p.sourceSecret, targetSecret: p.targetSecret } })),
+      ...exitEdges.map((x) => ({ id: x.id, source: x.source, target: x.target, type: 'passage', data: { twoWay: false, sourceLabel: '', targetLabel: x.label, sourceSecret: false, targetSecret: x.secret } })),
+    ],
+    [passages, exitEdges],
   )
 
-  const onNodeClick = useCallback((_, node) => onOpenEncounter(node.id), [onOpenEncounter])
+  const onNodeClick = useCallback((_, node) => node.type === 'room' && onOpenEncounter(node.id), [onOpenEncounter])
+  const hasContent = passages.length > 0 || exitPorts.length > 0
 
   return (
     <section className="chapter-map" data-testid="chapter-map">
-      <button
-        type="button"
-        className="map-title summary-toggle"
-        aria-expanded={!collapsed}
-        onClick={() => setCollapsed((c) => !c)}
-      >
+      <button type="button" className="map-title summary-toggle" aria-expanded={!collapsed} onClick={() => setCollapsed((c) => !c)}>
         <span className="chapter-caret" aria-hidden="true">{collapsed ? '▸' : '▾'}</span> Map —{' '}
-        {stats.rooms} room{stats.rooms === 1 ? '' : 's'} · {stats.connections} connection
-        {stats.connections === 1 ? '' : 's'} · {stats.loops} loop{stats.loops === 1 ? '' : 's'}
+        {stats.rooms} room{stats.rooms === 1 ? '' : 's'} · {stats.connections} passage{stats.connections === 1 ? '' : 's'} · {stats.exits} exit
+        {stats.exits === 1 ? '' : 's'}
       </button>
 
       {!collapsed &&
-        (gedges.length === 0 ? (
-          <p className="muted">
-            {gnodes.length ? 'No exits linked between these rooms yet — add Exits on an encounter.' : 'No encounters in this chapter yet.'}
-          </p>
+        (!hasContent ? (
+          <p className="muted">{stats.rooms ? 'No exits on these rooms yet — add Exits on an encounter.' : 'No encounters in this chapter yet.'}</p>
         ) : (
           <>
             <div className="map-canvas" data-testid="map-canvas">
@@ -120,6 +157,7 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
                 onNodesChange={onNodesChange}
                 onNodeClick={onNodeClick}
                 fitView
@@ -129,12 +167,12 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
               >
                 <Background gap={20} color="#2a3033" />
                 <Controls showInteractive={false} />
-                <MiniMap pannable zoomable nodeColor={(n) => ROOM_FILL[n.data?.roomType] || ROOM_FILL.empty} />
+                <MiniMap pannable zoomable nodeColor={(n) => (n.type === 'exit' ? '#8a8f98' : ROOM_FILL[n.data?.roomType] || ROOM_FILL.empty)} />
               </ReactFlow>
             </div>
             <p className="map-legend muted">
-              Lines are <strong>exits</strong> between rooms · <span style={{ color: '#b8860b' }}>gold</span> = a loop ·
-              red outline = dead-end. Drag the canvas to pan, scroll to zoom, drag a room to rearrange, click a room to open it.
+              <strong>→</strong> one-way exit · <strong>—</strong> two-way · <span className="map-legend-dash">– –</span> secret door (🔒 = the side it's hidden from) ·{' '}
+              ○ exit leaving the chapter · red outline = dead-end. Drag to pan, scroll to zoom, drag a room to rearrange, click a room to open it.
             </p>
           </>
         ))}

@@ -1,81 +1,76 @@
 // Pure node-link graph for a chapter's connectivity map (8hda). Turns the chapter's
-// encounters + their 3qq7 exits into nodes, intra-chapter directed edges, a
-// dependency-free FORCE-DIRECTED layout (forceLayout; layerLayout kept for
-// reference), and the Jaquays signals (dead-ends + loops). Kept pure/testable;
-// ChapterMap renders the SVG from this.
-
-// Only exits pointing at another encounter IN this chapter become drawn edges;
-// external / cross-chapter exits are authored on the encounter but not plotted here
-// (they'd point off the chapter map). Ids are coerced to strings for matching
-// (encounter ids are numeric; exit.to_encounter_id is stored as a string).
+// encounters + their 3qq7 exits into room nodes, undirected PASSAGES (a passage is
+// one-way unless BOTH rooms link it, in which case it's two-way), boundary EXIT PORTS
+// for exits that leave the chapter, a dependency-free force-directed layout, and the
+// dead-end signal. Kept pure/testable; ChapterMap renders it via React Flow.
+//
+// Reciprocity drives direction: exits are authored one-directionally, so A→B alone is
+// a one-way passage (arrow toward B); A→B + B→A is a two-way passage (plain line).
+// Each direction keeps its own label near its source end so a two-way passage's two
+// labels don't overlap at the midpoint. Exits pointing outside the chapter (no target,
+// or a target not in it) become an exit-port circle hung off the room, so boundary
+// exits are visible instead of silently dropped.
 export function buildChapterGraph(encounters) {
   const list = encounters || []
   const nodeIds = new Set(list.map((e) => String(e.id)))
-  const nodes = list.map((e) => ({ id: String(e.id), name: e.name || 'Untitled', roomType: e.room_type || 'combat' }))
+  const nodes = list.map((e) => ({ id: String(e.id), name: e.name || 'Untitled', roomType: e.room_type || 'combat', kind: 'room' }))
 
-  const edges = []
+  // Directed intra-chapter exits keyed for reciprocity lookup; boundary exits → ports.
+  const directed = new Map() // "from>to" -> { label, secret }
+  const exitPorts = []
+  const exitEdges = []
   for (const e of list) {
-    for (const ex of e.exits || []) {
+    const from = String(e.id)
+    ;(e.exits || []).forEach((ex, idx) => {
       const to = String(ex.to_encounter_id || '')
-      if (to && to !== String(e.id) && nodeIds.has(to)) {
-        edges.push({ from: String(e.id), to, label: ex.label || '' })
+      if (to && to !== from && nodeIds.has(to)) {
+        directed.set(`${from}>${to}`, { label: ex.label || '', secret: !!ex.secret })
+      } else if (to !== from && (ex.label || to)) {
+        const portId = `exit:${from}:${idx}`
+        exitPorts.push({ id: portId, name: ex.label || 'Exit', kind: 'exit' })
+        exitEdges.push({ id: `xe:${from}:${idx}`, source: from, target: portId, label: ex.label || '', secret: !!ex.secret })
       }
+    })
+  }
+
+  // Collapse the directed exits into undirected passages. One pass per canonical pair.
+  const passages = []
+  const seen = new Set()
+  const neighbors = Object.fromEntries(nodes.map((n) => [n.id, new Set()]))
+  for (const key of directed.keys()) {
+    const [a, b] = key.split('>')
+    const pk = pairKey(a, b)
+    if (seen.has(pk)) continue
+    seen.add(pk)
+    neighbors[a].add(b)
+    neighbors[b].add(a)
+    const ab = directed.get(`${a}>${b}`)
+    const ba = directed.get(`${b}>${a}`)
+    if (ab && ba) {
+      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: true, sourceLabel: ab.label, targetLabel: ba.label, sourceSecret: ab.secret, targetSecret: ba.secret })
+    } else if (ab) {
+      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: false, sourceLabel: ab.label, targetLabel: '', sourceSecret: ab.secret, targetSecret: false })
+    } else {
+      passages.push({ id: `p:${pk}`, source: b, target: a, twoWay: false, sourceLabel: ba.label, targetLabel: '', sourceSecret: ba.secret, targetSecret: false })
     }
   }
 
-  // Collapse reciprocal / duplicate directed exits to a DISTINCT UNDIRECTED
-  // adjacency before analysis. Exits are authored one-directionally and not
-  // auto-mirrored, so a two-way door is two records (A→B + B→A) and a corridor is a
-  // chain of them — but both Jaquays signals are about distinct *passages*, not
-  // authored records. Counting the multiset makes a plain corridor look full of
-  // loops and never flags its termini as dead-ends (the inverse of the truth).
-  const neighbors = Object.fromEntries(nodes.map((n) => [n.id, new Set()]))
-  const undirected = new Map() // canonical "a|b" -> [a, b]
-  for (const e of edges) {
-    neighbors[e.from].add(e.to)
-    neighbors[e.to].add(e.from)
-    undirected.set(pairKey(e.from, e.to), [e.from, e.to])
-  }
-
-  // A dead-end connects to at most one OTHER room (only way out is back) — the
-  // opposite of the loops Jaquays prized. Isolated (0-neighbor) rooms count too.
+  // A dead-end connects to at most one OTHER room (boundary exits don't count).
   const deadEnds = new Set(nodes.filter((n) => neighbors[n.id].size <= 1).map((n) => n.id))
 
-  // Loop-closing passages via union-find over the undirected simple graph: a passage
-  // whose endpoints are already connected closes a cycle. Their count is the
-  // cyclomatic number (E − V + components) — the real independent-loop count. Each
-  // drawn edge is tagged isLoop when its passage closes a loop (so the map highlights it).
-  const loopPairs = markLoopPairs(nodes, [...undirected.values()])
-  for (const e of edges) e.isLoop = loopPairs.has(pairKey(e.from, e.to))
-
-  const layout = forceLayout(nodes, edges)
-  const stats = { rooms: nodes.length, connections: undirected.size, loops: loopPairs.size }
-  return { nodes, edges, layout, deadEnds, stats }
+  // Lay rooms + exit ports out together so each port settles next to its room.
+  const layoutEdges = [
+    ...passages.map((p) => ({ from: p.source, to: p.target })),
+    ...exitEdges.map((x) => ({ from: x.source, to: x.target })),
+  ]
+  const layout = forceLayout([...nodes, ...exitPorts], layoutEdges)
+  const stats = { rooms: nodes.length, connections: passages.length, exits: exitPorts.length }
+  return { nodes, exitPorts, passages, exitEdges, layout, deadEnds, stats }
 }
 
 // Canonical undirected key for a node pair (order-independent).
 export function pairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`
-}
-
-// Union-find over undirected passages → the set of canonical keys that close a loop.
-function markLoopPairs(nodes, pairs) {
-  const parent = Object.fromEntries(nodes.map((n) => [n.id, n.id]))
-  const find = (x) => {
-    while (parent[x] !== x) {
-      parent[x] = parent[parent[x]]
-      x = parent[x]
-    }
-    return x
-  }
-  const loops = new Set()
-  for (const [a, b] of pairs) {
-    const ra = find(a)
-    const rb = find(b)
-    if (ra === rb) loops.add(pairKey(a, b))
-    else parent[ra] = rb
-  }
-  return loops
 }
 
 // Dependency-free layered layout: BFS distance from each component's roots (lowest

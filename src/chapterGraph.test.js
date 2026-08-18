@@ -1,95 +1,114 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout, connectedComponents, shelfPack } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey } from './chapterGraph.js'
 
-// A1↔A2↔A3↔A1 form a loop; A4 hangs off A1 as a spur (dead-end). One exit is
-// external (no target) and one is dangling (target not in the chapter) — neither
-// should become an edge.
+// A1→A2→A3→A1→A4 (all one-directional). One exit is external (no target) and one is
+// dangling (target not in the chapter) — both become boundary exit ports, not passages.
 const chapter = [
   { id: 1, name: 'A1', room_type: 'combat', exits: [{ to_encounter_id: '2', label: 'door' }, { to_encounter_id: '4' }, { label: 'Exterior' }] },
   { id: 2, name: 'A2', room_type: 'hazard', exits: [{ to_encounter_id: '3' }] },
   { id: 3, name: 'A3', room_type: 'combat', exits: [{ to_encounter_id: '1' }, { to_encounter_id: '999' }] }, // 999 dangling
   { id: 4, name: 'A4', room_type: 'knowledge', exits: [] },
 ]
+// Undirected passage between the current source/target of a passage `p`.
+const passageBetween = (g, a, b) => g.passages.find((p) => pairKey(p.source, p.target) === pairKey(a, b))
 
-test('buildChapterGraph: nodes + intra-chapter edges only (external/dangling/self dropped)', () => {
+test('buildChapterGraph: rooms + intra passages; external/dangling exits become boundary ports', () => {
   const g = buildChapterGraph(chapter)
   assert.equal(g.nodes.length, 4)
-  // 4 real intra-chapter edges: 1→2, 1→4, 2→3, 3→1. External + dangling(999) excluded.
-  assert.equal(g.edges.length, 4)
-  assert.ok(g.edges.some((e) => e.from === '1' && e.to === '2' && e.label === 'door'))
-  assert.ok(!g.edges.some((e) => e.to === '999')) // dangling target not drawn
+  assert.equal(g.passages.length, 4) // 1-2, 1-4, 2-3, 3-1
+  const p12 = passageBetween(g, '1', '2')
+  assert.equal(p12.source, '1') // authored direction
+  assert.equal(p12.sourceLabel, 'door')
+  // The "Exterior" (no target) + the dangling 999 → 2 boundary exit ports, not passages.
+  assert.equal(g.exitPorts.length, 2)
+  assert.equal(g.exitEdges.length, 2)
+  assert.ok(!g.passages.some((p) => p.source === '999' || p.target === '999'))
+  assert.equal(g.stats.exits, 2)
   assert.equal(g.nodes.find((n) => n.id === '2').roomType, 'hazard')
 })
 
-test('buildChapterGraph: dead-ends are rooms with ≤1 connection', () => {
+test('buildChapterGraph: dead-ends are rooms with ≤1 connected room', () => {
   const g = buildChapterGraph(chapter)
-  assert.ok(g.deadEnds.has('4')) // spur off A1
-  assert.ok(!g.deadEnds.has('1')) // A1 has 3 connections
-  assert.ok(!g.deadEnds.has('2')) // A2 in the loop
+  assert.ok(g.deadEnds.has('4')) // spur off A1 (boundary exits don't count)
+  assert.ok(!g.deadEnds.has('1')) // A1 connects to 3 rooms
+  assert.ok(!g.deadEnds.has('2'))
 })
 
-test('buildChapterGraph: loop count = cyclomatic number; loop edges tagged', () => {
-  const g = buildChapterGraph(chapter)
-  // 4 rooms, 4 distinct passages, 1 component → 4 − 4 + 1 = 1 independent loop.
-  assert.equal(g.stats.loops, 1)
-  assert.equal(g.edges.filter((e) => e.isLoop).length, 1)
+test('buildChapterGraph: one-way vs two-way passages (driven by reciprocity)', () => {
+  // A→B one-way (only A links it); B↔C two-way (both link it).
+  const g = buildChapterGraph([
+    { id: 1, name: 'A', exits: [{ to_encounter_id: '2', label: 'drop' }] },
+    { id: 2, name: 'B', exits: [{ to_encounter_id: '3', label: 'arch' }] },
+    { id: 3, name: 'C', exits: [{ to_encounter_id: '2', label: 'arch' }] },
+  ])
+  const ab = passageBetween(g, '1', '2')
+  assert.equal(ab.twoWay, false)
+  assert.equal(ab.source, '1') // arrow points the authored way, A→B
+  assert.equal(ab.target, '2')
+  assert.equal(ab.sourceLabel, 'drop')
+  assert.equal(ab.targetLabel, '') // no reverse exit → no label at the B end
+
+  const bc = passageBetween(g, '2', '3')
+  assert.equal(bc.twoWay, true) // both 2→3 and 3→2 authored
+  // each direction keeps its own label near its own end (so they don't overlap)
+  assert.equal(bc.sourceLabel, 'arch')
+  assert.equal(bc.targetLabel, 'arch')
 })
 
-test('buildChapterGraph: two-way doors are NOT loops, and a corridor has dead-ends', () => {
-  // A↔B↔C, every door authored both directions (the natural GM pattern). This is a
-  // linear corridor with ZERO real loops; A and C are the termini (dead-ends).
+test('buildChapterGraph: reciprocal doors collapse to one two-way passage; corridor has dead-ends', () => {
   const corridor = [
     { id: 1, name: 'A', exits: [{ to_encounter_id: '2' }] },
     { id: 2, name: 'B', exits: [{ to_encounter_id: '1' }, { to_encounter_id: '3' }] },
     { id: 3, name: 'C', exits: [{ to_encounter_id: '2' }] },
   ]
   const g = buildChapterGraph(corridor)
-  assert.equal(g.stats.loops, 0) // reciprocal edges collapse — no false loop
-  assert.equal(g.stats.connections, 2) // 2 distinct passages (A-B, B-C), not 4 records
-  assert.deepEqual([...g.deadEnds].sort(), ['1', '3']) // A and C, by distinct-neighbour count
+  assert.equal(g.passages.length, 2) // A-B, B-C — one passage per door, not 4 records
+  assert.ok(g.passages.every((p) => p.twoWay))
+  assert.equal(g.stats.connections, 2)
+  assert.deepEqual([...g.deadEnds].sort(), ['1', '3']) // A and C
 })
 
-test('buildChapterGraph: a duplicate exit does not invent a loop', () => {
+test('buildChapterGraph: a duplicate exit does not invent a second passage', () => {
   const dup = [
     { id: 1, name: 'A', exits: [{ to_encounter_id: '2' }, { to_encounter_id: '2' }] }, // A→B twice
     { id: 2, name: 'B', exits: [] },
   ]
   const g = buildChapterGraph(dup)
-  assert.equal(g.stats.loops, 0)
+  assert.equal(g.passages.length, 1)
   assert.equal(g.stats.connections, 1)
 })
 
-test('buildChapterGraph: a pure tree (no cycles) reports zero loops', () => {
-  const tree = [
-    { id: 1, name: 'R', exits: [{ to_encounter_id: '2' }, { to_encounter_id: '3' }] },
-    { id: 2, name: 'L1', exits: [] },
-    { id: 3, name: 'L2', exits: [] },
-  ]
-  const g = buildChapterGraph(tree)
-  assert.equal(g.stats.loops, 0)
-  assert.ok(g.deadEnds.has('2') && g.deadEnds.has('3'))
+test('buildChapterGraph: a per-direction secret flag rides on the passage', () => {
+  // Secret from the hallway (1) but obvious from the room (2).
+  const g = buildChapterGraph([
+    { id: 1, name: 'Hall', exits: [{ to_encounter_id: '2', secret: true }] },
+    { id: 2, name: 'Room', exits: [{ to_encounter_id: '1' }] },
+  ])
+  const p = passageBetween(g, '1', '2')
+  assert.equal(p.twoWay, true)
+  const hallSide = p.source === '1' ? p.sourceSecret : p.targetSecret
+  const roomSide = p.source === '1' ? p.targetSecret : p.sourceSecret
+  assert.equal(hallSide, true) // secret from the hallway
+  assert.equal(roomSide, false) // obvious from the room
 })
 
 test('layerLayout: every node gets a position, laid out in BFS columns', () => {
   const g = buildChapterGraph(chapter)
-  const pos = layerLayout(g.nodes, g.edges)
+  const edges = g.passages.map((p) => ({ from: p.source, to: p.target }))
+  const pos = layerLayout(g.nodes, edges)
   for (const n of g.nodes) assert.ok(pos[n.id], `no position for ${n.id}`)
-  const xs = new Set(Object.values(pos).map((p) => p.x))
-  assert.ok(xs.size >= 1) // one or more columns
+  assert.ok(new Set(Object.values(pos).map((p) => p.x)).size >= 1)
 })
 
 test('forceLayout (the map layout): finite, BOUNDED positions + deterministic across runs', () => {
   const g1 = buildChapterGraph(chapter)
-  // Per-component layout + shelf packing keeps the whole map within a modest
-  // multiple of N·(edge length + node size) — no disconnected piece can balloon to
-  // infinity (each is held by its own springs, packed by box). Bound loosely but
-  // finitely so a regression that lets a component drift still fails here.
-  const bound = g1.nodes.length * (190 + 132) + 500
-  for (const n of g1.nodes) {
-    const p = g1.layout[n.id]
-    assert.ok(p && Number.isFinite(p.x) && Number.isFinite(p.y), `bad position for ${n.id}`)
-    assert.ok(p.x >= 0 && p.y >= 0 && p.x <= bound && p.y <= bound, `unbounded position for ${n.id}: ${JSON.stringify(p)}`)
+  // The layout now covers rooms + exit ports; bound loosely off the total placed count.
+  const bound = Object.keys(g1.layout).length * (190 + 132) + 500
+  for (const id of Object.keys(g1.layout)) {
+    const p = g1.layout[id]
+    assert.ok(p && Number.isFinite(p.x) && Number.isFinite(p.y), `bad position for ${id}`)
+    assert.ok(p.x >= 0 && p.y >= 0 && p.x <= bound && p.y <= bound, `unbounded position for ${id}: ${JSON.stringify(p)}`)
   }
   // No RNG → identical layout for identical input, so the map doesn't jitter on re-render.
   assert.deepEqual(buildChapterGraph(chapter).layout, g1.layout)
@@ -102,24 +121,18 @@ test('forceLayout: a single node lays out at the origin margin', () => {
 
 test('connectedComponents: splits a disjoint graph into first-seen-order components', () => {
   const g = buildChapterGraph(disjoint)
-  const comps = connectedComponents(g.nodes, g.edges).map((c) => c.map((n) => n.id))
-  // 1↔2, 3↔4, and lone 5 — three components, membership by connectivity.
+  const edges = g.passages.map((p) => ({ from: p.source, to: p.target }))
+  const comps = connectedComponents(g.nodes, edges).map((c) => c.map((n) => n.id))
   assert.equal(comps.length, 3)
   assert.deepEqual(comps.map((c) => [...c].sort()), [['1', '2'], ['3', '4'], ['5']])
 })
 
 test('shelfPack: wraps to a new shelf and never overlaps components', () => {
-  // Six equal boxes wide enough that the √area target width forces a wrap — a real
-  // 2-D pack, not a single row. Each box is one node so its position IS its corner.
   const box = (id, w, h) => ({ pos: { [id]: { x: 0, y: 0 } }, minx: 0, miny: 0, w, h })
   const boxes = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => box(id, 200, 100))
   const out = shelfPack(boxes, { gap: 48, margin: 24 })
-
-  assert.equal(Object.keys(out).length, 6) // all placed
-  const ys = new Set(Object.values(out).map((p) => p.y))
-  assert.ok(ys.size >= 2, 'expected the pack to wrap to at least a second shelf')
-
-  // No two placed boxes overlap (rects are w×h at their placed top-left corner).
+  assert.equal(Object.keys(out).length, 6)
+  assert.ok(new Set(Object.values(out).map((p) => p.y)).size >= 2, 'expected a wrap to a second shelf')
   const rects = boxes.map((b) => {
     const id = Object.keys(b.pos)[0]
     return { x: out[id].x, y: out[id].y, w: b.w, h: b.h }
@@ -129,13 +142,12 @@ test('shelfPack: wraps to a new shelf and never overlaps components', () => {
       const A = rects[i]
       const B = rects[j]
       const overlap = A.x < B.x + B.w && B.x < A.x + A.w && A.y < B.y + B.h && B.y < A.y + A.h
-      assert.ok(!overlap, `boxes ${i} and ${j} overlap: ${JSON.stringify(A)} vs ${JSON.stringify(B)}`)
+      assert.ok(!overlap, `boxes ${i} and ${j} overlap`)
     }
   }
 })
 
 test('forceLayout: a multi-component layout is deterministic across runs', () => {
-  // The packing pass must be stable (no RNG anywhere) so the map doesn't jitter.
   assert.deepEqual(buildChapterGraph(disjoint).layout, buildChapterGraph(disjoint).layout)
 })
 
@@ -148,20 +160,20 @@ const disjoint = [
   { id: 5, name: 'Lone', exits: [] },
 ]
 
-test('layerLayout: disconnected components + an isolated node all get positions', () => {
+test('buildChapterGraph: disconnected components + an isolated node all get positions', () => {
   const g = buildChapterGraph(disjoint)
   for (const n of g.nodes) {
     const p = g.layout[n.id]
     assert.ok(p && Number.isFinite(p.x) && Number.isFinite(p.y), `bad position for ${n.id}`)
   }
-  assert.equal(g.stats.loops, 0)
   assert.ok(g.deadEnds.has('5')) // isolated node is a dead-end (0 neighbours)
 })
 
 test('buildChapterGraph tolerates empty / missing input', () => {
   const g = buildChapterGraph([])
   assert.deepEqual(g.nodes, [])
-  assert.deepEqual(g.edges, [])
-  assert.equal(g.stats.loops, 0)
+  assert.deepEqual(g.passages, [])
+  assert.deepEqual(g.exitPorts, [])
+  assert.equal(g.stats.connections, 0)
   assert.deepEqual(layerLayout([], []), {})
 })
