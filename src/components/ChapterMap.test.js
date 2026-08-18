@@ -18,9 +18,9 @@ const chapter = [
 // Here we assert the component's own chrome: the connectivity stats, the collapse
 // toggle, the canvas + legend presence, and the empty state.
 
-test('ChapterMap: the title reports rooms / passages / exits from the graph', () => {
+test('ChapterMap: the title reports rooms / passages / exits / loops from the graph', () => {
   render(<ChapterMap encounters={chapter} onOpenEncounter={() => {}} />)
-  assert.match(screen.getByText(/Map —/).textContent, /4 rooms · 4 passages · 0 exits/)
+  assert.match(screen.getByText(/Map —/).textContent, /4 rooms · 4 passages · 0 exits · 1 loop/)
 })
 
 test('ChapterMap: renders the canvas + one-way/two-way legend when rooms are linked', () => {
