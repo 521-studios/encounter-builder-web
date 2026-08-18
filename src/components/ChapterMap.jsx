@@ -57,8 +57,8 @@ const nodeTypes = { room: RoomNode, exit: ExitNode }
 
 // The centre + half-extents of an internal React Flow node (measured, with fallbacks).
 function boxOf(n) {
-  const w = n.measured?.width || (n.type === 'exit' ? 18 : 132)
-  const h = n.measured?.height || (n.type === 'exit' ? 18 : 46)
+  const w = n.measured?.width || (n.type === 'exit' ? 36 : 132)
+  const h = n.measured?.height || (n.type === 'exit' ? 36 : 46)
   const x = n.internals.positionAbsolute.x + w / 2
   const y = n.internals.positionAbsolute.y + h / 2
   return { x, y, hw: w / 2, hh: h / 2 }
@@ -120,21 +120,29 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   useEffect(() => {
-    const seeded = seedPositions(rooms, positionsRef.current, layout) // stored wins, new rooms auto-place
+    // Seed rooms AND exit ports: a saved position wins, else the force layout (new
+    // nodes auto-place). Port ids (exit:<room>:<idx>) are stable while the exit list is.
+    const seeded = seedPositions([...rooms, ...exitPorts], positionsRef.current, layout)
     setNodes([
       ...rooms.map((n) => ({ id: n.id, type: 'room', position: seeded[n.id], data: { name: n.name, roomType: n.roomType, dead: deadEnds.has(n.id) } })),
-      ...exitPorts.map((p) => ({ id: p.id, type: 'exit', position: layout[p.id] || { x: 0, y: 0 }, data: {}, draggable: true })),
+      ...exitPorts.map((p) => ({ id: p.id, type: 'exit', position: seeded[p.id], data: {}, draggable: true })),
     ])
   }, [rooms, exitPorts, layout, deadEnds, setNodes])
 
-  // On drop, persist the whole current room layout (prunes removed rooms, includes any
-  // auto-placed new ones). Exit ports are derived, not saved.
+  // Drags only mutate local node state; stash the latest full layout (rooms + ports,
+  // pruning gone nodes, including auto-placed new ones) and flush ONE save on unmount —
+  // leaving the Map tab or closing the chapter — instead of a PUT per drag.
+  const pendingRef = useRef(null)
   const onNodeDragStop = useCallback(() => {
-    if (!onPositionsChange) return
     const pos = {}
-    for (const n of nodes) if (n.type === 'room') pos[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
-    onPositionsChange(pos)
-  }, [nodes, onPositionsChange])
+    for (const n of nodes) pos[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
+    pendingRef.current = pos
+  }, [nodes])
+  const saveRef = useRef(onPositionsChange)
+  saveRef.current = onPositionsChange
+  useEffect(() => () => {
+    if (pendingRef.current && saveRef.current) saveRef.current(pendingRef.current)
+  }, [])
 
   // Passages (rooms) + boundary exits (room → port) both render via PassageEdge.
   const edges = useMemo(

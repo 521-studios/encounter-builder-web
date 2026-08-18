@@ -100,15 +100,15 @@ export function pairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`
 }
 
-// Seed the map's room positions, reconciling a GM's saved layout against the current
-// rooms: a stored {x,y} wins; a room with no stored position (added since the last
-// save) falls back to the force-layout position, so it auto-places. Rooms removed
-// since the save simply aren't in `rooms`, so their stale stored entries are ignored
-// (and pruned on the next save, which rebuilds from the live rooms). Exit ports are
-// derived, not persisted, so they always use the force layout.
-export function seedPositions(rooms, stored, layout) {
+// Seed the map's node positions (rooms and exit ports alike), reconciling a GM's saved
+// layout against the current nodes: a stored {x,y} wins; a node with no stored position
+// (added since the last save) falls back to the force-layout position, so it
+// auto-places. Nodes removed since the save simply aren't in `nodes`, so their stale
+// stored entries are ignored (and pruned on the next save, which rebuilds from the live
+// nodes). Exit-port ids (exit:<room>:<idx>) are stable while the room's exit list is.
+export function seedPositions(nodes, stored, layout) {
   const out = {}
-  for (const r of rooms || []) out[r.id] = (stored && stored[r.id]) || layout[r.id] || { x: 0, y: 0 }
+  for (const n of nodes || []) out[n.id] = (stored && stored[n.id]) || layout[n.id] || { x: 0, y: 0 }
   return out
 }
 
