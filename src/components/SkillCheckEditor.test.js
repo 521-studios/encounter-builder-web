@@ -30,6 +30,19 @@ test('SkillCheckEditor is read-only when disabled: shows the label, no inputs', 
   assert.equal(screen.queryByLabelText('check skill'), null)
 })
 
+test('SkillCheckEditor renders the effect as markdown with an Edit flip when it has content', () => {
+  const { container } = render(<SkillCheckEditor value={{ skill: 'Perception', dc: 12, description: 'spot **it**' }} siblings={[]} onChange={noop} onRemove={noop} />)
+  assert.equal(screen.queryByLabelText('check effect'), null) // preview, not a textarea
+  assert.ok(container.querySelector('.description-preview'))
+  fireEvent.click(screen.getByRole('button', { name: 'edit check effect' }))
+  assert.ok(screen.getByLabelText('check effect')) // flips to the textarea
+})
+
+test('SkillCheckEditor opens the effect in edit mode when empty', () => {
+  render(<SkillCheckEditor value={{ skill: 'Perception', dc: 12 }} siblings={[]} onChange={noop} onRemove={noop} />)
+  assert.ok(screen.getByLabelText('check effect')) // textarea visible for a fresh check
+})
+
 test('SkillCheckEditor remove button calls onRemove', () => {
   let removed = false
   render(<SkillCheckEditor value={{ skill: 'Perception', dc: 12 }} siblings={[]} onChange={noop} onRemove={() => (removed = true)} />)
