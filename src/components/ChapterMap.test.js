@@ -13,40 +13,41 @@ const chapter = [
   { id: 4, name: 'A4', room_type: 'empty', exits: [] },
 ]
 
-test('ChapterMap renders a node per encounter and an edge per intra-chapter exit', () => {
+// The map is now a React Flow canvas: node/edge layout needs real DOM dimensions
+// (absent in jsdom), so the graph structure itself is covered by chapterGraph.test.js.
+// Here we assert the component's own chrome: the connectivity stats, the collapse
+// toggle, the canvas + legend presence, and the empty state.
+
+test('ChapterMap: the title reports rooms / connections / loops from the graph', () => {
   render(<ChapterMap encounters={chapter} onOpenEncounter={() => {}} />)
-  assert.equal(screen.getAllByTestId('map-node').length, 4)
-  assert.equal(screen.getAllByTestId('map-edge').length, 4) // 1→2, 1→4, 2→3, 3→1
   assert.match(screen.getByText(/Map —/).textContent, /4 rooms · 4 connections · 1 loop/)
 })
 
-test('ChapterMap marks a dead-end room and highlights a loop edge', () => {
+test('ChapterMap: renders the canvas + exit legend when rooms are linked', () => {
   render(<ChapterMap encounters={chapter} onOpenEncounter={() => {}} />)
-  const deadEnds = screen.getAllByTestId('map-node').filter((n) => n.getAttribute('data-dead-end'))
-  assert.equal(deadEnds.length, 1) // only A4
-  const loopEdges = screen.getAllByTestId('map-edge').filter((e) => e.getAttribute('data-loop'))
-  assert.equal(loopEdges.length, 1) // the loop-closing passage is highlighted
+  assert.ok(screen.getByTestId('map-canvas'))
+  // The legend spells out that the lines are exits (the "no indication" fix).
+  assert.match(screen.getByText(/Lines are/).textContent, /exits/)
 })
 
-test('ChapterMap: clicking a node opens that encounter', () => {
-  const opened = []
-  render(<ChapterMap encounters={chapter} onOpenEncounter={(id) => opened.push(id)} />)
-  fireEvent.click(screen.getByLabelText('Open A2'))
-  assert.deepEqual(opened, ['2'])
-})
-
-test('ChapterMap: the title collapses and expands the graph', () => {
+test('ChapterMap: the title collapses and expands the canvas', () => {
   render(<ChapterMap encounters={chapter} onOpenEncounter={() => {}} />)
   const toggle = screen.getByRole('button', { name: /Map —/ })
   assert.equal(toggle.getAttribute('aria-expanded'), 'true')
-  assert.ok(screen.getByTestId('map-svg'))
+  assert.ok(screen.getByTestId('map-canvas'))
   fireEvent.click(toggle)
   assert.equal(toggle.getAttribute('aria-expanded'), 'false')
-  assert.equal(screen.queryByTestId('map-svg'), null) // graph hidden when collapsed
+  assert.equal(screen.queryByTestId('map-canvas'), null) // canvas hidden when collapsed
 })
 
-test('ChapterMap: no linked exits shows a hint, not an empty SVG', () => {
+test('ChapterMap: no linked exits shows a hint, not an empty canvas', () => {
   render(<ChapterMap encounters={[{ id: 1, name: 'Lone', exits: [] }]} onOpenEncounter={() => {}} />)
-  assert.equal(screen.queryByTestId('map-svg'), null)
+  assert.equal(screen.queryByTestId('map-canvas'), null)
   assert.match(screen.getByText(/No exits linked/).textContent, /add Exits/)
+})
+
+test('ChapterMap: an empty chapter (no rooms) shows the no-encounters hint', () => {
+  render(<ChapterMap encounters={[]} onOpenEncounter={() => {}} />)
+  assert.equal(screen.queryByTestId('map-canvas'), null)
+  assert.match(screen.getByText(/No encounters in this chapter/).textContent, /No encounters/)
 })

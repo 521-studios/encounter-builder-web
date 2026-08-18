@@ -30,5 +30,22 @@ for (const key of [
 // persists to it (e.g. the anon localStore) exercises the real path in tests.
 if (globalThis.localStorage === undefined) globalThis.localStorage = window.localStorage
 
+// React Flow (the chapter map) reaches for browser APIs jsdom lacks. Minimal stubs so
+// it mounts without crashing — it can't lay out nodes without real dimensions, but its
+// container + our surrounding chrome (title, legend) render, which is what we assert.
+if (globalThis.ResizeObserver === undefined) {
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+}
+window.ResizeObserver = globalThis.ResizeObserver
+if (globalThis.DOMMatrixReadOnly === undefined) {
+  globalThis.DOMMatrixReadOnly = class { constructor() { this.m22 = 1 } }
+}
+window.DOMMatrixReadOnly = globalThis.DOMMatrixReadOnly
+if (typeof window.matchMedia !== 'function') {
+  const mql = () => ({ matches: false, media: '', addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent() { return false } })
+  window.matchMedia = mql
+  globalThis.matchMedia = mql
+}
+
 // React 18 wants this flag set to route state updates through act() cleanly.
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
