@@ -816,6 +816,34 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               disabled={released}
               onChange={(e) => setExit(i, { label: e.target.value })}
             />
+            <label className="exit-secret">
+              <input
+                type="checkbox"
+                aria-label="secret door"
+                checked={!!ex.secret}
+                disabled={released}
+                onChange={(e) => setExit(i, { secret: e.target.checked })}
+              />{' '}
+              Secret
+            </label>
+            <input
+              className="exit-skill"
+              aria-label="exit skill check"
+              placeholder="Skill (optional)"
+              value={ex.skill || ''}
+              disabled={released}
+              onChange={(e) => setExit(i, { skill: e.target.value })}
+            />
+            <input
+              className="exit-dc"
+              type="number"
+              min="0"
+              aria-label="exit DC"
+              placeholder="DC"
+              value={ex.dc || ''}
+              disabled={released}
+              onChange={(e) => setExit(i, { dc: Number(e.target.value) })}
+            />
             {!released && (
               <button type="button" className="link danger" onClick={() => removeExit(i)}>
                 remove

@@ -23,15 +23,16 @@ export function buildChapterGraph(encounters) {
     const from = String(e.id)
     ;(e.exits || []).forEach((ex, idx) => {
       const to = String(ex.to_encounter_id || '')
+      const meta = { label: ex.label || '', secret: !!ex.secret, skill: ex.skill || '', dc: ex.dc || 0 }
       if (to && to !== from && nodeIds.has(to)) {
-        directed.set(`${from}>${to}`, { label: ex.label || '', secret: !!ex.secret })
+        directed.set(`${from}>${to}`, meta)
       } else if (to !== from) {
         // Anything that isn't an in-chapter passage or a self-loop is a boundary exit
         // — external, cross-chapter (dangling), OR a blank "— External —" placeholder
         // (no target + no label). All get a port circle so they're visible on the map.
         const portId = `exit:${from}:${idx}`
         exitPorts.push({ id: portId, name: ex.label || 'Exit', kind: 'exit' })
-        exitEdges.push({ id: `xe:${from}:${idx}`, source: from, target: portId, label: ex.label || '', secret: !!ex.secret })
+        exitEdges.push({ id: `xe:${from}:${idx}`, source: from, target: portId, ...meta })
       }
     })
   }
@@ -52,9 +53,9 @@ export function buildChapterGraph(encounters) {
     const ab = directed.get(`${a}>${b}`)
     const ba = directed.get(`${b}>${a}`)
     if (ba) {
-      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: true, sourceLabel: ab.label, targetLabel: ba.label, sourceSecret: ab.secret, targetSecret: ba.secret })
+      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: true, sourceLabel: ab.label, targetLabel: ba.label, sourceSecret: ab.secret, targetSecret: ba.secret, sourceSkill: ab.skill, sourceDC: ab.dc, targetSkill: ba.skill, targetDC: ba.dc })
     } else {
-      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: false, sourceLabel: ab.label, targetLabel: '', sourceSecret: ab.secret, targetSecret: false })
+      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: false, sourceLabel: ab.label, targetLabel: '', sourceSecret: ab.secret, targetSecret: false, sourceSkill: ab.skill, sourceDC: ab.dc, targetSkill: '', targetDC: 0 })
     }
   }
 
@@ -97,6 +98,16 @@ function countLoops(nodes, passages) {
 // Canonical undirected key for a node pair (order-independent).
 export function pairKey(a, b) {
   return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
+// One side's edge caption for the map: a 🔒 (secret from this side), the label, and
+// any skill check (Skill DC N), joined with " · " — e.g. "🔒 hidden panel · Perception
+// DC 18". A DC with no skill shows "DC N"; secret with nothing else is just "🔒";
+// nothing set → "" (no caption rendered).
+export function sideText(secret, label, skill, dc) {
+  const bits = [label, skill && dc ? `${skill} DC ${dc}` : dc ? `DC ${dc}` : ''].filter(Boolean).join(' · ')
+  if (secret) return bits ? `🔒 ${bits}` : '🔒'
+  return bits
 }
 
 // Where the segment from point `from` toward box centre `c` ({x, y, hw, hh}) crosses

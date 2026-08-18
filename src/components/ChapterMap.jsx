@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, getStraightPath, EdgeLabelRenderer } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { buildChapterGraph, boundaryPoint } from '../chapterGraph.js'
+import { buildChapterGraph, boundaryPoint, sideText } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
 // 8hda: an INTERACTIVE node-link map of a chapter — pan (drag canvas), zoom (scroll),
@@ -86,6 +86,8 @@ function PassageEdge({ source, target, data }) {
   const OFF = 40
   const sLabel = { x: sb.x + ux * OFF, y: sb.y + uy * OFF } // just past the source card
   const tLabel = { x: tb.x - ux * OFF, y: tb.y - uy * OFF } // just past the target card
+  const sText = sideText(data.sourceSecret, data.sourceLabel, data.sourceSkill, data.sourceDC)
+  const tText = sideText(data.targetSecret, data.targetLabel, data.targetSkill, data.targetDC)
   return (
     <>
       <path className="react-flow__edge-path" d={path} fill="none" stroke={EDGE_COLOR} strokeWidth={1.6} strokeDasharray={secret ? '6 4' : undefined} />
@@ -95,17 +97,11 @@ function PassageEdge({ source, target, data }) {
         </g>
       )}
       <EdgeLabelRenderer>
-        {data.sourceLabel && (
-          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${sLabel.x}px, ${sLabel.y}px)` }}>
-            {data.sourceSecret ? '🔒 ' : ''}
-            {data.sourceLabel}
-          </div>
+        {sText && (
+          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${sLabel.x}px, ${sLabel.y}px)` }}>{sText}</div>
         )}
-        {data.targetLabel && (
-          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${tLabel.x}px, ${tLabel.y}px)` }}>
-            {data.targetSecret ? '🔒 ' : ''}
-            {data.targetLabel}
-          </div>
+        {tText && (
+          <div className="map-edge-label" style={{ transform: `translate(-50%, -50%) translate(${tLabel.x}px, ${tLabel.y}px)` }}>{tText}</div>
         )}
       </EdgeLabelRenderer>
     </>
@@ -128,8 +124,8 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
   // Passages (rooms) + boundary exits (room → port) both render via PassageEdge.
   const edges = useMemo(
     () => [
-      ...passages.map((p) => ({ id: p.id, source: p.source, target: p.target, type: 'passage', data: { twoWay: p.twoWay, sourceLabel: p.sourceLabel, targetLabel: p.targetLabel, sourceSecret: p.sourceSecret, targetSecret: p.targetSecret } })),
-      ...exitEdges.map((x) => ({ id: x.id, source: x.source, target: x.target, type: 'passage', data: { twoWay: false, sourceLabel: '', targetLabel: x.label, sourceSecret: false, targetSecret: x.secret } })),
+      ...passages.map((p) => ({ id: p.id, source: p.source, target: p.target, type: 'passage', data: { twoWay: p.twoWay, sourceLabel: p.sourceLabel, targetLabel: p.targetLabel, sourceSecret: p.sourceSecret, targetSecret: p.targetSecret, sourceSkill: p.sourceSkill, sourceDC: p.sourceDC, targetSkill: p.targetSkill, targetDC: p.targetDC } })),
+      ...exitEdges.map((x) => ({ id: x.id, source: x.source, target: x.target, type: 'passage', data: { twoWay: false, sourceLabel: '', targetLabel: x.label, sourceSecret: false, targetSecret: x.secret, targetSkill: x.skill, targetDC: x.dc } })),
     ],
     [passages, exitEdges],
   )

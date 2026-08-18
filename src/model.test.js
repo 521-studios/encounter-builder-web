@@ -404,30 +404,33 @@ test('toEncounterInput sends complete skill checks, drops rows missing skill or 
 test('keyed stamps a _key on every exit; emptyExit strips cleanly', () => {
   const out = keyed({ exits: [{ to_encounter_id: 'a2', label: 'north' }] })
   assert.ok(out.exits[0]._key)
-  assert.deepEqual(stripKey(emptyExit()), { to_encounter_id: '', label: '' })
+  assert.deepEqual(stripKey(emptyExit()), { to_encounter_id: '', label: '', secret: false, skill: '', dc: 0 })
 })
 
-test('exitInput keeps the target, trims the label, drops _key', () => {
-  assert.deepEqual(exitInput({ _key: 'k', to_encounter_id: 'a2', label: '  north door ' }), {
+test('exitInput keeps target/secret/skill, trims label + skill, rounds DC, drops _key', () => {
+  assert.deepEqual(exitInput({ _key: 'k', to_encounter_id: 'a2', label: '  north door ', secret: true, skill: ' Perception ', dc: 18.4 }), {
     to_encounter_id: 'a2',
     label: 'north door',
+    secret: true,
+    skill: 'Perception',
+    dc: 18,
   })
 })
 
-test('toEncounterInput keeps every exit row, including a blank placeholder (trimmed)', () => {
+test('toEncounterInput keeps every exit row with its secret/skill/dc (blank placeholder trimmed)', () => {
   const enc = keyed({
     name: 'x',
     exits: [
-      { to_encounter_id: 'a2', label: 'north door' }, // internal
+      { to_encounter_id: 'a2', label: 'hidden panel', secret: true, skill: 'Perception', dc: 18 }, // secret door w/ check
       { to_encounter_id: '', label: 'Exterior' }, // external
       { to_encounter_id: '', label: '  ' }, // blank placeholder — kept (label trimmed to '')
     ],
   })
   const input = toEncounterInput(enc)
   assert.deepEqual(input.exits, [
-    { to_encounter_id: 'a2', label: 'north door' },
-    { to_encounter_id: '', label: 'Exterior' },
-    { to_encounter_id: '', label: '' },
+    { to_encounter_id: 'a2', label: 'hidden panel', secret: true, skill: 'Perception', dc: 18 },
+    { to_encounter_id: '', label: 'Exterior', secret: false, skill: '', dc: 0 },
+    { to_encounter_id: '', label: '', secret: false, skill: '', dc: 0 },
   ])
 })
 
