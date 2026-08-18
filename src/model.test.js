@@ -10,6 +10,7 @@ import {
   emptyTreasure,
   toEncounterInput,
   encounterBlocks,
+  reindexEditingAfterRemove,
   hasRef,
   gameIdOf,
   buildInput,
@@ -136,6 +137,17 @@ test('encounterBlocks: text_blocks is authoritative; a legacy description surfac
   assert.deepEqual(encounterBlocks({ description: '# Scene' }), [{ title: '', body: '# Scene' }])
   assert.deepEqual(encounterBlocks({}), [])
   assert.deepEqual(encounterBlocks({ text_blocks: [] }), []) // empty list → no legacy fallback needed
+})
+
+test('reindexEditingAfterRemove: keeps lower indices, drops the removed, decrements higher', () => {
+  // Blocks [0,1,2,3] with 1 and 3 in edit mode; removing block 1 → blocks become the old
+  // [0,2,3]; the edit-mode set must now be {2 (was 3)} — old 1 dropped, old 3 → 2.
+  assert.deepEqual([...reindexEditingAfterRemove(new Set([1, 3]), 1)].sort(), [2])
+  // Removing a block below the edited ones shifts them all down by one.
+  assert.deepEqual([...reindexEditingAfterRemove(new Set([2, 3]), 0)].sort(), [1, 2])
+  // Removing a block above the edited ones leaves them untouched.
+  assert.deepEqual([...reindexEditingAfterRemove(new Set([0, 1]), 2)].sort(), [0, 1])
+  assert.deepEqual([...reindexEditingAfterRemove(new Set(), 0)], [])
 })
 
 test('toEncounterInput serializes text_blocks (trimmed titles), drops empty blocks, always clears description', () => {

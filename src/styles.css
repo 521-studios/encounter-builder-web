@@ -146,17 +146,18 @@ button.encounter { flex: 1; text-align: left; }
 .title-input { flex: 1; font-size: 1.1rem; }
 
 /* Sticky title bars: the encounter + chapter top lines pin to the top of the
-   scrolling .main pane while the body scrolls under them. Negative margins bleed the
-   bar over .main's padding (1.25rem 1.5rem) so it spans the pane and nothing peeks
-   above the pinned bar; the padding is restored inside. */
+   scrolling .main pane while the body scrolls under them. `.main` has NO top padding
+   (below), so `top: 0` pins the bar flush to the pane's true top — nothing peeks
+   above it. The bar's own top padding supplies the breathing room, and a side-only
+   negative margin bleeds it over `.main`'s horizontal padding to span the pane. */
 .editor-head,
 .detail-head {
   position: sticky;
   top: 0;
   z-index: 5;
   background: var(--panel);
-  margin: -1.25rem -1.5rem 0;
-  padding: 0.6rem 1.5rem;
+  margin: 0 -1.5rem;
+  padding: 1.25rem 1.5rem 0.6rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -256,7 +257,10 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
   flex: 1;                 /* expands to fill */
   min-width: 0;
   overflow-y: auto;
-  padding: 1.25rem 1.5rem;
+  /* No top padding: sticky title bars (.editor-head/.detail-head) pin at top:0 flush
+     to the pane's true top, so scrolled content can't peek above them. The bar's own
+     top padding gives the breathing room; the empty-state placeholder sets its own. */
+  padding: 0 1.5rem 1.25rem;
   background: var(--panel);
 }
 
@@ -354,6 +358,8 @@ button.chapter-name:hover { color: var(--gold); }
 .field-label { font-weight: 500; opacity: 0.9; }
 .text-block { display: grid; gap: 0.35rem; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem; }
 .text-block-title { font-weight: 600; }
+.text-block-heading { margin: 0; font-size: 1rem; }
+.text-block-actions { display: flex; gap: 0.75rem; }
 .description-preview {
   background: var(--card);
   border-radius: var(--radius);

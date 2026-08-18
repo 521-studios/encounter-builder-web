@@ -14,6 +14,7 @@ import {
   REWARD_KIND_LABELS,
   buildInput,
   encounterBlocks,
+  reindexEditingAfterRemove,
   emptyMonster,
   emptyHazard,
   emptyAffliction,
@@ -53,6 +54,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [siblingEncounters, setSiblingEncounters] = useState([]) // campaign encounters, for the exit target picker
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
   const [partyContextError, setPartyContextError] = useState(false) // chapters/settings load failed
+  const [editingBlocks, setEditingBlocks] = useState(() => new Set()) // which markdown blocks are in edit (vs preview) mode
 
   // encRef exposes the latest working copy to the flush handlers (for the error
   // label); syncedRef is the last sidebar-visible signature we told the parent
@@ -169,8 +171,18 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   // legacy description). (markdown-blocks)
   const blocks = encounterBlocks(enc)
   const setBlock = (i, fields) => patch({ text_blocks: blocks.map((b, j) => (j === i ? { ...b, ...fields } : b)) })
-  const addBlock = () => patch({ text_blocks: [...blocks, { title: '', body: '' }] })
-  const removeBlock = (i) => patch({ text_blocks: blocks.filter((_, j) => j !== i) })
+  const editBlock = (i) => setEditingBlocks((s) => new Set(s).add(i))
+  const doneBlock = (i) => setEditingBlocks((s) => { const n = new Set(s); n.delete(i); return n })
+  // A new block opens in edit mode (it's empty); appended at the end so its index is blocks.length.
+  const addBlock = () => {
+    setEditingBlocks((s) => new Set(s).add(blocks.length))
+    patch({ text_blocks: [...blocks, { title: '', body: '' }] })
+  }
+  // Removing block i shifts every higher block down one — reindex the editing set to match.
+  const removeBlock = (i) => {
+    patch({ text_blocks: blocks.filter((_, j) => j !== i) })
+    setEditingBlocks((s) => reindexEditingAfterRemove(s, i))
+  }
 
   const setMonster = (i, m) => patch({ monsters: monsters.map((x, j) => (j === i ? m : x)) })
   const setHazard = (i, h) => patch({ hazards: hazards.map((x, j) => (j === i ? h : x)) })
@@ -379,36 +391,54 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
       <div className="text-blocks" data-testid="text-blocks">
         <span className="field-label">Description</span>
-        {blocks.map((b, i) => (
-          <div className="text-block" key={i}>
-            <input
-              className="text-block-title"
-              aria-label={`section ${i + 1} title`}
-              value={b.title || ''}
-              disabled={released}
-              placeholder="Section title (optional)"
-              onChange={(e) => setBlock(i, { title: e.target.value })}
-            />
-            <textarea
-              className="description-input"
-              aria-label={`section ${i + 1} body`}
-              value={b.body || ''}
-              disabled={released}
-              onChange={(e) => setBlock(i, { body: e.target.value })}
-              placeholder="Scene-setting, read-aloud text, GM notes… (markdown)"
-            />
-            {b.body && (
-              <div className="description-preview" data-testid="description-preview">
-                <WikiMarkdown text={b.body} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
-              </div>
-            )}
-            {!released && (
-              <button type="button" className="link danger" aria-label={`remove section ${i + 1}`} onClick={() => removeBlock(i)}>
-                Remove section
-              </button>
-            )}
-          </div>
-        ))}
+        {blocks.map((b, i) => {
+          // Each block flips between an editor (title input + markdown textarea) and its
+          // rendered preview — not both at once. Released encounters are always preview.
+          const isEditing = !released && editingBlocks.has(i)
+          return (
+            <div className="text-block" key={i} data-editing={isEditing || undefined}>
+              {isEditing ? (
+                <>
+                  <input
+                    className="text-block-title"
+                    aria-label={`section ${i + 1} title`}
+                    value={b.title || ''}
+                    placeholder="Section title (optional)"
+                    onChange={(e) => setBlock(i, { title: e.target.value })}
+                  />
+                  <textarea
+                    className="description-input"
+                    aria-label={`section ${i + 1} body`}
+                    value={b.body || ''}
+                    onChange={(e) => setBlock(i, { body: e.target.value })}
+                    placeholder="Scene-setting, read-aloud text, GM notes… (markdown)"
+                  />
+                  <div className="text-block-actions">
+                    <button type="button" className="link" onClick={() => doneBlock(i)}>Done</button>
+                    <button type="button" className="link danger" aria-label={`remove section ${i + 1}`} onClick={() => removeBlock(i)}>Remove</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {b.title && <h4 className="text-block-heading">{b.title}</h4>}
+                  {b.body ? (
+                    <div className="description-preview" data-testid="description-preview">
+                      <WikiMarkdown text={b.body} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
+                    </div>
+                  ) : (
+                    <p className="muted">(empty section)</p>
+                  )}
+                  {!released && (
+                    <div className="text-block-actions">
+                      <button type="button" className="link" aria-label={`edit section ${i + 1}`} onClick={() => editBlock(i)}>Edit</button>
+                      <button type="button" className="link danger" aria-label={`remove section ${i + 1}`} onClick={() => removeBlock(i)}>Remove</button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
         {!released && (
           <button type="button" className="link" data-testid="add-section" onClick={addBlock}>
             + Add section
