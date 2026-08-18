@@ -119,38 +119,43 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
 
   return (
     <section className="detail chapter-detail" data-testid="chapter-detail">
-      <div className="detail-head">
-        <input
-          className="title-input"
-          aria-label="chapter name"
-          value={value.name}
-          autoFocus
-          onChange={(e) => commit({ ...value, name: e.target.value })}
-        />
-        <span className="save-state muted" data-testid="chapter-saved">{SAVE_LABEL[saveState]}</span>
-        <button type="button" className="link danger" aria-label={`Delete chapter ${value.name.trim() || 'Untitled chapter'}`} onClick={del}>Delete chapter</button>
-        <button type="button" className="link" onClick={onClose}>Close</button>
-      </div>
-      {nameMissing && <p className="error" role="alert">Name is required.</p>}
-      {error && <p className="error" role="alert">{error}</p>}
+      {/* Title + tabs pin together as one sticky header; only the active panel scrolls
+          under them, and its width is isolated so a wide map can't push the header. */}
+      <div className="detail-header">
+        <div className="detail-head">
+          <input
+            className="title-input"
+            aria-label="chapter name"
+            value={value.name}
+            autoFocus
+            onChange={(e) => commit({ ...value, name: e.target.value })}
+          />
+          <span className="save-state muted" data-testid="chapter-saved">{SAVE_LABEL[saveState]}</span>
+          <button type="button" className="link danger" aria-label={`Delete chapter ${value.name.trim() || 'Untitled chapter'}`} onClick={del}>Delete chapter</button>
+          <button type="button" className="link" onClick={onClose}>Close</button>
+        </div>
+        {nameMissing && <p className="error" role="alert">Name is required.</p>}
+        {error && <p className="error" role="alert">{error}</p>}
 
-      <div className="tabs" role="tablist" aria-label="Chapter sections">
-        {CHAPTER_TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            id={`chtab-${t.id}`}
-            aria-controls={`chpanel-${t.id}`}
-            aria-selected={tab === t.id}
-            className={`tab${tab === t.id ? ' tab--active' : ''}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
+        <div className="tabs" role="tablist" aria-label="Chapter sections">
+          {CHAPTER_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`chtab-${t.id}`}
+              aria-controls={`chpanel-${t.id}`}
+              aria-selected={tab === t.id}
+              className={`tab${tab === t.id ? ' tab--active' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
+      <div className="tab-panel">
       {tab === 'config' && (
         <div role="tabpanel" id="chpanel-config" aria-labelledby="chtab-config">
           <p className="muted">
@@ -186,6 +191,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
           <ChapterMap encounters={chapterEncounters} onOpenEncounter={onOpenEncounter} />
         </div>
       )}
+      </div>
     </section>
   )
 }
