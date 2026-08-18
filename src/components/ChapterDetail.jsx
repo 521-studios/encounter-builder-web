@@ -13,11 +13,22 @@ import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
 import ChapterMap from './ChapterMap.jsx'
 
+// The chapter detail's three tabs: Config (party override), Summary (treasure/XP
+// rollup), Map (connectivity graph). The title bar + name/error stay above the tabs.
+const CHAPTER_TABS = [
+  { id: 'config', label: 'Config' },
+  { id: 'summary', label: 'Summary' },
+  { id: 'map', label: 'Map' },
+]
+
 // Chapter detail: the chapter's name + expected-party override, and rename/delete.
 // Edits persist on change (no Save button); party fields inherit from campaign
 // settings when left empty. Chapter update full-replaces name + order + party
-// fields, so every save round-trips them via the shared clear-encoding.
+// fields, so every save round-trips them via the shared clear-encoding. The body is
+// tabbed (Config / Summary / Map); the rollup hook runs unconditionally so its tab
+// shows fresh numbers regardless of which tab is active.
 export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted, onSaveError, onOpenEncounter }) {
+  const [tab, setTab] = useState('config')
   const [value, setValue] = useState({
     name: chapter.name || '',
     party_level: chapter.party_level ?? null,
@@ -121,30 +132,58 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
         <button type="button" className="link" onClick={onClose}>Close</button>
       </div>
       {nameMissing && <p className="error" role="alert">Name is required.</p>}
-      <p className="muted">
-        Expected party for this chapter. Its encounters inherit these unless they set their
-        own; leave a field empty to inherit from the campaign.
-      </p>
       {error && <p className="error" role="alert">{error}</p>}
-      <PartyFields
-        value={value}
-        inherited={inherited}
-        inheritedError={settingsError}
-        onChange={(next) => commit({ ...value, ...next })}
-      />
 
-      <TreasureRollup
-        rollup={rollup}
-        title="Chapter treasure"
-        rowLabel="Encounter"
-        secondaryLabel="Type / difficulty"
-        secondaryOf={(r) => (isCombatRoom(r.roomType) ? BAND_LABELS[r.threat] : roomTypeLabel(r.roomType))}
-        emptyLabel="No encounters in this chapter yet."
-        loadError={encountersError}
-        onReload={() => setReloadKey((k) => k + 1)}
-      />
+      <div className="tabs" role="tablist" aria-label="Chapter sections">
+        {CHAPTER_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`tab${tab === t.id ? ' tab--active' : ''}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      <ChapterMap encounters={chapterEncounters} onOpenEncounter={onOpenEncounter} />
+      {tab === 'config' && (
+        <div role="tabpanel">
+          <p className="muted">
+            Expected party for this chapter. Its encounters inherit these unless they set their
+            own; leave a field empty to inherit from the campaign.
+          </p>
+          <PartyFields
+            value={value}
+            inherited={inherited}
+            inheritedError={settingsError}
+            onChange={(next) => commit({ ...value, ...next })}
+          />
+        </div>
+      )}
+
+      {tab === 'summary' && (
+        <div role="tabpanel">
+          <TreasureRollup
+            rollup={rollup}
+            title="Chapter treasure"
+            rowLabel="Encounter"
+            secondaryLabel="Type / difficulty"
+            secondaryOf={(r) => (isCombatRoom(r.roomType) ? BAND_LABELS[r.threat] : roomTypeLabel(r.roomType))}
+            emptyLabel="No encounters in this chapter yet."
+            loadError={encountersError}
+            onReload={() => setReloadKey((k) => k + 1)}
+          />
+        </div>
+      )}
+
+      {tab === 'map' && (
+        <div role="tabpanel">
+          <ChapterMap encounters={chapterEncounters} onOpenEncounter={onOpenEncounter} />
+        </div>
+      )}
     </section>
   )
 }
