@@ -25,7 +25,10 @@ export function buildChapterGraph(encounters) {
       const to = String(ex.to_encounter_id || '')
       if (to && to !== from && nodeIds.has(to)) {
         directed.set(`${from}>${to}`, { label: ex.label || '', secret: !!ex.secret })
-      } else if (to !== from && (ex.label || to)) {
+      } else if (to !== from) {
+        // Anything that isn't an in-chapter passage or a self-loop is a boundary exit
+        // — external, cross-chapter (dangling), OR a blank "— External —" placeholder
+        // (no target + no label). All get a port circle so they're visible on the map.
         const portId = `exit:${from}:${idx}`
         exitPorts.push({ id: portId, name: ex.label || 'Exit', kind: 'exit' })
         exitEdges.push({ id: `xe:${from}:${idx}`, source: from, target: portId, label: ex.label || '', secret: !!ex.secret })
