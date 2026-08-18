@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, getStraightPath, EdgeLabelRenderer } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { buildChapterGraph, boundaryPoint, sideText } from '../chapterGraph.js'
+import { buildChapterGraph, boundaryPoint, sideText, seedPositions } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
 // 8hda: an INTERACTIVE node-link map of a chapter — pan (drag canvas), zoom (scroll),
@@ -109,17 +109,32 @@ function PassageEdge({ source, target, data }) {
 }
 const edgeTypes = { passage: PassageEdge }
 
-export default function ChapterMap({ encounters, onOpenEncounter }) {
+export default function ChapterMap({ encounters, onOpenEncounter, positions, onPositionsChange }) {
   const [collapsed, setCollapsed] = useState(false)
   const { nodes: rooms, exitPorts, passages, exitEdges, layout, deadEnds, stats } = useMemo(() => buildChapterGraph(encounters), [encounters])
 
+  // The GM's saved layout, read via a ref so a save doesn't re-seed (which would fight
+  // the drag); the graph STRUCTURE changing (rooms added/removed) does re-seed.
+  const positionsRef = useRef(positions)
+  positionsRef.current = positions
+
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   useEffect(() => {
+    const seeded = seedPositions(rooms, positionsRef.current, layout) // stored wins, new rooms auto-place
     setNodes([
-      ...rooms.map((n) => ({ id: n.id, type: 'room', position: layout[n.id] || { x: 0, y: 0 }, data: { name: n.name, roomType: n.roomType, dead: deadEnds.has(n.id) } })),
+      ...rooms.map((n) => ({ id: n.id, type: 'room', position: seeded[n.id], data: { name: n.name, roomType: n.roomType, dead: deadEnds.has(n.id) } })),
       ...exitPorts.map((p) => ({ id: p.id, type: 'exit', position: layout[p.id] || { x: 0, y: 0 }, data: {}, draggable: true })),
     ])
   }, [rooms, exitPorts, layout, deadEnds, setNodes])
+
+  // On drop, persist the whole current room layout (prunes removed rooms, includes any
+  // auto-placed new ones). Exit ports are derived, not saved.
+  const onNodeDragStop = useCallback(() => {
+    if (!onPositionsChange) return
+    const pos = {}
+    for (const n of nodes) if (n.type === 'room') pos[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
+    onPositionsChange(pos)
+  }, [nodes, onPositionsChange])
 
   // Passages (rooms) + boundary exits (room → port) both render via PassageEdge.
   const edges = useMemo(
@@ -153,6 +168,7 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 onNodesChange={onNodesChange}
+                onNodeDragStop={onNodeDragStop}
                 onNodeClick={onNodeClick}
                 fitView
                 minZoom={0.1}

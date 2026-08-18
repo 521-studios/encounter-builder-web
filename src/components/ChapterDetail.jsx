@@ -101,6 +101,23 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
     }
   }
 
+  // Persist the GM's hand-arranged map layout. Round-trips name + party (party is
+  // full-replace, so omitting it would clear the override); map_positions is
+  // touch-only-when-supplied on the API, so only this send updates it.
+  function savePositions(map_positions) {
+    const name = value.name.trim() || chapter.name
+    if (!name) return
+    chaptersApi.edit(
+      campaignId,
+      chapter.id,
+      { name, order: chapter.order, ...partyFields(value), map_positions },
+      {
+        onSaved: (updated) => onSaved && onSaved(updated),
+        onError: () => onSaveError && onSaveError(`chapter “${name}” map layout`, chapter.id),
+      },
+    )
+  }
+
   async function del() {
     if (!window.confirm(`Delete chapter "${value.name.trim() || 'Untitled chapter'}"? Its encounters move to Unsorted.`)) return
     try {
@@ -188,7 +205,12 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
 
       {tab === 'map' && (
         <div role="tabpanel" id="chpanel-map" aria-labelledby="chtab-map">
-          <ChapterMap encounters={chapterEncounters} onOpenEncounter={onOpenEncounter} />
+          <ChapterMap
+            encounters={chapterEncounters}
+            onOpenEncounter={onOpenEncounter}
+            positions={chapter.map_positions}
+            onPositionsChange={savePositions}
+          />
         </div>
       )}
       </div>

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText, seedPositions } from './chapterGraph.js'
 
 // A1→A2→A3→A1→A4 (all one-directional). One exit is external (no target) and one is
 // dangling (target not in the chapter) — both become boundary exit ports, not passages.
@@ -97,6 +97,17 @@ test('buildChapterGraph: a self-exit is dropped; a blank exit becomes a boundary
   assert.equal(g.passages.length, 0) // the self-reference makes no passage
   assert.equal(g.exitPorts.length, 1) // the blank "— External —" placeholder shows as a port
   assert.equal(g.exitPorts[0].name, 'Exit') // unlabeled → falls back to "Exit"
+})
+
+test('seedPositions: a saved position wins; a room added since the save auto-places from the layout', () => {
+  const rooms = [{ id: '1' }, { id: '2' }, { id: '3' }]
+  const stored = { 1: { x: 100, y: 200 }, 9: { x: 7, y: 7 } } // 1 hand-placed; 9 is a since-removed room (ignored)
+  const layout = { 1: { x: 5, y: 5 }, 2: { x: 10, y: 20 }, 3: { x: 30, y: 40 } }
+  assert.deepEqual(seedPositions(rooms, stored, layout), {
+    1: { x: 100, y: 200 }, // stored wins
+    2: { x: 10, y: 20 }, // new room → force layout
+    3: { x: 30, y: 40 },
+  })
 })
 
 test('sideText: composes 🔒 / label / skill check for an edge caption', () => {
