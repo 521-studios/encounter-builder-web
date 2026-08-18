@@ -164,6 +164,26 @@ button.encounter { flex: 1; text-align: left; }
   border-bottom: 1px solid var(--border);
 }
 
+/* Encounter editor: title row + tabs pin together as one sticky header (same pattern
+   as the chapter detail); only the active tab panel scrolls under them. The wrapper is
+   the sticky element, so the inner title row is no longer independently sticky. */
+.editor .editor-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--panel);
+  margin: 0 -1.5rem;
+  padding: 1.25rem 1.5rem 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.editor .editor-header .editor-head {
+  position: static;
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
+}
+
 .field { display: grid; gap: 0.25rem; }
 
 /* Chapter detail: the title row + tabs pin together as one sticky header; only the

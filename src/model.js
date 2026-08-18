@@ -194,6 +194,20 @@ export function encounterBlocks(enc) {
   return []
 }
 
+// Challenges-tab markdown sections — tactics/setup prose distinct from the
+// Description read-aloud. No legacy source (new field), so just the array.
+export function challengeBlocks(enc) {
+  return enc?.challenge_blocks || []
+}
+
+// A block list → its serialized form: trim titles, drop rows with neither title
+// nor body. Shared by text_blocks and challenge_blocks so they never diverge.
+function blocksInput(blocks) {
+  return (blocks || [])
+    .map((b) => ({ title: (b.title || '').trim(), body: b.body || '' }))
+    .filter((b) => b.title || b.body)
+}
+
 // When markdown block `removed` is deleted, every higher block shifts down one, so the
 // set of edit-mode block indices must remap: indices below `removed` stay, the removed
 // one drops, and indices above decrement. Pure so the off-by-one is testable.
@@ -213,9 +227,8 @@ export function toEncounterInput(enc) {
     // Markdown body: titled blocks. Migrate-on-save — a legacy `description` folds
     // into an untitled block (encounterBlocks) and description clears here, so it's
     // written once and never double-counted. Empty blocks (no title + no body) drop.
-    text_blocks: encounterBlocks(enc)
-      .map((b) => ({ title: (b.title || '').trim(), body: b.body || '' }))
-      .filter((b) => b.title || b.body),
+    text_blocks: blocksInput(encounterBlocks(enc)),
+    challenge_blocks: blocksInput(challengeBlocks(enc)),
     description: '',
     notes: enc.notes || '',
     monsters: (enc.monsters || []).filter(hasRef).map(monsterInput),
