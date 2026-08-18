@@ -369,17 +369,23 @@ export function skillCheckLabel(s) {
 }
 
 // An exit / connectivity edge: a passage to another encounter (to_encounter_id, a
-// soft reference) or an external destination named by label ("Exterior"). _key is
-// the client-only React key.
+// soft reference) or an external destination named by label ("Exterior"). `secret`
+// marks a secret door (per-direction), and skill/dc are an optional check to find or
+// traverse it. _key is the client-only React key.
 export function emptyExit() {
-  return withKey({ to_encounter_id: '', label: '' })
+  return withKey({ to_encounter_id: '', label: '', secret: false, skill: '', dc: 0 })
 }
 
-// Serialize an exit for the API: drop the client _key, trim the label. Rows with
-// neither a target nor a label are filtered by the caller (the API rejects them).
+// Serialize an exit for the API: drop the client _key, trim the label/skill, round DC.
 export function exitInput(e) {
   const { _key, ...rest } = e
-  return { to_encounter_id: rest.to_encounter_id || '', label: (rest.label || '').trim() }
+  return {
+    to_encounter_id: rest.to_encounter_id || '',
+    label: (rest.label || '').trim(),
+    secret: !!rest.secret,
+    skill: (rest.skill || '').trim(),
+    dc: Math.round(Number(rest.dc) || 0),
+  }
 }
 
 export function emptyTreasure() {

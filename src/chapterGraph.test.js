@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText } from './chapterGraph.js'
 
 // A1→A2→A3→A1→A4 (all one-directional). One exit is external (no target) and one is
 // dangling (target not in the chapter) — both become boundary exit ports, not passages.
@@ -99,6 +99,15 @@ test('buildChapterGraph: a self-exit is dropped; a blank exit becomes a boundary
   assert.equal(g.exitPorts[0].name, 'Exit') // unlabeled → falls back to "Exit"
 })
 
+test('sideText: composes 🔒 / label / skill check for an edge caption', () => {
+  assert.equal(sideText(true, 'hidden panel', 'Perception', 18), '🔒 hidden panel · Perception DC 18')
+  assert.equal(sideText(false, 'north door', '', 0), 'north door') // label only
+  assert.equal(sideText(false, '', 'Athletics', 15), 'Athletics DC 15') // check, no label
+  assert.equal(sideText(false, '', '', 15), 'DC 15') // DC without a skill
+  assert.equal(sideText(true, '', '', 0), '🔒') // secret with nothing else
+  assert.equal(sideText(false, '', '', 0), '') // nothing → no caption
+})
+
 test('boundaryPoint: crosses the box edge nearest the incoming direction; centre on coincidence', () => {
   // Horizontal approach → crosses the vertical (hw) edge.
   assert.deepEqual(boundaryPoint({ x: 0, y: 50 }, { x: 100, y: 50, hw: 10, hh: 20 }), { x: 90, y: 50 })
@@ -132,6 +141,23 @@ test('buildChapterGraph: a per-direction secret flag rides on the passage', () =
   const roomSide = p.source === '1' ? p.targetSecret : p.sourceSecret
   assert.equal(hallSide, true) // secret from the hallway
   assert.equal(roomSide, false) // obvious from the room
+})
+
+test('buildChapterGraph: a per-direction skill check rides on the passage + exit port', () => {
+  // A one-way climb A→B (Athletics DC 15) and a boundary exit needing Perception DC 12.
+  const g = buildChapterGraph([
+    { id: 1, name: 'A', exits: [{ to_encounter_id: '2', skill: 'Athletics', dc: 15 }, { label: 'crevice', skill: 'Perception', dc: 12 }] },
+    { id: 2, name: 'B', exits: [] },
+  ])
+  const p = passageBetween(g, '1', '2')
+  assert.equal(p.source, '1') // one-way A→B
+  assert.equal(p.sourceSkill, 'Athletics')
+  assert.equal(p.sourceDC, 15)
+  assert.equal(p.targetSkill, '') // no reverse exit → no check at the B end
+  // the boundary exit carries its own check on its edge
+  assert.equal(g.exitEdges.length, 1)
+  assert.equal(g.exitEdges[0].skill, 'Perception')
+  assert.equal(g.exitEdges[0].dc, 12)
 })
 
 test('layerLayout: every node gets a position, laid out in BFS columns', () => {
