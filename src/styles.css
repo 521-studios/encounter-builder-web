@@ -319,6 +319,9 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
 .monster-header { display: grid; gap: 0.1rem; font-weight: 400; }
 .monster-header-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
 .monster-header-name { font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+/* The name doubles as the stat-block toggle: a caret + name, styled as text not a button. */
+.monster-expand { background: none; border: none; padding: 0; margin: 0; color: inherit; font-family: inherit; font-size: inherit; cursor: pointer; text-align: left; }
+.monster-expand:hover { color: var(--accent); }
 .monster-header-level { font-weight: 700; white-space: nowrap; color: var(--gold); }
 .monster-header-source, .monster-header-init, .monster-header-loading { font-size: 0.85em; color: var(--muted); }
 .statblock {
