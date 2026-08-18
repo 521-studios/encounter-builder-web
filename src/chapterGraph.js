@@ -64,8 +64,31 @@ export function buildChapterGraph(encounters) {
     ...exitEdges.map((x) => ({ from: x.source, to: x.target })),
   ]
   const layout = forceLayout([...nodes, ...exitPorts], layoutEdges)
-  const stats = { rooms: nodes.length, connections: passages.length, exits: exitPorts.length }
+  const stats = { rooms: nodes.length, connections: passages.length, exits: exitPorts.length, loops: countLoops(nodes, passages) }
   return { nodes, exitPorts, passages, exitEdges, layout, deadEnds, stats }
+}
+
+// Independent loops in the room graph = the cyclomatic number (E − V + components):
+// the count of passages that close a cycle (endpoints already connected). Union-find
+// over the undirected passages. Just the count — the loops aren't highlighted on the
+// map (only the number is useful), so no per-passage tagging.
+function countLoops(nodes, passages) {
+  const parent = Object.fromEntries(nodes.map((n) => [n.id, n.id]))
+  const find = (x) => {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]]
+      x = parent[x]
+    }
+    return x
+  }
+  let loops = 0
+  for (const p of passages) {
+    const ra = find(p.source)
+    const rb = find(p.target)
+    if (ra === rb) loops++
+    else parent[ra] = rb
+  }
+  return loops
 }
 
 // Canonical undirected key for a node pair (order-independent).

@@ -28,6 +28,18 @@ test('buildChapterGraph: rooms + intra passages; external/dangling exits become 
   assert.equal(g.nodes.find((n) => n.id === '2').roomType, 'hazard')
 })
 
+test('buildChapterGraph: loop count = cyclomatic number (independent cycles), no highlighting', () => {
+  // 1-2-3-1 is a cycle; 1-4 is a spur. 4 passages − 4 rooms + 1 component = 1 loop.
+  assert.equal(buildChapterGraph(chapter).stats.loops, 1)
+  // A pure tree (R→L1, R→L2) has zero loops.
+  const tree = buildChapterGraph([
+    { id: 1, name: 'R', exits: [{ to_encounter_id: '2' }, { to_encounter_id: '3' }] },
+    { id: 2, name: 'L1', exits: [] },
+    { id: 3, name: 'L2', exits: [] },
+  ])
+  assert.equal(tree.stats.loops, 0)
+})
+
 test('buildChapterGraph: dead-ends are rooms with ≤1 connected room', () => {
   const g = buildChapterGraph(chapter)
   assert.ok(g.deadEnds.has('4')) // spur off A1 (boundary exits don't count)
