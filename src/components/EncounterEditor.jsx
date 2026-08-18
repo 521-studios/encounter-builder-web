@@ -14,6 +14,7 @@ import {
   REWARD_KIND_LABELS,
   buildInput,
   encounterBlocks,
+  challengeBlocks,
   reindexEditingAfterRemove,
   emptyMonster,
   emptyHazard,
@@ -38,12 +39,22 @@ import MonsterLine from './MonsterLine.jsx'
 import HazardLine from './HazardLine.jsx'
 import AfflictionLine from './AfflictionLine.jsx'
 import WikiMarkdown from './WikiMarkdown.jsx'
+import MarkdownSections from './MarkdownSections.jsx'
 import TreasurePoolSection from './TreasurePoolSection.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
 import EncounterPrintSheet from './EncounterPrintSheet.jsx'
 
+const ENCOUNTER_TABS = [
+  { id: 'config', label: 'Config' },
+  { id: 'description', label: 'Description' },
+  { id: 'challenges', label: 'Challenges' },
+  { id: 'rewards', label: 'Rewards' },
+  { id: 'exits', label: 'Exits' },
+]
+
 export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onSaveOk, onOpenEncounter }) {
+  const [tab, setTab] = useState('config')
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
   const [releasing, setReleasing] = useState(false)
@@ -56,7 +67,8 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [siblingsLoaded, setSiblingsLoaded] = useState(false) // the picker list finished loading (so an unresolved exit is genuinely deleted, not just still-loading)
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
   const [partyContextError, setPartyContextError] = useState(false) // chapters/settings load failed
-  const [editingBlocks, setEditingBlocks] = useState(() => new Set()) // which markdown blocks are in edit (vs preview) mode
+  const [descEditing, setDescEditing] = useState(() => new Set()) // Description blocks in edit (vs preview) mode
+  const [chalEditing, setChalEditing] = useState(() => new Set()) // Challenges blocks in edit mode
 
   // encRef exposes the latest working copy to the flush handlers (for the error
   // label); syncedRef is the last sidebar-visible signature we told the parent
@@ -171,24 +183,27 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const hazards = enc.hazards || []
   const afflictions = enc.afflictions || []
   const treasure = enc.treasure || []
+  // A room with no monsters/hazards/afflictions has no combat difficulty to show —
+  // suppress the "Trivial 1" band and fall back to the room-type label.
+  const hasChallenges = monsters.length > 0 || hazards.length > 0 || afflictions.length > 0
 
-  // Titled markdown blocks (a legacy single description surfaces as one untitled
-  // block via encounterBlocks; edits persist text_blocks, and the save clears the
-  // legacy description). (markdown-blocks)
-  const blocks = encounterBlocks(enc)
-  const setBlock = (i, fields) => patch({ text_blocks: blocks.map((b, j) => (j === i ? { ...b, ...fields } : b)) })
-  const editBlock = (i) => setEditingBlocks((s) => new Set(s).add(i))
-  const doneBlock = (i) => setEditingBlocks((s) => { const n = new Set(s); n.delete(i); return n })
-  // A new block opens in edit mode (it's empty); appended at the end so its index is blocks.length.
-  const addBlock = () => {
-    setEditingBlocks((s) => new Set(s).add(blocks.length))
-    patch({ text_blocks: [...blocks, { title: '', body: '' }] })
-  }
-  // Removing block i shifts every higher block down one — reindex the editing set to match.
-  const removeBlock = (i) => {
-    patch({ text_blocks: blocks.filter((_, j) => j !== i) })
-    setEditingBlocks((s) => reindexEditingAfterRemove(s, i))
-  }
+  // Titled markdown blocks. Two independent lists — text_blocks (Description) and
+  // challenge_blocks (Challenges) — each with its own edit-set; a factory keeps their
+  // add/remove/edit/done identical. A legacy single description surfaces as one untitled
+  // text_block via encounterBlocks; the save clears it. (markdown-blocks)
+  const blockHandlers = (field, list, setEditing) => ({
+    set: (i, fields) => patch({ [field]: list.map((b, j) => (j === i ? { ...b, ...fields } : b)) }),
+    edit: (i) => setEditing((s) => new Set(s).add(i)),
+    done: (i) => setEditing((s) => { const n = new Set(s); n.delete(i); return n }),
+    // A new block opens in edit mode (it's empty), appended so its index is list.length.
+    add: () => { setEditing((s) => new Set(s).add(list.length)); patch({ [field]: [...list, { title: '', body: '' }] }) },
+    // Removing block i shifts higher blocks down one — reindex the editing set to match.
+    remove: (i) => { patch({ [field]: list.filter((_, j) => j !== i) }); setEditing((s) => reindexEditingAfterRemove(s, i)) },
+  })
+  const descBlocks = encounterBlocks(enc)
+  const chalBlocks = challengeBlocks(enc)
+  const descH = blockHandlers('text_blocks', descBlocks, setDescEditing)
+  const chalH = blockHandlers('challenge_blocks', chalBlocks, setChalEditing)
 
   const setMonster = (i, m) => patch({ monsters: monsters.map((x, j) => (j === i ? m : x)) })
   const setHazard = (i, h) => patch({ hazards: hazards.map((x, j) => (j === i ? h : x)) })
@@ -319,577 +334,581 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
   return (
     <section className="editor">
-      <div className="editor-head">
-        <input
-          className="title-input"
-          aria-label="encounter name"
-          value={enc.name}
-          disabled={released}
-          onChange={(e) => patch({ name: e.target.value })}
-        />
-        {isCombatRoom(budget.roomType) ? (
-          <span
-            className={`difficulty-badge difficulty-badge--${budget.threat}`}
-            data-testid="difficulty-badge"
-            title={
-              `${BAND_LABELS[budget.threat]} encounter for a level-${effectiveParty.level} party (from monster XP)` +
-              (effectiveParty.size !== BASE_PARTY
-                ? ` · ${BAND_LABELS[budget.canonicalThreat]} at ${BASE_PARTY} PCs (book standard)`
-                : '')
-            }
-          >
-            {BAND_LABELS[budget.threat]} {effectiveParty.level}
-          </span>
-        ) : (
-          <span
-            className="difficulty-badge difficulty-badge--noncombat"
-            data-testid="difficulty-badge"
-            title={`${roomTypeLabel(budget.roomType)} room — no combat difficulty`}
-          >
-            {roomTypeLabel(budget.roomType)}
-          </span>
-        )}
-        <span className="status">{enc.status}</span>
-        <button type="button" className="link" onClick={() => setPrinting(true)}>Print / PDF</button>
-        <button type="button" className="link danger" aria-label={`Delete ${enc.name || 'Untitled encounter'}`} onClick={del}>Delete</button>
-        <button type="button" className="link" onClick={onClose}>Close</button>
+      {/* Title + tabs pin together as one sticky header; only the active panel scrolls. */}
+      <div className="editor-header">
+        <div className="editor-head">
+          <input
+            className="title-input"
+            aria-label="encounter name"
+            value={enc.name}
+            disabled={released}
+            onChange={(e) => patch({ name: e.target.value })}
+          />
+          {isCombatRoom(budget.roomType) && hasChallenges ? (
+            <span
+              className={`difficulty-badge difficulty-badge--${budget.threat}`}
+              data-testid="difficulty-badge"
+              title={
+                `${BAND_LABELS[budget.threat]} encounter for a level-${effectiveParty.level} party (from monster XP)` +
+                (effectiveParty.size !== BASE_PARTY
+                  ? ` · ${BAND_LABELS[budget.canonicalThreat]} at ${BASE_PARTY} PCs (book standard)`
+                  : '')
+              }
+            >
+              {BAND_LABELS[budget.threat]} {effectiveParty.level}
+            </span>
+          ) : (
+            <span
+              className="difficulty-badge difficulty-badge--noncombat"
+              data-testid="difficulty-badge"
+              title={`${roomTypeLabel(budget.roomType)} room — no combat difficulty`}
+            >
+              {roomTypeLabel(budget.roomType)}
+            </span>
+          )}
+          <span className="status">{enc.status}</span>
+          <button type="button" className="link" onClick={() => setPrinting(true)}>Print / PDF</button>
+          <button type="button" className="link danger" aria-label={`Delete ${enc.name || 'Untitled encounter'}`} onClick={del}>Delete</button>
+          <button type="button" className="link" onClick={onClose}>Close</button>
+        </div>
+
+        {released && <p className="muted">Released — read-only.</p>}
+        {error && <p className="error" role="alert">{error}</p>}
+
+        <div className="tabs" role="tablist" aria-label="Encounter sections">
+          {ENCOUNTER_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`enctab-${t.id}`}
+              aria-controls={`encpanel-${t.id}`}
+              aria-selected={tab === t.id}
+              className={`tab${tab === t.id ? ' tab--active' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {released && <p className="muted">Released — read-only.</p>}
-      {error && <p className="error" role="alert">{error}</p>}
-
-      <label className="field">
-        <span>Chapter</span>
-        <select
-          aria-label="chapter"
-          value={chapters.some((c) => c.id === enc.chapter_id) ? enc.chapter_id : ''}
-          disabled={released}
-          onChange={(e) => patch({ chapter_id: e.target.value })}
-        >
-          <option value="">Unsorted</option>
-          {chapters.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </label>
-
-      <label className="field">
-        <span>Room type</span>
-        <select
-          aria-label="room type"
-          value={enc.room_type || 'combat'}
-          disabled={released}
-          onChange={(e) => patch({ room_type: e.target.value })}
-        >
-          {ROOM_TYPES.map((t) => (
-            <option key={t} value={t}>{ROOM_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
-      </label>
-
-      <PartyFields
-        value={{ party_level: enc.party_level ?? null, party_size: enc.party_size ?? null }}
-        inherited={resolveParty({
-          // Layers below the encounter: its chapter, then campaign settings.
-          chapter: chapters.find((c) => c.id === enc.chapter_id) || null,
-          campaign: campaignSettings || null,
-        })}
-        inheritedError={partyContextError}
-        disabled={released}
-        onChange={(next) => patch({ party_level: next.party_level, party_size: next.party_size })}
-      />
-
-      <div className="text-blocks" data-testid="text-blocks">
-        <span className="field-label">Description</span>
-        {blocks.map((b, i) => {
-          // Each block flips between an editor (title input + markdown textarea) and its
-          // rendered preview — not both at once. Released encounters are always preview.
-          const isEditing = !released && editingBlocks.has(i)
-          return (
-            <div className="text-block" key={i} data-editing={isEditing || undefined}>
-              {isEditing ? (
-                <>
-                  <input
-                    className="text-block-title"
-                    aria-label={`section ${i + 1} title`}
-                    value={b.title || ''}
-                    placeholder="Section title (optional)"
-                    onChange={(e) => setBlock(i, { title: e.target.value })}
-                  />
-                  <textarea
-                    className="description-input"
-                    aria-label={`section ${i + 1} body`}
-                    value={b.body || ''}
-                    onChange={(e) => setBlock(i, { body: e.target.value })}
-                    placeholder="Scene-setting, read-aloud text, GM notes… (markdown)"
-                  />
-                  <div className="text-block-actions">
-                    <button type="button" className="link" onClick={() => doneBlock(i)}>Done</button>
-                    <button type="button" className="link danger" aria-label={`remove section ${i + 1}`} onClick={() => removeBlock(i)}>Remove</button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {b.title && <h4 className="text-block-heading">{b.title}</h4>}
-                  {b.body ? (
-                    <div className="description-preview" data-testid="description-preview">
-                      <WikiMarkdown text={b.body} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
-                    </div>
-                  ) : (
-                    <p className="muted">(empty section)</p>
-                  )}
-                  {!released && (
-                    <div className="text-block-actions">
-                      <button type="button" className="link" aria-label={`edit section ${i + 1}`} onClick={() => editBlock(i)}>Edit</button>
-                      <button type="button" className="link danger" aria-label={`remove section ${i + 1}`} onClick={() => removeBlock(i)}>Remove</button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )
-        })}
-        {!released && (
-          <button type="button" className="link" data-testid="add-section" onClick={addBlock}>
-            + Add section
-          </button>
-        )}
-      </div>
-
-      <label className="field">
-        <span>Notes</span>
-        <textarea
-          value={enc.notes || ''}
-          disabled={released}
-          onChange={(e) => patch({ notes: e.target.value })}
-        />
-      </label>
-
-      <fieldset className="coins">
-        <legend>Coin</legend>
-        {CURRENCIES.map((c) => (
-          <label key={c} className="coin">
-            {c}
-            <input
-              type="number"
-              min="0"
-              value={enc.currency?.[c] || 0}
-              disabled={released}
-              onChange={(e) => patch({ currency: { ...enc.currency, [c]: Number(e.target.value) } })}
-            />
-          </label>
-        ))}
-      </fieldset>
-
-      <fieldset>
-        <legend>Monsters</legend>
-        {monsters.map((m, i) => (
-          <MonsterLine
-            key={m._key}
-            monster={m}
-            entryOf={budget.entryOf}
-            disabled={released}
-            onChange={(m2) => setMonster(i, m2)}
-            onRemove={() => patch({ monsters: monsters.filter((_, j) => j !== i) })}
-            onAddToTreasure={addLoadoutToTreasure}
-          />
-        ))}
-        {!released && (
-          <button type="button" onClick={() => patch({ monsters: [...monsters, emptyMonster()] })}>
-            + monster
-          </button>
-        )}
-      </fieldset>
-
-      <fieldset>
-        <legend>Hazards</legend>
-        {hazards.map((h, i) => (
-          <HazardLine
-            key={h._key}
-            hazard={h}
-            entryOf={budget.entryOf}
-            disabled={released}
-            onChange={(h2) => setHazard(i, h2)}
-            onRemove={() => patch({ hazards: hazards.filter((_, j) => j !== i) })}
-          />
-        ))}
-        {!released && (
-          <button type="button" onClick={() => patch({ hazards: [...hazards, emptyHazard()] })}>
-            + hazard
-          </button>
-        )}
-      </fieldset>
-
-      <fieldset>
-        <legend>Afflictions</legend>
-        {afflictions.map((a, i) => (
-          <AfflictionLine
-            key={a._key}
-            affliction={a}
-            entryOf={budget.entryOf}
-            disabled={released}
-            onChange={(a2) => setAffliction(i, a2)}
-            onRemove={() => patch({ afflictions: afflictions.filter((_, j) => j !== i) })}
-          />
-        ))}
-        {!released && (
-          <button type="button" onClick={() => patch({ afflictions: [...afflictions, emptyAffliction()] })}>
-            + affliction
-          </button>
-        )}
-      </fieldset>
-
-      <fieldset>
-        <legend>Treasure</legend>
-        {pools.map((pool) => (
-          <TreasurePoolSection
-            key={pool.id}
-            pool={pool}
-            lines={treasure.map((t, i) => ({ t, i })).filter(({ t }) => t.pool_id === pool.id)}
-            disabled={released}
-            canRemove={pools.length > 1}
-            onPoolChange={(fields) => setPool(pool.id, fields)}
-            onPoolRemove={() => removePool(pool.id)}
-            onLineChange={setTreasure}
-            onLineRemove={(i) => patch({ treasure: treasure.filter((_, j) => j !== i) })}
-            onAddLine={() => addLineToPool(pool.id)}
-          />
-        ))}
-        {!released && (
-          <div className="treasure-actions">
-            <button type="button" onClick={addTreasure}>+ treasure</button>
-            <button type="button" className="link add-pool" onClick={addPool}>+ pool</button>
-          </div>
-        )}
-      </fieldset>
-
-      <fieldset>
-        <legend>XP awards</legend>
-        <p className="muted">
-          Flat XP for non-combat accomplishments — story milestones, exploration, a
-          recruited ally. Counts toward the party’s XP, not the encounter’s combat difficulty.
-        </p>
-        {awards.map((a, i) => (
-          <div className="xp-award" data-testid="xp-award" key={a._key}>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              className="award-amount"
-              aria-label="XP amount"
-              placeholder="XP"
-              value={a.amount || ''}
-              disabled={released}
-              onChange={(e) => setAward(i, { amount: Number(e.target.value) })}
-            />
-            <input
-              className="award-reason"
-              aria-label="award reason"
-              placeholder="Reason (e.g. gained Augrael as an ally)"
-              value={a.reason || ''}
-              disabled={released}
-              onChange={(e) => setAward(i, { reason: e.target.value })}
-            />
-            {!released && (
-              <button type="button" className="link danger" onClick={() => removeAward(i)}>
-                remove
-              </button>
-            )}
-          </div>
-        ))}
-        {!released && (
-          <button type="button" className="add-award" onClick={addAward}>
-            + XP award
-          </button>
-        )}
-      </fieldset>
-
-      <fieldset>
-        <legend>Rewards</legend>
-        <p className="muted">
-          Non-treasure rewards — information/lore unlocked, a ritual granted, an ally
-          recruited, a unique item. Recorded for the GM; no gp or XP effect.
-        </p>
-        {rewards.map((r, i) => (
-          <div className="reward" data-testid="reward" key={r._key}>
-            <div className="reward-head">
+      <div className="tab-panel">
+        {tab === 'config' && (
+          <div role="tabpanel" id="encpanel-config" aria-labelledby="enctab-config">
+            <label className="field">
+              <span>Chapter</span>
               <select
-                aria-label="reward kind"
-                value={r.kind || 'information'}
+                aria-label="chapter"
+                value={chapters.some((c) => c.id === enc.chapter_id) ? enc.chapter_id : ''}
                 disabled={released}
-                onChange={(e) => setReward(i, { kind: e.target.value })}
+                onChange={(e) => patch({ chapter_id: e.target.value })}
               >
-                {REWARD_KINDS.map((k) => (
-                  <option key={k} value={k}>{REWARD_KIND_LABELS[k]}</option>
+                <option value="">Unsorted</option>
+                {chapters.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-              <input
-                className="reward-label"
-                aria-label="reward label"
-                placeholder="Name (e.g. The Whispering Reeds)"
-                value={r.label || ''}
-                disabled={released}
-                onChange={(e) => setReward(i, { label: e.target.value })}
-              />
-              {!released && (
-                <button type="button" className="link danger" onClick={() => removeReward(i)}>
-                  remove
-                </button>
-              )}
-            </div>
-            {!released ? (
-              <textarea
-                className="reward-description"
-                aria-label="reward description"
-                placeholder="Details — GM notes (markdown)"
-                value={r.description || ''}
-                onChange={(e) => setReward(i, { description: e.target.value })}
-              />
-            ) : r.description ? (
-              <WikiMarkdown text={r.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
-            ) : null}
-          </div>
-        ))}
-        {!released && (
-          <button type="button" className="add-reward" onClick={addReward}>
-            + reward
-          </button>
-        )}
-      </fieldset>
-
-      <fieldset>
-        <legend>Skill checks</legend>
-        <p className="muted">
-          Structured discovery checks — skill + DC + what it reveals. Surfaced at the
-          table instead of buried in the description.
-        </p>
-        {skillChecks.map((s, i) => (
-          <div className="skill-check" data-testid="skill-check" key={s._key}>
-            {released ? (
-              <div className="skill-check-head">
-                <span className="check-label" data-testid="check-label">{skillCheckLabel(s)}</span>
-              </div>
-            ) : (
-              <div className="skill-check-head">
-                <input
-                  className="check-skill"
-                  aria-label="check skill"
-                  placeholder="Skill (e.g. Perception)"
-                  value={s.skill || ''}
-                  onChange={(e) => setCheck(i, { skill: e.target.value })}
-                />
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  className="check-dc"
-                  aria-label="check DC"
-                  placeholder="DC"
-                  value={s.dc || ''}
-                  onChange={(e) => setCheck(i, { dc: Number(e.target.value) })}
-                />
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  className="check-successes"
-                  aria-label="required successes"
-                  title="Required successes to resolve (e.g. 4 successful checks)"
-                  placeholder="×1"
-                  value={s.successes || ''}
-                  onChange={(e) => setCheck(i, { successes: Number(e.target.value) })}
-                />
-                <button type="button" className="link danger" onClick={() => removeCheck(i)}>
-                  remove
-                </button>
-              </div>
-            )}
-            {!released ? (
-              <textarea
-                className="check-description"
-                aria-label="check effect"
-                placeholder="What it reveals / does (markdown)"
-                value={s.description || ''}
-                onChange={(e) => setCheck(i, { description: e.target.value })}
-              />
-            ) : s.description ? (
-              <WikiMarkdown text={s.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
-            ) : null}
-
-            {/* Alternative skills (OR) — a check the party can pass with another skill+DC. */}
-            {!released && (
-              <div className="check-alts">
-                {(s.alternatives || []).map((a, j) => (
-                  <div className="check-alt" data-testid="check-alt" key={j}>
-                    <span className="muted">or</span>
-                    <input
-                      className="check-skill"
-                      aria-label="alternative skill"
-                      placeholder="Skill"
-                      value={a.skill || ''}
-                      onChange={(e) => setAlt(i, j, { skill: e.target.value })}
-                    />
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      className="check-dc"
-                      aria-label="alternative DC"
-                      placeholder="DC"
-                      value={a.dc || ''}
-                      onChange={(e) => setAlt(i, j, { dc: Number(e.target.value) })}
-                    />
-                    <button type="button" className="link danger" onClick={() => removeAlt(i, j)}>remove</button>
-                  </div>
-                ))}
-                <button type="button" className="link add-alt" onClick={() => addAlt(i)}>+ alternative skill</button>
-              </div>
-            )}
-
-            {/* Per-degree-of-success outcomes (native details — open when any is set). */}
-            {!released && (
-              // Uncontrolled <details> — a native toggle React never re-collapses; the
-              // summary shows how many degrees are set so it's discoverable when closed.
-              <details className="check-outcomes">
-                <summary>
-                  Per-degree outcomes
-                  {(() => {
-                    const n = SKILL_CHECK_DEGREES.filter((d) => (s.outcomes?.[d] || '').trim()).length
-                    return n ? ` (${n} set)` : ''
-                  })()}
-                </summary>
-                {SKILL_CHECK_DEGREES.map((d) => (
-                  <label className="outcome field" key={d}>
-                    <span>{SKILL_CHECK_DEGREE_LABELS[d]}</span>
-                    <textarea
-                      aria-label={`${SKILL_CHECK_DEGREE_LABELS[d]} outcome`}
-                      value={s.outcomes?.[d] || ''}
-                      onChange={(e) => setOutcome(i, d, e.target.value)}
-                    />
-                  </label>
-                ))}
-              </details>
-            )}
-            {released && s.outcomes && SKILL_CHECK_DEGREES.some((d) => (s.outcomes[d] || '').trim()) && (
-              <ul className="check-outcomes-ro" data-testid="check-outcomes-ro">
-                {SKILL_CHECK_DEGREES.filter((d) => (s.outcomes[d] || '').trim()).map((d) => (
-                  <li key={d}><strong>{SKILL_CHECK_DEGREE_LABELS[d]}</strong> {s.outcomes[d]}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ))}
-        {!released && (
-          <button type="button" className="add-skill-check" onClick={addCheck}>
-            + skill check
-          </button>
-        )}
-      </fieldset>
-
-      <fieldset>
-        <legend>Exits</legend>
-        <p className="muted">
-          Where this room connects — the dungeon map graph. Link to another encounter,
-          or name an external exit (Exterior, stairs up).
-        </p>
-        {exits.map((ex, i) => (
-          <div className="exit" data-testid="exit" key={ex._key}>
-            <select
-              className="exit-target"
-              aria-label="exit target"
-              value={ex.to_encounter_id || ''}
-              disabled={released}
-              onChange={(e) => setExit(i, { to_encounter_id: e.target.value })}
-            >
-              <option value="">— External —</option>
-              {exitTargets.map((t) => (
-                <option key={t.id} value={t.id}>{t.name || 'Untitled'}</option>
-              ))}
-              {/* An id not in the picker is either a since-deleted encounter (shown
-                  honestly as broken so the GM can re-point it) OR the picker just hasn't
-                  loaded yet — in which case show a neutral placeholder, never a false
-                  "(deleted encounter)" that makes a valid saved link look lost. */}
-              {ex.to_encounter_id && !exitTargets.some((t) => String(t.id) === String(ex.to_encounter_id)) && (
-                <option value={ex.to_encounter_id}>{siblingsLoaded ? '(deleted encounter)' : 'Linked encounter…'}</option>
-              )}
-            </select>
-            <input
-              className="exit-label"
-              aria-label="exit label"
-              placeholder={ex.to_encounter_id ? 'Passage (optional)' : 'Destination (e.g. Exterior)'}
-              value={ex.label || ''}
-              disabled={released}
-              onChange={(e) => setExit(i, { label: e.target.value })}
-            />
-            <label className="exit-secret">
-              <input
-                type="checkbox"
-                aria-label="secret door"
-                checked={!!ex.secret}
-                disabled={released}
-                onChange={(e) => setExit(i, { secret: e.target.checked })}
-              />{' '}
-              Secret
             </label>
-            <input
-              className="exit-skill"
-              aria-label="exit skill check"
-              placeholder="Skill (optional)"
-              value={ex.skill || ''}
+
+            <label className="field">
+              <span>Room type</span>
+              <select
+                aria-label="room type"
+                value={enc.room_type || 'combat'}
+                disabled={released}
+                onChange={(e) => patch({ room_type: e.target.value })}
+              >
+                {ROOM_TYPES.map((t) => (
+                  <option key={t} value={t}>{ROOM_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </label>
+
+            <PartyFields
+              value={{ party_level: enc.party_level ?? null, party_size: enc.party_size ?? null }}
+              inherited={resolveParty({
+                // Layers below the encounter: its chapter, then campaign settings.
+                chapter: chapters.find((c) => c.id === enc.chapter_id) || null,
+                campaign: campaignSettings || null,
+              })}
+              inheritedError={partyContextError}
               disabled={released}
-              onChange={(e) => setExit(i, { skill: e.target.value })}
+              onChange={(next) => patch({ party_level: next.party_level, party_size: next.party_size })}
             />
-            <input
-              className="exit-dc"
-              type="number"
-              min="0"
-              aria-label="exit DC"
-              placeholder="DC"
-              value={ex.dc || ''}
-              disabled={released}
-              onChange={(e) => setExit(i, { dc: Number(e.target.value) })}
-            />
-            {!released && (
-              <button type="button" className="link danger" onClick={() => removeExit(i)}>
-                remove
-              </button>
-            )}
           </div>
-        ))}
-        {!released && (
-          <button type="button" className="add-exit" onClick={addExit}>
-            + exit
-          </button>
         )}
 
-        {incoming.length > 0 && (
-          <div className="exits-incoming" data-testid="exits-incoming">
-            <span className="field-label">Incoming</span>
-            {incoming.map((inc) => (
-              <div className="exit-incoming" key={inc.id}>
-                <span className="grow">
-                  {inc.name} → here{inc.label ? ` (${inc.label})` : ''}
-                </span>
-                {inc.connected ? (
-                  <span className="muted">two-way ✓</span>
-                ) : (
-                  !released && (
-                    <button type="button" className="link" onClick={() => connectIncoming(inc.id)}>
-                      connect
+        {tab === 'description' && (
+          <div role="tabpanel" id="encpanel-description" aria-labelledby="enctab-description">
+            <MarkdownSections
+              name="description"
+              blocks={descBlocks}
+              editing={descEditing}
+              released={released}
+              siblings={siblingEncounters}
+              onOpenEncounter={onOpenEncounter}
+              h={descH}
+            />
+            <label className="field">
+              <span>Notes</span>
+              <textarea
+                value={enc.notes || ''}
+                disabled={released}
+                onChange={(e) => patch({ notes: e.target.value })}
+              />
+            </label>
+          </div>
+        )}
+
+        {tab === 'challenges' && (
+          <div role="tabpanel" id="encpanel-challenges" aria-labelledby="enctab-challenges">
+            <fieldset>
+              <legend>Monsters</legend>
+              {monsters.map((m, i) => (
+                <MonsterLine
+                  key={m._key}
+                  monster={m}
+                  entryOf={budget.entryOf}
+                  disabled={released}
+                  onChange={(m2) => setMonster(i, m2)}
+                  onRemove={() => patch({ monsters: monsters.filter((_, j) => j !== i) })}
+                  onAddToTreasure={addLoadoutToTreasure}
+                />
+              ))}
+              {!released && (
+                <button type="button" onClick={() => patch({ monsters: [...monsters, emptyMonster()] })}>
+                  + monster
+                </button>
+              )}
+            </fieldset>
+
+            <fieldset>
+              <legend>Hazards</legend>
+              {hazards.map((h, i) => (
+                <HazardLine
+                  key={h._key}
+                  hazard={h}
+                  entryOf={budget.entryOf}
+                  disabled={released}
+                  onChange={(h2) => setHazard(i, h2)}
+                  onRemove={() => patch({ hazards: hazards.filter((_, j) => j !== i) })}
+                />
+              ))}
+              {!released && (
+                <button type="button" onClick={() => patch({ hazards: [...hazards, emptyHazard()] })}>
+                  + hazard
+                </button>
+              )}
+            </fieldset>
+
+            <fieldset>
+              <legend>Afflictions</legend>
+              {afflictions.map((a, i) => (
+                <AfflictionLine
+                  key={a._key}
+                  affliction={a}
+                  entryOf={budget.entryOf}
+                  disabled={released}
+                  onChange={(a2) => setAffliction(i, a2)}
+                  onRemove={() => patch({ afflictions: afflictions.filter((_, j) => j !== i) })}
+                />
+              ))}
+              {!released && (
+                <button type="button" onClick={() => patch({ afflictions: [...afflictions, emptyAffliction()] })}>
+                  + affliction
+                </button>
+              )}
+            </fieldset>
+
+            <fieldset>
+              <legend>Skill checks</legend>
+              <p className="muted">
+                Structured discovery checks — skill + DC + what it reveals. Surfaced at the
+                table instead of buried in the description.
+              </p>
+              {skillChecks.map((s, i) => (
+                <div className="skill-check" data-testid="skill-check" key={s._key}>
+                  {released ? (
+                    <div className="skill-check-head">
+                      <span className="check-label" data-testid="check-label">{skillCheckLabel(s)}</span>
+                    </div>
+                  ) : (
+                    <div className="skill-check-head">
+                      <input
+                        className="check-skill"
+                        aria-label="check skill"
+                        placeholder="Skill (e.g. Perception)"
+                        value={s.skill || ''}
+                        onChange={(e) => setCheck(i, { skill: e.target.value })}
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="check-dc"
+                        aria-label="check DC"
+                        placeholder="DC"
+                        value={s.dc || ''}
+                        onChange={(e) => setCheck(i, { dc: Number(e.target.value) })}
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="check-successes"
+                        aria-label="required successes"
+                        title="Required successes to resolve (e.g. 4 successful checks)"
+                        placeholder="×1"
+                        value={s.successes || ''}
+                        onChange={(e) => setCheck(i, { successes: Number(e.target.value) })}
+                      />
+                      <button type="button" className="link danger" onClick={() => removeCheck(i)}>
+                        remove
+                      </button>
+                    </div>
+                  )}
+                  {!released ? (
+                    <textarea
+                      className="check-description"
+                      aria-label="check effect"
+                      placeholder="What it reveals / does (markdown)"
+                      value={s.description || ''}
+                      onChange={(e) => setCheck(i, { description: e.target.value })}
+                    />
+                  ) : s.description ? (
+                    <WikiMarkdown text={s.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
+                  ) : null}
+
+                  {/* Alternative skills (OR) — a check the party can pass with another skill+DC. */}
+                  {!released && (
+                    <div className="check-alts">
+                      {(s.alternatives || []).map((a, j) => (
+                        <div className="check-alt" data-testid="check-alt" key={j}>
+                          <span className="muted">or</span>
+                          <input
+                            className="check-skill"
+                            aria-label="alternative skill"
+                            placeholder="Skill"
+                            value={a.skill || ''}
+                            onChange={(e) => setAlt(i, j, { skill: e.target.value })}
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            className="check-dc"
+                            aria-label="alternative DC"
+                            placeholder="DC"
+                            value={a.dc || ''}
+                            onChange={(e) => setAlt(i, j, { dc: Number(e.target.value) })}
+                          />
+                          <button type="button" className="link danger" onClick={() => removeAlt(i, j)}>remove</button>
+                        </div>
+                      ))}
+                      <button type="button" className="link add-alt" onClick={() => addAlt(i)}>+ alternative skill</button>
+                    </div>
+                  )}
+
+                  {/* Per-degree-of-success outcomes (native details — open when any is set). */}
+                  {!released && (
+                    // Uncontrolled <details> — a native toggle React never re-collapses; the
+                    // summary shows how many degrees are set so it's discoverable when closed.
+                    <details className="check-outcomes">
+                      <summary>
+                        Per-degree outcomes
+                        {(() => {
+                          const n = SKILL_CHECK_DEGREES.filter((d) => (s.outcomes?.[d] || '').trim()).length
+                          return n ? ` (${n} set)` : ''
+                        })()}
+                      </summary>
+                      {SKILL_CHECK_DEGREES.map((d) => (
+                        <label className="outcome field" key={d}>
+                          <span>{SKILL_CHECK_DEGREE_LABELS[d]}</span>
+                          <textarea
+                            aria-label={`${SKILL_CHECK_DEGREE_LABELS[d]} outcome`}
+                            value={s.outcomes?.[d] || ''}
+                            onChange={(e) => setOutcome(i, d, e.target.value)}
+                          />
+                        </label>
+                      ))}
+                    </details>
+                  )}
+                  {released && s.outcomes && SKILL_CHECK_DEGREES.some((d) => (s.outcomes[d] || '').trim()) && (
+                    <ul className="check-outcomes-ro" data-testid="check-outcomes-ro">
+                      {SKILL_CHECK_DEGREES.filter((d) => (s.outcomes[d] || '').trim()).map((d) => (
+                        <li key={d}><strong>{SKILL_CHECK_DEGREE_LABELS[d]}</strong> {s.outcomes[d]}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+              {!released && (
+                <button type="button" className="add-skill-check" onClick={addCheck}>
+                  + skill check
+                </button>
+              )}
+            </fieldset>
+
+            <MarkdownSections
+              name="challenge"
+              blocks={chalBlocks}
+              editing={chalEditing}
+              released={released}
+              siblings={siblingEncounters}
+              onOpenEncounter={onOpenEncounter}
+              h={chalH}
+            />
+          </div>
+        )}
+
+        {tab === 'rewards' && (
+          <div role="tabpanel" id="encpanel-rewards" aria-labelledby="enctab-rewards">
+            <fieldset>
+              <legend>Treasure</legend>
+              {pools.map((pool) => (
+                <TreasurePoolSection
+                  key={pool.id}
+                  pool={pool}
+                  lines={treasure.map((t, i) => ({ t, i })).filter(({ t }) => t.pool_id === pool.id)}
+                  disabled={released}
+                  canRemove={pools.length > 1}
+                  onPoolChange={(fields) => setPool(pool.id, fields)}
+                  onPoolRemove={() => removePool(pool.id)}
+                  onLineChange={setTreasure}
+                  onLineRemove={(i) => patch({ treasure: treasure.filter((_, j) => j !== i) })}
+                  onAddLine={() => addLineToPool(pool.id)}
+                />
+              ))}
+              {!released && (
+                <div className="treasure-actions">
+                  <button type="button" onClick={addTreasure}>+ treasure</button>
+                  <button type="button" className="link add-pool" onClick={addPool}>+ pool</button>
+                </div>
+              )}
+            </fieldset>
+
+            <fieldset className="coins">
+              <legend>Coin</legend>
+              {CURRENCIES.map((c) => (
+                <label key={c} className="coin">
+                  {c}
+                  <input
+                    type="number"
+                    min="0"
+                    value={enc.currency?.[c] || 0}
+                    disabled={released}
+                    onChange={(e) => patch({ currency: { ...enc.currency, [c]: Number(e.target.value) } })}
+                  />
+                </label>
+              ))}
+            </fieldset>
+
+            <fieldset>
+              <legend>XP awards</legend>
+              <p className="muted">
+                Flat XP for non-combat accomplishments — story milestones, exploration, a
+                recruited ally. Counts toward the party’s XP, not the encounter’s combat difficulty.
+              </p>
+              {awards.map((a, i) => (
+                <div className="xp-award" data-testid="xp-award" key={a._key}>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    className="award-amount"
+                    aria-label="XP amount"
+                    placeholder="XP"
+                    value={a.amount || ''}
+                    disabled={released}
+                    onChange={(e) => setAward(i, { amount: Number(e.target.value) })}
+                  />
+                  <input
+                    className="award-reason"
+                    aria-label="award reason"
+                    placeholder="Reason (e.g. gained Augrael as an ally)"
+                    value={a.reason || ''}
+                    disabled={released}
+                    onChange={(e) => setAward(i, { reason: e.target.value })}
+                  />
+                  {!released && (
+                    <button type="button" className="link danger" onClick={() => removeAward(i)}>
+                      remove
                     </button>
-                  )
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              ))}
+              {!released && (
+                <button type="button" className="add-award" onClick={addAward}>
+                  + XP award
+                </button>
+              )}
+            </fieldset>
+
+            <fieldset>
+              <legend>Rewards</legend>
+              <p className="muted">
+                Non-treasure rewards — information/lore unlocked, a ritual granted, an ally
+                recruited, a unique item. Recorded for the GM; no gp or XP effect.
+              </p>
+              {rewards.map((r, i) => (
+                <div className="reward" data-testid="reward" key={r._key}>
+                  <div className="reward-head">
+                    <select
+                      aria-label="reward kind"
+                      value={r.kind || 'information'}
+                      disabled={released}
+                      onChange={(e) => setReward(i, { kind: e.target.value })}
+                    >
+                      {REWARD_KINDS.map((k) => (
+                        <option key={k} value={k}>{REWARD_KIND_LABELS[k]}</option>
+                      ))}
+                    </select>
+                    <input
+                      className="reward-label"
+                      aria-label="reward label"
+                      placeholder="Name (e.g. The Whispering Reeds)"
+                      value={r.label || ''}
+                      disabled={released}
+                      onChange={(e) => setReward(i, { label: e.target.value })}
+                    />
+                    {!released && (
+                      <button type="button" className="link danger" onClick={() => removeReward(i)}>
+                        remove
+                      </button>
+                    )}
+                  </div>
+                  {!released ? (
+                    <textarea
+                      className="reward-description"
+                      aria-label="reward description"
+                      placeholder="Details — GM notes (markdown)"
+                      value={r.description || ''}
+                      onChange={(e) => setReward(i, { description: e.target.value })}
+                    />
+                  ) : r.description ? (
+                    <WikiMarkdown text={r.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
+                  ) : null}
+                </div>
+              ))}
+              {!released && (
+                <button type="button" className="add-reward" onClick={addReward}>
+                  + reward
+                </button>
+              )}
+            </fieldset>
+
+            <TreasureBudget
+              budget={budget}
+              partyLevel={effectiveParty.level}
+              partySize={effectiveParty.size}
+            />
           </div>
         )}
-      </fieldset>
 
-      <TreasureBudget
-        budget={budget}
-        partyLevel={effectiveParty.level}
-        partySize={effectiveParty.size}
-      />
+        {tab === 'exits' && (
+          <div role="tabpanel" id="encpanel-exits" aria-labelledby="enctab-exits">
+            <fieldset>
+              <legend>Exits</legend>
+              <p className="muted">
+                Where this room connects — the dungeon map graph. Link to another encounter,
+                or name an external exit (Exterior, stairs up).
+              </p>
+              {exits.map((ex, i) => (
+                <div className="exit" data-testid="exit" key={ex._key}>
+                  <select
+                    className="exit-target"
+                    aria-label="exit target"
+                    value={ex.to_encounter_id || ''}
+                    disabled={released}
+                    onChange={(e) => setExit(i, { to_encounter_id: e.target.value })}
+                  >
+                    <option value="">— External —</option>
+                    {exitTargets.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name || 'Untitled'}</option>
+                    ))}
+                    {/* An id not in the picker is either a since-deleted encounter (shown
+                        honestly as broken so the GM can re-point it) OR the picker just hasn't
+                        loaded yet — in which case show a neutral placeholder, never a false
+                        "(deleted encounter)" that makes a valid saved link look lost. */}
+                    {ex.to_encounter_id && !exitTargets.some((t) => String(t.id) === String(ex.to_encounter_id)) && (
+                      <option value={ex.to_encounter_id}>{siblingsLoaded ? '(deleted encounter)' : 'Linked encounter…'}</option>
+                    )}
+                  </select>
+                  <input
+                    className="exit-label"
+                    aria-label="exit label"
+                    placeholder={ex.to_encounter_id ? 'Passage (optional)' : 'Destination (e.g. Exterior)'}
+                    value={ex.label || ''}
+                    disabled={released}
+                    onChange={(e) => setExit(i, { label: e.target.value })}
+                  />
+                  <label className="exit-secret">
+                    <input
+                      type="checkbox"
+                      aria-label="secret door"
+                      checked={!!ex.secret}
+                      disabled={released}
+                      onChange={(e) => setExit(i, { secret: e.target.checked })}
+                    />{' '}
+                    Secret
+                  </label>
+                  <input
+                    className="exit-skill"
+                    aria-label="exit skill check"
+                    placeholder="Skill (optional)"
+                    value={ex.skill || ''}
+                    disabled={released}
+                    onChange={(e) => setExit(i, { skill: e.target.value })}
+                  />
+                  <input
+                    className="exit-dc"
+                    type="number"
+                    min="0"
+                    aria-label="exit DC"
+                    placeholder="DC"
+                    value={ex.dc || ''}
+                    disabled={released}
+                    onChange={(e) => setExit(i, { dc: Number(e.target.value) })}
+                  />
+                  {!released && (
+                    <button type="button" className="link danger" onClick={() => removeExit(i)}>
+                      remove
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!released && (
+                <button type="button" className="add-exit" onClick={addExit}>
+                  + exit
+                </button>
+              )}
+
+              {incoming.length > 0 && (
+                <div className="exits-incoming" data-testid="exits-incoming">
+                  <span className="field-label">Incoming</span>
+                  {incoming.map((inc) => (
+                    <div className="exit-incoming" key={inc.id}>
+                      <span className="grow">
+                        {inc.name} → here{inc.label ? ` (${inc.label})` : ''}
+                      </span>
+                      {inc.connected ? (
+                        <span className="muted">two-way ✓</span>
+                      ) : (
+                        !released && (
+                          <button type="button" className="link" onClick={() => connectIncoming(inc.id)}>
+                            connect
+                          </button>
+                        )
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+          </div>
+        )}
+      </div>
 
       {printing && (
         <EncounterPrintSheet

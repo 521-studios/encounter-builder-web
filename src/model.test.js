@@ -10,6 +10,7 @@ import {
   emptyTreasure,
   toEncounterInput,
   encounterBlocks,
+  challengeBlocks,
   reindexEditingAfterRemove,
   hasRef,
   gameIdOf,
@@ -166,6 +167,24 @@ test('toEncounterInput serializes text_blocks (trimmed titles), drops empty bloc
     { title: 'Tactics', body: '' },
   ])
   assert.equal(input.description, '') // never re-sent once blocks exist
+})
+
+test('challengeBlocks + toEncounterInput serializes challenge_blocks independently of text_blocks (no legacy fallback)', () => {
+  assert.deepEqual(challengeBlocks({ challenge_blocks: [{ title: 'Tactics', body: 'They flee.' }] }), [
+    { title: 'Tactics', body: 'They flee.' },
+  ])
+  assert.deepEqual(challengeBlocks({ description: 'x' }), []) // no legacy source — new field
+  assert.deepEqual(challengeBlocks({}), [])
+  const input = toEncounterInput({
+    name: 'A1',
+    text_blocks: [{ title: 'Read-aloud', body: 'Mildew.' }],
+    challenge_blocks: [
+      { title: '  Tactics  ', body: 'Three mitflits lurk.' },
+      { title: '', body: '' }, // empty → dropped
+    ],
+  })
+  assert.deepEqual(input.challenge_blocks, [{ title: 'Tactics', body: 'Three mitflits lurk.' }])
+  assert.deepEqual(input.text_blocks, [{ title: 'Read-aloud', body: 'Mildew.' }]) // the two lists stay separate
 })
 
 test('gameIdOf resolves a line to its game_id — direct, or a templated ref base', () => {
