@@ -59,9 +59,15 @@ export default function MonsterLine({ monster, entryOf, disabled, onChange, onRe
       <div className="line monster-line">
         <div className="picked grow monster-header" data-testid="monster-header">
           <div className="monster-header-top">
-            <span className="monster-header-name">
-              {name}{count > 1 ? ` (${count})` : ''}
-            </span>
+            <button
+              type="button"
+              className="monster-header-name monster-expand"
+              aria-expanded={showBlock}
+              aria-label={`${showBlock ? 'hide' : 'show'} stat block for ${name}`}
+              onClick={() => setShowBlock((s) => !s)}
+            >
+              <span className="chapter-caret" aria-hidden="true">{showBlock ? '▾' : '▸'}</span> {name}{count > 1 ? ` (${count})` : ''}
+            </button>
             {hdr.level != null && (
               <span className="monster-header-level" data-testid="monster-header-level">CREATURE {hdr.level}</span>
             )}
@@ -72,9 +78,6 @@ export default function MonsterLine({ monster, entryOf, disabled, onChange, onRe
           )}
           {entry == null && snapshot == null && <div className="muted monster-header-loading">Loading…</div>}
         </div>
-        {!disabled && (
-          <button type="button" className="link" onClick={() => set({ ref: { game_id: '' } })}>change</button>
-        )}
         <input
           type="number"
           min="1"
@@ -89,9 +92,6 @@ export default function MonsterLine({ monster, entryOf, disabled, onChange, onRe
           disabled={disabled}
           onChange={(e) => set({ nickname: e.target.value })}
         />
-        <button type="button" className="link" onClick={() => setShowBlock((s) => !s)}>
-          {showBlock ? 'hide' : 'stat block'}
-        </button>
         <button type="button" className="link" onClick={() => setShowLoadout((s) => !s)}>
           {showLoadout ? 'hide equipment' : `equipment${loadoutCount ? ` (${loadoutCount})` : ''}`}
         </button>
