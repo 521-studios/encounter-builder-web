@@ -33,6 +33,7 @@ import {
   monsterInput,
   emptyExit,
   exitInput,
+  incomingLinks,
   clearSaveErrorOnSave,
 } from './model.js'
 
@@ -399,6 +400,25 @@ test('toEncounterInput sends complete skill checks, drops rows missing skill or 
   })
   const input = toEncounterInput(enc)
   assert.deepEqual(input.skill_checks, [{ skill: 'Perception', dc: 12, description: 'spot the planks' }])
+})
+
+test('incomingLinks: siblings pointing here, deduped, with connected status + label', () => {
+  const siblings = [
+    { id: 1, name: 'A', exits: [{ to_encounter_id: '5', label: 'north' }] }, // → here (5)
+    { id: 2, name: 'B', exits: [{ to_encounter_id: '9' }] }, // points elsewhere → not incoming
+    { id: 3, name: 'C', exits: [{ to_encounter_id: '5' }, { to_encounter_id: '5' }] }, // dup → one entry
+    { id: 5, name: 'Self', exits: [] }, // self → excluded
+  ]
+  const currentExits = [{ to_encounter_id: '3' }] // this room (5) already links back to C → two-way
+  const inc = incomingLinks('5', siblings, currentExits)
+  assert.deepEqual(
+    inc.map((i) => [i.name, i.connected]),
+    [
+      ['A', false], // A→here, no back-link yet
+      ['C', true], // C→here and here→C
+    ],
+  )
+  assert.equal(inc.find((i) => i.name === 'A').label, 'north')
 })
 
 test('keyed stamps a _key on every exit; emptyExit strips cleanly', () => {

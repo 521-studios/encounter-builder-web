@@ -24,6 +24,7 @@ import {
   emptyReward,
   emptySkillCheck,
   emptyExit,
+  incomingLinks,
   keyed,
   skillCheckLabel,
   SKILL_CHECK_DEGREES,
@@ -278,6 +279,10 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     patch({ exits: exits.map((e, j) => (j === i ? { ...e, ...fields } : e)) })
   const addExit = () => patch({ exits: [...exits, emptyExit()] })
   const removeExit = (i) => patch({ exits: exits.filter((_, j) => j !== i) })
+  // Rooms whose exits point AT this encounter; "connect" adds the reciprocal exit here
+  // (making the passage two-way).
+  const incoming = incomingLinks(encounterId, siblingEncounters, exits)
+  const connectIncoming = (sourceId) => patch({ exits: [...exits, { ...emptyExit(), to_encounter_id: sourceId }] })
 
   // Release hands the loot to the party: it saves current edits first (so the
   // released encounter matches what the GM sees), then flips it to released —
@@ -855,6 +860,28 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           <button type="button" className="add-exit" onClick={addExit}>
             + exit
           </button>
+        )}
+
+        {incoming.length > 0 && (
+          <div className="exits-incoming" data-testid="exits-incoming">
+            <span className="field-label">Incoming</span>
+            {incoming.map((inc) => (
+              <div className="exit-incoming" key={inc.id}>
+                <span className="grow">
+                  {inc.name} → here{inc.label ? ` (${inc.label})` : ''}
+                </span>
+                {inc.connected ? (
+                  <span className="muted">two-way ✓</span>
+                ) : (
+                  !released && (
+                    <button type="button" className="link" onClick={() => connectIncoming(inc.id)}>
+                      connect
+                    </button>
+                  )
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </fieldset>
 
