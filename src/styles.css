@@ -212,6 +212,12 @@ button.encounter { flex: 1; text-align: left; }
 .map-room-type { font-size: 10px; color: #556; }
 /* Boundary-exit port: a small circle hung off a room. */
 .map-exit { width: 18px; height: 18px; border-radius: 50%; background: #2a3033; border: 2px solid #8a8f98; }
+
+/* Exit editor row: target · label · secret · skill · DC · remove (wraps when narrow). */
+.exit { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
+.exit-label, .exit-skill { flex: 1; min-width: 8rem; }
+.exit-dc { width: 4.5rem; }
+.exit-secret { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; font-size: 0.9rem; }
 /* Passage labels, positioned at each side's card edge via EdgeLabelRenderer. */
 .map-edge-label { position: absolute; pointer-events: none; background: rgba(27, 31, 34, 0.85); color: #cbd0d6; font-size: 10px; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
 .map-legend { font-size: 12px; }

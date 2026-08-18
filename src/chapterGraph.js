@@ -23,15 +23,16 @@ export function buildChapterGraph(encounters) {
     const from = String(e.id)
     ;(e.exits || []).forEach((ex, idx) => {
       const to = String(ex.to_encounter_id || '')
+      const meta = { label: ex.label || '', secret: !!ex.secret, skill: ex.skill || '', dc: ex.dc || 0 }
       if (to && to !== from && nodeIds.has(to)) {
-        directed.set(`${from}>${to}`, { label: ex.label || '', secret: !!ex.secret })
+        directed.set(`${from}>${to}`, meta)
       } else if (to !== from) {
         // Anything that isn't an in-chapter passage or a self-loop is a boundary exit
         // — external, cross-chapter (dangling), OR a blank "— External —" placeholder
         // (no target + no label). All get a port circle so they're visible on the map.
         const portId = `exit:${from}:${idx}`
         exitPorts.push({ id: portId, name: ex.label || 'Exit', kind: 'exit' })
-        exitEdges.push({ id: `xe:${from}:${idx}`, source: from, target: portId, label: ex.label || '', secret: !!ex.secret })
+        exitEdges.push({ id: `xe:${from}:${idx}`, source: from, target: portId, ...meta })
       }
     })
   }
@@ -52,9 +53,9 @@ export function buildChapterGraph(encounters) {
     const ab = directed.get(`${a}>${b}`)
     const ba = directed.get(`${b}>${a}`)
     if (ba) {
-      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: true, sourceLabel: ab.label, targetLabel: ba.label, sourceSecret: ab.secret, targetSecret: ba.secret })
+      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: true, sourceLabel: ab.label, targetLabel: ba.label, sourceSecret: ab.secret, targetSecret: ba.secret, sourceSkill: ab.skill, sourceDC: ab.dc, targetSkill: ba.skill, targetDC: ba.dc })
     } else {
-      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: false, sourceLabel: ab.label, targetLabel: '', sourceSecret: ab.secret, targetSecret: false })
+      passages.push({ id: `p:${pk}`, source: a, target: b, twoWay: false, sourceLabel: ab.label, targetLabel: '', sourceSecret: ab.secret, targetSecret: false, sourceSkill: ab.skill, sourceDC: ab.dc, targetSkill: '', targetDC: 0 })
     }
   }
 

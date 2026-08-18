@@ -134,6 +134,23 @@ test('buildChapterGraph: a per-direction secret flag rides on the passage', () =
   assert.equal(roomSide, false) // obvious from the room
 })
 
+test('buildChapterGraph: a per-direction skill check rides on the passage + exit port', () => {
+  // A one-way climb A→B (Athletics DC 15) and a boundary exit needing Perception DC 12.
+  const g = buildChapterGraph([
+    { id: 1, name: 'A', exits: [{ to_encounter_id: '2', skill: 'Athletics', dc: 15 }, { label: 'crevice', skill: 'Perception', dc: 12 }] },
+    { id: 2, name: 'B', exits: [] },
+  ])
+  const p = passageBetween(g, '1', '2')
+  assert.equal(p.source, '1') // one-way A→B
+  assert.equal(p.sourceSkill, 'Athletics')
+  assert.equal(p.sourceDC, 15)
+  assert.equal(p.targetSkill, '') // no reverse exit → no check at the B end
+  // the boundary exit carries its own check on its edge
+  assert.equal(g.exitEdges.length, 1)
+  assert.equal(g.exitEdges[0].skill, 'Perception')
+  assert.equal(g.exitEdges[0].dc, 12)
+})
+
 test('layerLayout: every node gets a position, laid out in BFS columns', () => {
   const g = buildChapterGraph(chapter)
   const edges = g.passages.map((p) => ({ from: p.source, to: p.target }))
