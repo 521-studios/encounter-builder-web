@@ -57,9 +57,9 @@ export default function SkillCheckEditor({ value, disabled, siblings, onOpenEnco
               onChange={(e) => set({ successes: Number(e.target.value) })}
             />
           </label>
-          <RemoveButton label="skill check" onRemove={onRemove} />
         </div>
       )}
+      {!disabled && <RemoveButton className="remove-x-abs" label="skill check" onRemove={onRemove} />}
       {!disabled ? (
         editingDesc ? (
           <div className="text-block" data-editing>
