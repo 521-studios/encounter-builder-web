@@ -142,7 +142,7 @@ export default function ChapterMap({ encounters, onOpenEncounter }) {
       <button type="button" className="map-title summary-toggle" aria-expanded={!collapsed} onClick={() => setCollapsed((c) => !c)}>
         <span className="chapter-caret" aria-hidden="true">{collapsed ? '▸' : '▾'}</span> Map —{' '}
         {stats.rooms} room{stats.rooms === 1 ? '' : 's'} · {stats.connections} passage{stats.connections === 1 ? '' : 's'} · {stats.exits} exit
-        {stats.exits === 1 ? '' : 's'}
+        {stats.exits === 1 ? '' : 's'} · {stats.loops} loop{stats.loops === 1 ? '' : 's'}
       </button>
 
       {!collapsed &&
