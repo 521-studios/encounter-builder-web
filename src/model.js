@@ -275,9 +275,6 @@ export function challengeAfflictions(enc) {
 export function challengeSkillChecks(enc) {
   return enc?.challenges ? enc.challenges.filter((c) => c.type === 'skill_check').map((c) => c.skill_check || {}) : enc?.skill_checks || []
 }
-export function challengeMarkdown(enc) {
-  return enc?.challenges ? enc.challenges.filter((c) => c.type === 'markdown').map((c) => c.markdown || {}) : enc?.challenge_blocks || []
-}
 
 // Serialize the unified list for a save: drop incomplete placeholders (a monster with
 // no ref, a skill check without skill + DC≥1, an empty markdown), cleaning each payload

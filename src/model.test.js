@@ -15,6 +15,7 @@ import {
   emptyChallenge,
   challengeMonsters,
   challengeHazards,
+  challengeAfflictions,
   challengeSkillChecks,
   challengesInput,
   reorderById,
@@ -220,7 +221,10 @@ test('challenge selectors filter the unified list by type; fall back to legacy a
   }
   assert.deepEqual(challengeMonsters(enc), [{ ref: { game_id: 'M:1' }, count: 2 }])
   assert.deepEqual(challengeHazards(enc), [{ ref: { game_id: 'H:1' }, count: 1 }])
+  assert.deepEqual(challengeAfflictions(enc), []) // none of this type
   assert.deepEqual(challengeSkillChecks(enc), [{ skill: 'Perception', dc: 12 }])
+  // affliction fallback to the legacy array when un-migrated
+  assert.deepEqual(challengeAfflictions({ afflictions: [{ ref: { game_id: 'D:1' }, count: 1 }] }), [{ ref: { game_id: 'D:1' }, count: 1 }])
   // No `challenges` → fall back to the legacy array (a raw rollup sibling).
   assert.deepEqual(challengeMonsters({ monsters: [{ ref: { game_id: 'L:1' }, count: 1 }] }), [{ ref: { game_id: 'L:1' }, count: 1 }])
 })
