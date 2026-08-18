@@ -168,6 +168,39 @@ test('ItemComposeView leaves ref.price_cp unset when the applied component has n
   assert.equal(ref.price_cp, undefined) // one unpriced component → no composed total
 })
 
+test('ItemComposeView prices a scroll/wand by its spell-rank variant — set mode, base has no standalone price (qeai)', async () => {
+  const refs = []
+  // A Magic Scroll holder: no standalone price, a price variant per spell rank.
+  const SCROLL = {
+    name: 'Magic Scroll',
+    stat_block: {
+      variants: [
+        { name: '2nd-rank Scroll', spell_rank: 2, price: { value: 12, currency: 'gp' } },
+        { name: '3rd-rank Scroll', spell_rank: 3, price: { value: 30, currency: 'gp' } },
+      ],
+    },
+  }
+  function SpellPicker({ onApplySpell }) {
+    // The spell search row carries `level` = the spell's rank (here Fireball, rank 3).
+    return <button onClick={() => onApplySpell({ game_id: 'spell:fireball', name: 'Fireball', level: 3 })}>applySpell</button>
+  }
+  const deps = makeDeps({
+    api: { entryFull: async () => SCROLL, applyItemPost: async () => ({}), templatesGet: async () => ({}), suggestSpells: async () => [] },
+    fetchEligible: async () => ({ spells: { holder: 'scroll' } }), // truthy → the picker opens
+    applyItemEffect: async () => ({ item: { name: 'Scroll of Fireball', stat_block: {} }, patches: [], applied: 'Fireball' }),
+    SlotPicker: SpellPicker,
+  })
+  render(<ItemComposeView treasure={{ ref: { game_id: 'equipment:scroll' } }} onChange={(t) => refs.push(t.ref)} deps={deps} />)
+  await screen.findByTestId('card')
+  fireEvent.click(screen.getByTestId('customize-item'))
+  fireEvent.click(await screen.findByText('applySpell'))
+  await waitFor(() => assert.equal(refs.length, 1))
+  const ref = refs.at(-1)
+  assert.equal(ref.modifications[0].price_mode, 'set')
+  assert.equal(ref.modifications[0].price_cp, 3000) // rank-3 scroll variant = 30 gp
+  assert.equal(ref.price_cp, 3000) // the rank price IS the total; the base (no price) is not added
+})
+
 test('ItemComposeView preserves per-modification price_cp across reload so the total stays composed (4den)', async () => {
   const refs = []
   const deps = makeDeps({

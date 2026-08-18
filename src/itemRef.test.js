@@ -15,11 +15,33 @@ test('a non-empty stack yields a derived ref with base, modifications (grade car
   assert.deepEqual(buildItemRef('weapons:1', stack), {
     base: { game_id: 'weapons:1' },
     modifications: [
-      { effect_game_id: 'equipment:pot', effect_name: 'Weapon Potency', grade: 2, price_cp: null },
-      { effect_game_id: 'equipment:strk', effect_name: 'Striking', grade: null, price_cp: null },
+      { effect_game_id: 'equipment:pot', effect_name: 'Weapon Potency', grade: 2, price_cp: null, price_mode: 'add' },
+      { effect_game_id: 'equipment:strk', effect_name: 'Striking', grade: null, price_cp: null, price_mode: 'add' },
     ],
     json: { name: 'Rapier', v: 2 }, // the LAST resolved item is the snapshot
   })
+})
+
+test("a 'set' component (a scroll/wand spell) IS the whole price — base + others ignored", () => {
+  // A Scroll of Fireball: generic Magic Scroll base (no standalone price) + a rank-3
+  // spell whose rank variant is 30 gp. The composed total is that rank price, not
+  // base(null)+spell — which would leave it unpriced.
+  const stack = [{ effect: { game_id: 's:fireball', name: 'Fireball' }, grade: null, price_cp: 3000, price_mode: 'set', item: {} }]
+  const ref = buildItemRef('equipment:scroll', stack, '', null) // base has no price
+  assert.equal(ref.price_cp, 3000)
+  assert.equal(ref.modifications[0].price_mode, 'set')
+})
+
+test("a 'set' component with no resolved price leaves the line unpriced (a staff: no rank variant)", () => {
+  const stack = [{ effect: { game_id: 's:x', name: 'Spell' }, grade: null, price_cp: null, price_mode: 'set', item: {} }]
+  assert.equal(buildItemRef('equipment:staff', stack, '', 5000).price_cp, undefined) // base priced, but the 'set' part isn't
+})
+
+test('modifications default to add mode; a mix of add components stays additive', () => {
+  const stack = [{ effect: { game_id: 'e:x', name: 'X' }, grade: null, price_cp: 200, item: {} }] // no price_mode key
+  const ref = buildItemRef('w:1', stack, '', 100)
+  assert.equal(ref.modifications[0].price_mode, 'add')
+  assert.equal(ref.price_cp, 300)
 })
 
 test('buildItemRef sums base + component prices into ref.price_cp when all parts are priced', () => {
