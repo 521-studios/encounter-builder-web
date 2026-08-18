@@ -194,6 +194,18 @@ export function encounterBlocks(enc) {
   return []
 }
 
+// When markdown block `removed` is deleted, every higher block shifts down one, so the
+// set of edit-mode block indices must remap: indices below `removed` stay, the removed
+// one drops, and indices above decrement. Pure so the off-by-one is testable.
+export function reindexEditingAfterRemove(editing, removed) {
+  const next = new Set()
+  for (const k of editing) {
+    if (k < removed) next.add(k)
+    else if (k > removed) next.add(k - 1)
+  }
+  return next
+}
+
 export function toEncounterInput(enc) {
   const input = {
     name: enc.name,
