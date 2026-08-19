@@ -71,7 +71,7 @@ test('keyed tolerates missing arrays: content defaults to []', () => {
   assert.deepEqual(out.content, [])
 })
 
-test('hazards migrate into content; toEncounterInput drops the ref-less placeholder', () => {
+test('hazards migrate into content; toEncounterInput keeps every row incl. the still-empty one', () => {
   const enc = keyed({
     name: 'x',
     hazards: [{ ref: { game_id: 'Hazards:1' }, count: 2 }, emptyHazard()],
@@ -79,8 +79,9 @@ test('hazards migrate into content; toEncounterInput drops the ref-less placehol
   assert.ok(enc.content.filter((c) => c.type === 'hazard').length >= 1)
   const input = toEncounterInput(enc)
   const hazards = input.content.filter((c) => c.type === 'hazard')
-  assert.equal(hazards.length, 1) // the ref-less empty row is dropped
+  assert.equal(hazards.length, 2) // in-progress work is never dropped — the empty row persists
   assert.equal(hazards[0].monster.ref.game_id, 'Hazards:1')
+  assert.equal(hazards[1].monster.ref.game_id, '') // still-empty placeholder kept
   assert.ok(!('_key' in hazards[0].monster))
 })
 
@@ -91,15 +92,16 @@ test('emptyHazard is a ref-less count-1 row (no elite/weak adjustment)', () => {
   assert.ok(!('adjustment' in h)) // a hazard has no elite/weak
 })
 
-test('afflictions migrate into content; toEncounterInput drops the empty one', () => {
+test('afflictions migrate into content; toEncounterInput keeps the empty one too', () => {
   const enc = keyed({
     name: 'x',
     afflictions: [{ ref: { game_id: 'Diseases:1' }, count: 1 }, emptyAffliction()],
   })
   const input = toEncounterInput(enc)
   const affl = input.content.filter((c) => c.type === 'affliction')
-  assert.equal(affl.length, 1) // ref-less empty dropped
+  assert.equal(affl.length, 2) // ref-less empty persists (in-progress work)
   assert.equal(affl[0].monster.ref.game_id, 'Diseases:1')
+  assert.equal(affl[1].monster.ref.game_id, '')
 })
 
 test('stripKey(withKey(x)) removes only _key and preserves the rest incl. nested ref', () => {
@@ -166,13 +168,13 @@ test('reindexEditingAfterRemove: keeps lower indices, drops the removed, decreme
   assert.deepEqual([...reindexEditingAfterRemove(new Set(), 0)], [])
 })
 
-test('toEncounterInput folds text_blocks into content markdown items (trimmed titles, empties dropped)', () => {
+test('toEncounterInput folds text_blocks into content markdown items (trimmed titles, empties kept)', () => {
   const input = toEncounterInput(
     keyed({
       name: 'A2',
       text_blocks: [
         { title: '  Read-aloud  ', body: 'The bridge sags.' },
-        { title: '', body: '' }, // empty → dropped
+        { title: '', body: '' }, // still-empty block → kept (a just-added text box)
         { title: 'Tactics', body: '' }, // title-only → kept
       ],
       description: 'stale', // superseded by text_blocks → must not leak
@@ -181,6 +183,7 @@ test('toEncounterInput folds text_blocks into content markdown items (trimmed ti
   const md = input.content.filter((c) => c.type === 'markdown').map((c) => c.markdown)
   assert.deepEqual(md, [
     { title: 'Read-aloud', body: 'The bridge sags.' },
+    { title: '', body: '' },
     { title: 'Tactics', body: '' },
   ])
   assert.equal(input.description, '') // never re-sent once blocks exist
@@ -284,27 +287,28 @@ test('hasRef is true only when a line resolves to a game_id (direct or templated
   assert.equal(hasRef(undefined), false)
 })
 
-test('toEncounterInput drops half-filled rows (autosave fires mid-edit)', () => {
-  // A GM clicks "+ monster"/"+ treasure" then autosave fires before they pick —
-  // the empty rows must not reach the API (which 400s on an empty ref).
+test('toEncounterInput keeps half-filled rows (autosave must never lose in-progress work)', () => {
+  // A GM clicks "+ monster"/"+ treasure" then autosave fires before they pick — the
+  // empty rows must PERSIST (the API accepts them; completeness is a draft→done gate).
   const enc = keyed({
     name: 'WIP',
     monsters: [
       { ref: { game_id: 'Monsters:1' }, count: 1 },
-      emptyMonster(), // unfilled — dropped
+      emptyMonster(), // unfilled — kept
     ],
     treasure: [
-      emptyTreasure(), // unfilled — dropped
+      emptyTreasure(), // unfilled — kept
       { ref: { game_id: 'Weapons:1' }, qty: 1 },
     ],
   })
   const input = toEncounterInput(enc)
   const monsters = input.content.filter((c) => c.type === 'monster')
-  assert.equal(monsters.length, 1)
+  assert.equal(monsters.length, 2)
   assert.equal(monsters[0].monster.ref.game_id, 'Monsters:1')
+  assert.equal(monsters[1].monster.ref.game_id, '') // placeholder persists
   const treasure = input.content.filter((c) => c.type === 'treasure')
-  assert.equal(treasure.length, 1)
-  assert.equal(treasure[0].treasure.ref.game_id, 'Weapons:1')
+  assert.equal(treasure.length, 2)
+  assert.equal(treasure[1].treasure.ref.game_id, 'Weapons:1')
 })
 
 test('custom treasure: ref/detector/content helpers', () => {
@@ -376,18 +380,19 @@ test('emptyContentItem builds the right empty payload per type, with an id', () 
   assert.deepEqual(emptyContentItem('reward').reward, { kind: 'information', label: '', description: '' })
 })
 
-test('contentCurrency sums every coin item; contentInput cleans a coin (rounds, positive-only, drops empty)', () => {
+test('contentCurrency sums every coin item; contentInput cleans a coin (rounds, positive-only, keeps empty)', () => {
   const enc = {
     content: [
       { id: '1', type: 'coin', coin: { gp: 5, sp: 3 } },
       { id: '2', type: 'coin', coin: { gp: 2, cp: 1 } },
-      { id: '3', type: 'coin', coin: {} }, // empty → dropped on save, contributes nothing
+      { id: '3', type: 'coin', coin: {} }, // empty coin item — persists (contributes nothing)
     ],
   }
   assert.deepEqual(contentCurrency(enc), { cp: 1, sp: 3, gp: 7, pp: 0 }) // summed across coin items
   const coins = toEncounterInput(enc).content.filter((c) => c.type === 'coin')
-  assert.equal(coins.length, 2) // the empty coin item is dropped
+  assert.equal(coins.length, 3) // every coin item persists, even the zeroed one
   assert.deepEqual(coins[0].coin, { gp: 5, sp: 3 })
+  assert.deepEqual(coins[2].coin, {}) // positive-only cleaning still strips the zeros
   // un-migrated fallback: no content → the legacy currency field
   assert.deepEqual(contentCurrency({ currency: { gp: 9 } }), { gp: 9 })
 })
@@ -429,19 +434,22 @@ test('rewardInput trims the label, keeps kind/description, drops _key', () => {
   })
 })
 
-test('toEncounterInput sends room_type + labelled rewards, drops empty-label rows', () => {
+test('toEncounterInput sends room_type + rewards, keeping even a blank-label row', () => {
   const enc = keyed({
     name: 'x',
     room_type: 'knowledge',
     rewards: [
       { kind: 'information', label: "Belcorra's history", description: '# lore' },
-      { kind: 'item', label: '  ', description: 'blank label' }, // dropped
+      { kind: 'item', label: '  ', description: 'blank label' }, // kept (in-progress work)
     ],
   })
   const input = toEncounterInput(enc)
   assert.equal(input.room_type, 'knowledge')
   const rewards = input.content.filter((c) => c.type === 'reward').map((c) => c.reward)
-  assert.deepEqual(rewards, [{ kind: 'information', label: "Belcorra's history", description: '# lore' }])
+  assert.deepEqual(rewards, [
+    { kind: 'information', label: "Belcorra's history", description: '# lore' },
+    { kind: 'item', label: '', description: 'blank label' },
+  ])
 })
 
 test('toEncounterInput defaults room_type to combat when unset', () => {
@@ -474,13 +482,18 @@ test('skillCheckInput serializes the richer fields (xhwl), omitting empties', ()
     successes: 4,
     alternatives: [
       { skill: '  Religion ', dc: '20' },
-      { skill: '', dc: 18 }, // incomplete → dropped
-      { skill: 'Arcana', dc: 0 }, // dc<1 → dropped
+      { skill: '', dc: 18 }, // dc only → kept (partial, in-progress)
+      { skill: 'Arcana', dc: 0 }, // skill only → kept (partial, in-progress)
+      { skill: '', dc: 0 }, // entirely blank → dropped (nothing to preserve)
     ],
     outcomes: { crit_success: 'extra clue', success: '', failure: 'alarm', crit_failure: '   ' },
   })
   assert.equal(out.successes, 4)
-  assert.deepEqual(out.alternatives, [{ skill: 'Religion', dc: 20 }])
+  assert.deepEqual(out.alternatives, [
+    { skill: 'Religion', dc: 20 },
+    { skill: '', dc: 18 },
+    { skill: 'Arcana', dc: 0 },
+  ]) // the fully-blank row is dropped; the three with any data are kept
   assert.deepEqual(out.outcomes, { crit_success: 'extra clue', failure: 'alarm' })
 
   // Defaults stay absent: successes 1 (or 0), no alternatives, no outcomes.
@@ -539,18 +552,22 @@ test('skillCheckLabel renders base, successes, and alternatives', () => {
   )
 })
 
-test('toEncounterInput sends complete skill checks, drops rows missing skill or dc', () => {
+test('toEncounterInput sends skill checks, keeping rows still missing skill or dc', () => {
   const enc = keyed({
     name: 'x',
     skill_checks: [
       { skill: 'Perception', dc: 12, description: 'spot the planks' },
-      { skill: '', dc: 10 }, // no skill → dropped
-      { skill: 'Society', dc: 0 }, // dc < 1 → dropped
+      { skill: '', dc: 10 }, // no skill yet → kept
+      { skill: 'Society', dc: 0 }, // no dc yet → kept
     ],
   })
   const input = toEncounterInput(enc)
   const checks = input.content.filter((c) => c.type === 'skill_check').map((c) => c.skill_check)
-  assert.deepEqual(checks, [{ skill: 'Perception', dc: 12, description: 'spot the planks' }])
+  assert.deepEqual(checks, [
+    { skill: 'Perception', dc: 12, description: 'spot the planks' },
+    { skill: '', dc: 10, description: '' },
+    { skill: 'Society', dc: 0, description: '' },
+  ])
 })
 
 test('incomingLinks: siblings pointing here, deduped, with connected status + label', () => {
@@ -605,18 +622,22 @@ test('toEncounterInput keeps every exit row with its secret/skill/dc (blank plac
   ])
 })
 
-test('toEncounterInput sends valued XP awards and drops blank/zero-amount ones', () => {
+test('toEncounterInput sends XP awards, keeping blank/zero-amount ones', () => {
   const enc = keyed({
     name: 'x',
     xp_awards: [
       { amount: 30, reason: 'gained Augrael' },
-      { amount: 0, reason: 'typed then cleared' }, // no XP → dropped
-      { amount: '', reason: '' }, // blank → dropped
+      { amount: 0, reason: 'typed then cleared' }, // no XP yet → kept
+      { amount: '', reason: '' }, // blank → kept
     ],
   })
   const input = toEncounterInput(enc)
   const awards = input.content.filter((c) => c.type === 'xp_award').map((c) => c.xp_award)
-  assert.deepEqual(awards, [{ amount: 30, reason: 'gained Augrael' }])
+  assert.deepEqual(awards, [
+    { amount: 30, reason: 'gained Augrael' },
+    { amount: 0, reason: 'typed then cleared' },
+    { amount: 0, reason: '' },
+  ])
 })
 
 test('treasureLineInput strips _key and drops an empty value_tiers, keeps a set one', () => {
@@ -652,21 +673,32 @@ test('keyed + toEncounterInput: a named/gated pool becomes a content header; emp
   assert.deepEqual(pools[0].gate, { skill: 'Perception', dc: 18 })
 })
 
-test('contentInput drops an incomplete pool gate but keeps the pool on its name/complete gate', () => {
+test('contentInput keeps partial pool gates (in-progress work is never dropped)', () => {
   const enc = keyed({
     name: 'x',
     treasure_pools: [
-      { id: 'p1', name: 'altar', gate: { skill: 'Perception', dc: 0 } }, // dc<1 → gate dropped, kept on name
-      { id: 'p2', name: '', gate: { skill: '', dc: 5 } }, // incomplete gate + no name → dropped
+      { id: 'p1', name: 'altar', gate: { skill: 'Perception', dc: 0 } }, // skill only → gate kept partial
+      { id: 'p2', name: '', gate: { skill: '', dc: 5 } }, // dc only → gate kept partial
       { id: 'p3', name: '', gate: { skill: 'Perception', dc: 18 } }, // complete gate → kept
     ],
     treasure: [],
   })
   const pools = toEncounterInput(enc).content.filter((c) => c.type === 'pool').map((c) => c.pool)
   const altar = pools.find((p) => p.name === 'altar')
-  assert.ok(altar && altar.gate === null) // incomplete gate dropped, pool kept on its name
-  assert.equal(pools.filter((p) => !p.name && !p.gate).length, 0) // empty p2 dropped
-  assert.ok(pools.some((p) => p.gate && p.gate.dc === 18)) // p3's complete gate kept
+  assert.deepEqual(altar.gate, { skill: 'Perception', dc: 0 }) // skill-only gate preserved
+  assert.ok(pools.some((p) => p.gate && p.gate.dc === 5 && p.gate.skill === '')) // dc-only gate preserved
+  assert.ok(pools.some((p) => p.gate && p.gate.dc === 18)) // complete gate kept
+})
+
+test('gateInput returns null only for an entirely blank gate', () => {
+  const enc = keyed({
+    name: 'x',
+    treasure_pools: [{ id: 'p1', name: 'shelf', gate: { skill: '', dc: 0 } }], // nothing entered → ungated
+    treasure: [],
+  })
+  const pool = toEncounterInput(enc).content.find((c) => c.type === 'pool').pool
+  assert.equal(pool.name, 'shelf')
+  assert.equal(pool.gate, null) // blank gate collapses to ungated
 })
 
 test('gpToCp/cpToGp: empty is null (unvalued), not 0 — the floor-vs-valued distinction', () => {
@@ -698,14 +730,15 @@ test('toEncounterInput keeps a custom (freeform) treasure line and strips _key',
     name: 'Loot',
     treasure: [
       withKey({ ref: customTreasureRef('gold tooth', 400), qty: 1 }),
-      emptyTreasure(), // unfilled → dropped
+      emptyTreasure(), // unfilled → kept (in-progress work)
     ],
   })
   const input = toEncounterInput(enc)
   const treasure = input.content.filter((c) => c.type === 'treasure')
-  assert.equal(treasure.length, 1)
+  assert.equal(treasure.length, 2)
   assert.deepEqual(treasure[0].treasure.ref, { json: { name: 'gold tooth', value_cp: 400 } })
   assert.ok(!('_key' in treasure[0].treasure))
+  assert.equal(treasure[1].treasure.ref.game_id, '') // empty placeholder persists
 })
 
 test('toEncounterInput keeps a templated (derived) monster whose ref carries base.game_id', () => {
