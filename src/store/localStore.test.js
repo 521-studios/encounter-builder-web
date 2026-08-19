@@ -16,7 +16,7 @@ test('create mints an id, defaults status draft + empty line arrays, and echoes 
   assert.ok(rec.id, 'minted an id')
   assert.equal(rec.status, 'draft')
   assert.equal(rec.name, 'Ambush')
-  for (const k of ['challenges', 'treasure', 'treasure_pools', 'xp_awards', 'rewards', 'exits']) {
+  for (const k of ['content', 'exits']) {
     assert.deepEqual(rec[k], [], `${k} defaults to []`)
   }
   assert.deepEqual(localStore.encounters.list().map((e) => e.id), [rec.id])

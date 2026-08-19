@@ -10,10 +10,14 @@ import {
   skillCheckLabel,
   SKILL_CHECK_DEGREES,
   SKILL_CHECK_DEGREE_LABELS,
-  challengeMonsters,
-  challengeHazards,
-  challengeAfflictions,
-  challengeSkillChecks,
+  contentMonsters,
+  contentHazards,
+  contentAfflictions,
+  contentSkillChecks,
+  contentTreasure,
+  contentCurrency,
+  contentXPAwards,
+  contentRewards,
 } from '../model.js'
 import { BAND_LABELS } from '../pf2eRules.js'
 import { creatureHeader } from '../creatureHeader.js'
@@ -68,17 +72,17 @@ function afflictionLabel(gid, entryOf) {
 }
 
 export default function EncounterPrintSheet({ enc, budget, effectiveParty, siblings = [], onClose }) {
-  const monsters = challengeMonsters(enc)
-  const hazards = challengeHazards(enc)
-  const afflictions = challengeAfflictions(enc)
-  const treasure = enc.treasure || []
-  const awards = enc.xp_awards || []
-  const rewards = enc.rewards || []
-  const skillChecks = challengeSkillChecks(enc)
+  const monsters = contentMonsters(enc)
+  const hazards = contentHazards(enc)
+  const afflictions = contentAfflictions(enc)
+  const treasure = contentTreasure(enc)
+  const awards = contentXPAwards(enc)
+  const rewards = contentRewards(enc)
+  const skillChecks = contentSkillChecks(enc)
   const exits = enc.exits || []
   const combat = isCombatRoom(budget.roomType)
 
-  const coins = CURRENCIES.map((c) => [c, enc.currency?.[c] || 0]).filter(([, n]) => n > 0)
+  const coins = CURRENCIES.map((c) => [c, contentCurrency(enc)?.[c] || 0]).filter(([, n]) => n > 0)
   const exitTargetName = (id) => {
     const t = (siblings).find((s) => String(s.id) === String(id))
     return t ? t.name || 'Untitled' : null

@@ -64,37 +64,16 @@ export function emptyPool(name = '') {
 }
 
 export function keyed(e) {
-  const treasure = (e.treasure || []).map(withKey)
-  let pools = e.treasure_pools || []
-  // Ensure a home for treasure: if there are lines but no pool holds them (none
-  // exist, or a line's pool_id is empty/dangling), materialize a default pool and
-  // adopt the orphans — like a dangling chapter_id renders under "Unsorted". A
-  // treasureless encounter stays pool-less until the GM adds loot.
-  if (treasure.length) {
-    const ids = new Set(pools.map((p) => p.id))
-    const orphaned = (t) => !t.pool_id || !ids.has(t.pool_id)
-    if (!pools.length || treasure.some(orphaned)) {
-      const def = pools[0] || emptyPool()
-      if (!pools.length) pools = [def]
-      for (const t of treasure) if (orphaned(t)) t.pool_id = def.id
-    }
-  }
-  // Unified Challenges list: migrate the legacy arrays in (if `challenges` is absent),
-  // and give each monster-type payload's loadout React keys for its inline editor.
-  const challenges = migrateChallenges(e).map((c) =>
-    c.type === 'monster' || c.type === 'hazard' || c.type === 'affliction'
-      ? { ...c, monster: { ...c.monster, loadout: (c.monster?.loadout || []).map(withKey) } }
-      : c,
-  )
-  return {
-    ...e,
-    challenges,
-    treasure,
-    treasure_pools: pools,
-    xp_awards: (e.xp_awards || []).map(withKey),
-    rewards: (e.rewards || []).map(withKey),
-    exits: (e.exits || []).map(withKey),
-  }
+  // Migrate every legacy source into the single ordered content list, giving each
+  // payload the React keys its inline editor needs (a monster's loadout, treasure lines);
+  // the content ITEM's stable id is the list-row key.
+  const content = migrateContent(e).map((c) => {
+    if (c.type === 'monster' || c.type === 'hazard' || c.type === 'affliction')
+      return { ...c, monster: { ...c.monster, loadout: (c.monster?.loadout || []).map(withKey) } }
+    if (c.type === 'treasure') return { ...c, treasure: withKey(c.treasure || {}) }
+    return c
+  })
+  return { ...e, content, exits: (e.exits || []).map(withKey) }
 }
 
 // gameIdOf resolves a monster/treasure line's content game_id — the single rule
@@ -298,6 +277,207 @@ export function challengesInput(enc) {
   return out
 }
 
+// ── Unified Encounter content list ─────────────────────────────────────────────
+// The single ordered "Encounter" authoring list that merges Description + Challenges
+// + Rewards. Supersedes text_blocks + challenges + treasure/treasure_pools/xp_awards/
+// rewards/currency: all migrated into `content` on load (keyed) and cleared on save.
+// Each item is { id, type, <payload> }. Pools are POSITIONAL headers — treasure/coin
+// after a pool item (until the next pool) belong to it, so there is no per-line pool id.
+export const CONTENT_SECTIONS = [
+  { label: 'Text', types: ['markdown', 'box_text'] },
+  { label: 'Challenges', types: ['monster', 'hazard', 'affliction', 'skill_check'] },
+  { label: 'Rewards', types: ['pool', 'treasure', 'coin', 'xp_award', 'reward'] },
+]
+export const CONTENT_TYPE_LABELS = {
+  markdown: 'Markdown section',
+  box_text: 'Box text',
+  monster: 'Monster',
+  hazard: 'Hazard',
+  affliction: 'Affliction',
+  skill_check: 'Skill check',
+  pool: 'Treasure pool',
+  treasure: 'Treasure',
+  coin: 'Coin',
+  xp_award: 'XP award',
+  reward: 'Reward',
+}
+
+export function emptyContentItem(type) {
+  const id = crypto.randomUUID()
+  switch (type) {
+    case 'monster':
+    case 'hazard':
+    case 'affliction':
+      return { id, type, monster: { ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '', loadout: [] } }
+    case 'skill_check':
+      return { id, type, skill_check: { skill: '', dc: 0, description: '' } }
+    case 'box_text':
+    case 'markdown':
+      return { id, type, markdown: { title: '', body: '' } }
+    case 'pool':
+      return { id, type, pool: { name: '', gate: null } }
+    case 'treasure':
+      return { id, type, treasure: emptyTreasure() }
+    case 'coin':
+      return { id, type, coin: {} }
+    case 'xp_award':
+      return { id, type, xp_award: { amount: 0, reason: '' } }
+    case 'reward':
+      return { id, type, reward: { kind: 'information', label: '', description: '' } }
+    default:
+      return { id, type }
+  }
+}
+
+// Build the ordered content list from a raw encounter: its `content` if present, else
+// migrate every legacy source in reading order — Description (text_blocks) → Challenges
+// (challenges, or the raw monster/hazard/affliction/skill/challenge_blocks arrays) →
+// Rewards. Rewards migrate to positional pools: a named/gated pool becomes a `pool`
+// header followed by its treasure; the unnamed default pool's loot stays headerless;
+// then coins → one coin item, xp_awards, and non-treasure rewards.
+export function migrateContent(e) {
+  if (e?.content?.length) return e.content.map((c) => ({ ...c, id: c.id || crypto.randomUUID() }))
+  const out = []
+  const add = (type, payload, key) => out.push({ id: crypto.randomUUID(), type, [key]: payload })
+  // Description
+  for (const b of encounterBlocks(e)) add('markdown', b, 'markdown')
+  // Challenges (challenges list if present, else the raw arrays via migrateChallenges)
+  const challenges = e?.challenges?.length ? e.challenges : migrateChallenges(e)
+  for (const c of challenges) {
+    const item = { id: c.id || crypto.randomUUID(), type: c.type }
+    if (c.monster) item.monster = c.monster
+    if (c.skill_check) item.skill_check = c.skill_check
+    if (c.markdown) item.markdown = c.markdown
+    out.push(item)
+  }
+  // Rewards → positional pools
+  const pools = e?.treasure_pools || []
+  const treasure = e?.treasure || []
+  const poolIds = new Set(pools.map((p) => p.id))
+  for (const t of treasure) if (!t.pool_id || !poolIds.has(t.pool_id)) add('treasure', t, 'treasure') // default (headerless) group first
+  for (const p of pools) {
+    if (p.name || p.gate) add('pool', { name: p.name || '', gate: p.gate || null }, 'pool') // bare default pool → no header
+    // A pool's GM prose (the old TreasurePool.description) is preserved as a markdown
+    // item under its header rather than dropped.
+    if (p.description) add('markdown', { title: '', body: p.description }, 'markdown')
+    for (const t of treasure) if (t.pool_id === p.id) add('treasure', t, 'treasure')
+  }
+  const cur = e?.currency || {}
+  if (cur.cp || cur.sp || cur.gp || cur.pp) add('coin', cur, 'coin')
+  for (const a of e?.xp_awards || []) add('xp_award', a, 'xp_award')
+  for (const r of e?.rewards || []) add('reward', r, 'reward')
+  return out
+}
+
+export function contentItems(enc) {
+  return enc?.content || []
+}
+
+// Typed views for the difficulty/treasure budget + entry prefetch. Prefer `content`;
+// fall back through the challenge selectors (which fall back to the legacy arrays) so a
+// not-yet-migrated rollup sibling still computes.
+export function contentMonsters(enc) {
+  return enc?.content ? enc.content.filter((c) => c.type === 'monster').map((c) => c.monster || {}) : challengeMonsters(enc)
+}
+export function contentHazards(enc) {
+  return enc?.content ? enc.content.filter((c) => c.type === 'hazard').map((c) => c.monster || {}) : challengeHazards(enc)
+}
+export function contentAfflictions(enc) {
+  return enc?.content ? enc.content.filter((c) => c.type === 'affliction').map((c) => c.monster || {}) : challengeAfflictions(enc)
+}
+export function contentSkillChecks(enc) {
+  return enc?.content ? enc.content.filter((c) => c.type === 'skill_check').map((c) => c.skill_check || {}) : challengeSkillChecks(enc)
+}
+export function contentTreasure(enc) {
+  return enc?.content ? enc.content.filter((c) => c.type === 'treasure').map((c) => c.treasure || {}) : enc?.treasure || []
+}
+// All coin items summed into one Currency for the treasure-value budget.
+export function contentCurrency(enc) {
+  if (!enc?.content) return enc?.currency || {}
+  const sum = { cp: 0, sp: 0, gp: 0, pp: 0 }
+  for (const c of enc.content) if (c.type === 'coin' && c.coin) for (const k of ['cp', 'sp', 'gp', 'pp']) sum[k] += Number(c.coin[k]) || 0
+  return sum
+}
+export function contentXPAwards(enc) {
+  return enc?.content ? enc.content.filter((c) => c.type === 'xp_award').map((c) => c.xp_award || {}) : enc?.xp_awards || []
+}
+export function contentRewards(enc) {
+  return enc?.content ? enc.content.filter((c) => c.type === 'reward').map((c) => c.reward || {}) : enc?.rewards || []
+}
+
+// Serialize the content list for a save: drop incomplete placeholders per type, clean
+// each payload through its existing serializer. Keeps id + type for reorder identity.
+export function contentInput(enc) {
+  const out = []
+  for (const c of enc?.content || []) {
+    switch (c.type) {
+      case 'monster':
+      case 'hazard':
+      case 'affliction':
+        if (hasRef(c.monster || {})) out.push({ id: c.id, type: c.type, monster: monsterInput(c.monster) })
+        break
+      case 'skill_check': {
+        const s = skillCheckInput(c.skill_check || {})
+        if (s.skill && s.dc >= 1) out.push({ id: c.id, type: c.type, skill_check: s })
+        break
+      }
+      case 'markdown':
+      case 'box_text': {
+        const [md] = blocksInput([c.markdown || {}])
+        if (md) out.push({ id: c.id, type: c.type, markdown: md })
+        break
+      }
+      case 'pool': {
+        // Drop an empty pool header (no name, no complete gate) — a no-op divider; its
+        // loot just falls into the default (headerless) group.
+        const name = (c.pool?.name || '').trim()
+        const gate = gateInput(c.pool?.gate)
+        if (name || gate) out.push({ id: c.id, type: c.type, pool: { name, gate } })
+        break
+      }
+      case 'treasure':
+        if (hasTreasureContent(c.treasure || {})) out.push({ id: c.id, type: c.type, treasure: treasureLineInput(c.treasure) })
+        break
+      case 'coin': {
+        const coin = coinInput(c.coin)
+        if (coin) out.push({ id: c.id, type: c.type, coin })
+        break
+      }
+      case 'xp_award': {
+        const a = awardInput(c.xp_award || {})
+        if (a.amount > 0) out.push({ id: c.id, type: c.type, xp_award: a })
+        break
+      }
+      case 'reward': {
+        const r = rewardInput(c.reward || {})
+        if (r.label) out.push({ id: c.id, type: c.type, reward: r })
+        break
+      }
+      default:
+        break
+    }
+  }
+  return out
+}
+
+// A coin drop: keep only the positive denominations; null if empty (drop the item).
+function coinInput(coin) {
+  const out = {}
+  for (const k of ['cp', 'sp', 'gp', 'pp']) {
+    const n = Math.round(Number(coin?.[k]) || 0)
+    if (n > 0) out[k] = n
+  }
+  return Object.keys(out).length ? out : null
+}
+
+// A pool's discovery gate — kept only when complete (skill + DC≥1), else null (ungated).
+function gateInput(gate) {
+  if (!gate) return null
+  const skill = (gate.skill || '').trim()
+  const dc = Math.round(Number(gate.dc) || 0)
+  return skill && dc >= 1 ? { skill, dc } : null
+}
+
 // When markdown block `removed` is deleted, every higher block shifts down one, so the
 // set of edit-mode block indices must remap: indices below `removed` stay, the removed
 // one drops, and indices above decrement. Pure so the off-by-one is testable.
@@ -314,25 +494,17 @@ export function toEncounterInput(enc) {
   const input = {
     name: enc.name,
     chapter_id: enc.chapter_id || '',
-    // Markdown body: titled blocks. Migrate-on-save — a legacy `description` folds
-    // into an untitled block (encounterBlocks) and description clears here, so it's
-    // written once and never double-counted. Empty blocks (no title + no body) drop.
-    text_blocks: blocksInput(encounterBlocks(enc)),
     description: '',
     notes: enc.notes || '',
-    // Unified Challenges list (supersedes monsters/hazards/afflictions/skill_checks/
-    // challenge_blocks — those are omitted here so the full-replace PUT clears them).
-    challenges: challengesInput(enc),
-    treasure: (enc.treasure || []).filter(hasTreasureContent).map(treasureLineInput),
-    treasure_pools: treasurePoolsInput(enc),
-    xp_awards: (enc.xp_awards || []).map(awardInput).filter((a) => a.amount > 0),
+    // The single ordered "Encounter" content list. Supersedes text_blocks / challenges /
+    // treasure / treasure_pools / xp_awards / rewards / currency — all omitted here so the
+    // full-replace PUT clears them (the description→text_blocks migration pattern).
+    content: contentInput(enc),
     room_type: enc.room_type || 'combat',
-    rewards: (enc.rewards || []).map(rewardInput).filter((r) => r.label),
     // Keep every exit row, INCLUDING blank ones — a "+ exit" placeholder must persist
     // so it survives a navigate-away before the GM fills in the target/label (the map
     // ignores empty exits; the API accepts them). Don't filter here.
     exits: (enc.exits || []).map(exitInput),
-    currency: enc.currency || {},
   }
   // Party overrides use the shared clear-encoding: set when overridden, omitted
   // when nil so the full-replace PUT clears back to inherit (encounter -> chapter

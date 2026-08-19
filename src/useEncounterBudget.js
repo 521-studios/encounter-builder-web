@@ -1,7 +1,7 @@
 import { useEntries } from './useEntries.js'
 import { treasureValueCp, encounterXp, hazardXp, afflictionXp, awardXp, gameIdsInEncounter } from './budget.js'
 import { encounterThreat, BASE_PARTY } from './pf2eRules.js'
-import { challengeMonsters, challengeHazards, challengeAfflictions } from './model.js'
+import { contentMonsters, contentHazards, contentAfflictions, contentTreasure, contentCurrency } from './model.js'
 
 // useEncounterBudget computes an encounter's treasure value (copper) + difficulty
 // (XP → threat band) against a party level/size, fetching the referenced entries
@@ -12,10 +12,10 @@ export function useEncounterBudget(encounter, partyLevel, partySize) {
   const ids = gameIdsInEncounter(encounter)
   const { entryOf, loading, failedCount, onRetry } = useEntries(ids)
 
-  const { cp, unpriced } = treasureValueCp(encounter.treasure, encounter.currency, entryOf)
-  const { xp: mXp, unknown: mUnknown } = encounterXp(challengeMonsters(encounter), partyLevel, entryOf)
-  const { xp: hXp, unknown: hUnknown } = hazardXp(challengeHazards(encounter), partyLevel, entryOf)
-  const { xp: aXp, unknown: aUnknown } = afflictionXp(challengeAfflictions(encounter), partyLevel, entryOf)
+  const { cp, unpriced } = treasureValueCp(contentTreasure(encounter), contentCurrency(encounter), entryOf)
+  const { xp: mXp, unknown: mUnknown } = encounterXp(contentMonsters(encounter), partyLevel, entryOf)
+  const { xp: hXp, unknown: hUnknown } = hazardXp(contentHazards(encounter), partyLevel, entryOf)
+  const { xp: aXp, unknown: aUnknown } = afflictionXp(contentAfflictions(encounter), partyLevel, entryOf)
   const xp = mXp + hXp + aXp
   const unknown = [...mUnknown, ...hUnknown, ...aUnknown]
   const threat = encounterThreat(xp, partySize)

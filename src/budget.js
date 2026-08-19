@@ -4,7 +4,7 @@
 // without fetching; the TreasureBudget component wires the real fetched entries.
 import { itemPriceCp, creatureLevel, coinsToCp } from '@521studios/pfsrd2-display'
 import { creatureXp, encounterThreat, treasureBudget } from './pf2eRules.js'
-import { isCustomTreasure, isCombatRoom, challengeMonsters, challengeHazards, challengeAfflictions } from './model.js'
+import { isCustomTreasure, isCombatRoom, contentMonsters, contentHazards, contentAfflictions, contentTreasure, contentCurrency, contentXPAwards } from './model.js'
 
 // refGameId: the game_id a monster/treasure ref resolves to — a pristine ref, or
 // a derived (templated/runed) ref's base.game_id.
@@ -147,7 +147,7 @@ export function encounterXp(monsters, partyLevel, entryOf) {
 // the treasure budget, which stay creature-derived.
 export function awardXp(enc) {
   let xp = 0
-  for (const a of enc?.xp_awards || []) xp += Number(a.amount) || 0
+  for (const a of contentXPAwards(enc)) xp += Number(a.amount) || 0
   return xp
 }
 
@@ -164,10 +164,10 @@ export function rollupEncounters(encounters, entryOf, partyFor) {
   let totalXp = 0
   for (const enc of encounters || []) {
     const { level, size } = partyFor(enc)
-    const { cp, unpriced } = treasureValueCp(enc.treasure, enc.currency, entryOf)
-    const { xp: mXp, unknown: mUnknown } = encounterXp(challengeMonsters(enc), level, entryOf)
-    const { xp: hXp, unknown: hUnknown } = hazardXp(challengeHazards(enc), level, entryOf)
-    const { xp: aXp, unknown: aUnknown } = afflictionXp(challengeAfflictions(enc), level, entryOf)
+    const { cp, unpriced } = treasureValueCp(contentTreasure(enc), contentCurrency(enc), entryOf)
+    const { xp: mXp, unknown: mUnknown } = encounterXp(contentMonsters(enc), level, entryOf)
+    const { xp: hXp, unknown: hUnknown } = hazardXp(contentHazards(enc), level, entryOf)
+    const { xp: aXp, unknown: aUnknown } = afflictionXp(contentAfflictions(enc), level, entryOf)
     const xp = mXp + hXp + aXp
     const unknown = [...mUnknown, ...hUnknown, ...aUnknown]
     // Non-combat rooms (hazard/haunt/social/knowledge/…) have no meaningful combat
@@ -235,17 +235,17 @@ export function rollupByChapter(chapters, encounters, entryOf, partyFor) {
 // destroyed treasure). Used to batch the entry fetches.
 export function gameIdsInEncounter(enc) {
   const ids = new Set()
-  for (const m of challengeMonsters(enc)) {
+  for (const m of contentMonsters(enc)) {
     if (!isDerived(m.ref)) {
       const g = refGameId(m.ref)
       if (g) ids.add(g)
     }
   }
-  for (const h of challengeHazards(enc)) {
+  for (const h of contentHazards(enc)) {
     const g = refGameId(h.ref)
     if (g) ids.add(g)
   }
-  for (const a of challengeAfflictions(enc)) {
+  for (const a of contentAfflictions(enc)) {
     const g = refGameId(a.ref)
     if (g) ids.add(g)
   }

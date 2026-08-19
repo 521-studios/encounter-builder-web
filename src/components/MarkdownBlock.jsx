@@ -6,12 +6,12 @@ import RemoveButton from './RemoveButton.jsx'
 // MarkdownSections (the Description tab) and the Challenges list, so the two never
 // diverge. `ariaLabel` namespaces the field labels; the caller owns the block data +
 // edit/preview toggle (onEdit/onDone) so it can key many blocks independently.
-export default function MarkdownBlock({ block, editing, ariaLabel, released, siblings, onOpenEncounter, onSet, onEdit, onDone, onRemove }) {
+export default function MarkdownBlock({ block, editing, ariaLabel, released, siblings, onOpenEncounter, onSet, onEdit, onDone, onRemove, box }) {
   const b = block || {}
   const isEditing = !released && editing
   return (
-    <div className="text-block" data-editing={isEditing || undefined}>
-      {!released && <RemoveButton className="remove-x-abs" label="section" onRemove={onRemove} />}
+    <div className={`text-block${box ? ' text-block--box' : ''}`} data-editing={isEditing || undefined}>
+      {!released && <RemoveButton className="remove-x-abs" label={box ? 'box text' : 'section'} onRemove={onRemove} />}
       {isEditing ? (
         <>
           <input

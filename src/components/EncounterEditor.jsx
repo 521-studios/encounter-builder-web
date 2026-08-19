@@ -5,33 +5,21 @@ import { flushState, subscribeFlush, encKey } from '../store/store.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { settings as settingsApi } from '../api/settings.js'
 import {
-  CURRENCIES,
   ROOM_TYPES,
   ROOM_TYPE_LABELS,
   isCombatRoom,
   roomTypeLabel,
-  REWARD_KINDS,
-  REWARD_KIND_LABELS,
   buildInput,
-  encounterBlocks,
-  reindexEditingAfterRemove,
   reorderById,
-  emptyTreasure,
-  emptyPool,
-  emptyAward,
-  emptyReward,
   emptyExit,
   incomingLinks,
   keyed,
 } from '../model.js'
 import { resolveParty } from '../party.js'
 import { naturalSort } from '../sort.js'
-import { BAND_LABELS, BASE_PARTY } from '../pf2eRules.js'
+import { BAND_LABELS, BASE_PARTY, treasureBudget } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
-import WikiMarkdown from './WikiMarkdown.jsx'
-import MarkdownSections from './MarkdownSections.jsx'
-import ChallengeList from './ChallengeList.jsx'
-import TreasurePoolSection from './TreasurePoolSection.jsx'
+import EncounterContent from './EncounterContent.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
 import EncounterPrintSheet from './EncounterPrintSheet.jsx'
@@ -39,9 +27,7 @@ import RemoveButton from './RemoveButton.jsx'
 
 const ENCOUNTER_TABS = [
   { id: 'config', label: 'Config' },
-  { id: 'description', label: 'Description' },
-  { id: 'challenges', label: 'Challenges' },
-  { id: 'rewards', label: 'Rewards' },
+  { id: 'encounter', label: 'Encounter' },
   { id: 'exits', label: 'Exits' },
 ]
 
@@ -59,7 +45,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [siblingsLoaded, setSiblingsLoaded] = useState(false) // the picker list finished loading (so an unresolved exit is genuinely deleted, not just still-loading)
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
   const [partyContextError, setPartyContextError] = useState(false) // chapters/settings load failed
-  const [descEditing, setDescEditing] = useState(() => new Set()) // Description blocks in edit (vs preview) mode
+  const [showBudget, setShowBudget] = useState(false) // the treasure chip toggles the full budget table
 
   // encRef exposes the latest working copy to the flush handlers (for the error
   // label); syncedRef is the last sidebar-visible signature we told the parent
@@ -170,91 +156,17 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     setEnc(next)
     encounters.edit(campaignId, encounterId, next, { onSaved: onFlushSaved, onError: onFlushError })
   }
-  const treasure = enc.treasure || []
-  const challenges = enc.challenges || []
-  // A room with no monster/hazard/affliction challenge has no combat difficulty to show —
+  const content = enc.content || []
+  // A room with no monster/hazard/affliction item has no combat difficulty to show —
   // suppress the "Trivial 1" band and fall back to the room-type label.
-  const hasChallenges = challenges.some((c) => c.type === 'monster' || c.type === 'hazard' || c.type === 'affliction')
+  const hasChallenges = content.some((c) => c.type === 'monster' || c.type === 'hazard' || c.type === 'affliction')
 
-  // Titled markdown blocks. Two independent lists — text_blocks (Description) and
-  // challenge_blocks (Challenges) — each with its own edit-set; a factory keeps their
-  // add/remove/edit/done identical. A legacy single description surfaces as one untitled
-  // text_block via encounterBlocks; the save clears it. (markdown-blocks)
-  const blockHandlers = (field, list, setEditing) => ({
-    set: (i, fields) => patch({ [field]: list.map((b, j) => (j === i ? { ...b, ...fields } : b)) }),
-    edit: (i) => setEditing((s) => new Set(s).add(i)),
-    done: (i) => setEditing((s) => { const n = new Set(s); n.delete(i); return n }),
-    // A new block opens in edit mode (it's empty), appended so its index is list.length.
-    add: () => { setEditing((s) => new Set(s).add(list.length)); patch({ [field]: [...list, { title: '', body: '' }] }) },
-    // Removing block i shifts higher blocks down one — reindex the editing set to match.
-    remove: (i) => { patch({ [field]: list.filter((_, j) => j !== i) }); setEditing((s) => reindexEditingAfterRemove(s, i)) },
-  })
-  const descBlocks = encounterBlocks(enc)
-  const descH = blockHandlers('text_blocks', descBlocks, setDescEditing)
-
-  // Unified Challenges list handlers (monster/hazard/affliction/skill-check/markdown,
-  // one ordered array). Adding takes a ready-built item so ChallengeList owns its id.
-  const setChallengeItem = (id, fields) => patch({ challenges: challenges.map((c) => (c.id === id ? { ...c, ...fields } : c)) })
-  const addChallengeItem = (item) => patch({ challenges: [...challenges, item] })
-  const removeChallengeItem = (id) => patch({ challenges: challenges.filter((c) => c.id !== id) })
-  const reorderChallenges = (fromId, toId) => patch({ challenges: reorderById(challenges, fromId, toId) })
-
-  const setTreasure = (i, t) => patch({ treasure: treasure.map((x, j) => (j === i ? t : x)) })
-
-  // Treasure pools: loot grouped by where it's found. Every encounter with treasure
-  // keeps at least a default pool (materialized on the first add); lines carry a
-  // pool_id. keyed() adopts orphaned lines into the default on load.
-  const pools = enc.treasure_pools || []
-  const setPool = (id, fields) =>
-    patch({ treasure_pools: pools.map((p) => (p.id === id ? { ...p, ...fields } : p)) })
-  const addPool = () => patch({ treasure_pools: [...pools, emptyPool()] })
-  const removePool = (id) => {
-    const remaining = pools.filter((p) => p.id !== id)
-    const fallback = remaining[0]?.id // orphaned lines fall to the first remaining pool
-    patch({
-      treasure_pools: remaining,
-      treasure: treasure.map((t) => (t.pool_id === id ? { ...t, pool_id: fallback } : t)),
-    })
-  }
-  // "+ treasure" adds a line to the default pool, materializing one if none exists
-  // yet — both writes in a single patch so the line's pool_id is stable (no
-  // intermediate render sees an orphan).
-  const addTreasure = () => {
-    const def = pools[0] || emptyPool()
-    patch({
-      treasure_pools: pools.length ? pools : [def],
-      treasure: [...treasure, { ...emptyTreasure(), pool_id: def.id }],
-    })
-  }
-  const addLineToPool = (poolId) =>
-    patch({ treasure: [...treasure, { ...emptyTreasure(), pool_id: poolId }] })
-  // 0o77: drop a monster's loadout items into the default treasure pool (one line
-  // each), materializing the pool if needed — they price through budget.js like any
-  // catalog/composed treasure line.
-  const addLoadoutToTreasure = (items) => {
-    const def = pools[0] || emptyPool()
-    const lines = items.map((it) => ({ ...emptyTreasure(), ref: it.ref, qty: it.qty || 1, variant: it.variant || '', pool_id: def.id }))
-    patch({
-      treasure_pools: pools.length ? pools : [def],
-      treasure: [...treasure, ...lines],
-    })
-  }
-
-  // Non-combat XP awards. Blank/zero-amount lines are dropped on save (model.js);
-  // the on-screen helper text explains the rest.
-  const awards = enc.xp_awards || []
-  const setAward = (i, fields) =>
-    patch({ xp_awards: awards.map((a, j) => (j === i ? { ...a, ...fields } : a)) })
-  const addAward = () => patch({ xp_awards: [...awards, emptyAward()] })
-  const removeAward = (i) => patch({ xp_awards: awards.filter((_, j) => j !== i) })
-
-  // Non-treasure reward slots (information/ritual/ally/item) — informational, no
-  // gp/XP effect. Rows with an empty label are dropped on save (model.js).
-  const rewards = enc.rewards || []
-  const setReward = (i, fields) =>
-    patch({ rewards: rewards.map((r, j) => (j === i ? { ...r, ...fields } : r)) })
-  const addReward = () => patch({ rewards: [...rewards, emptyReward()] })
-  const removeReward = (i) => patch({ rewards: rewards.filter((_, j) => j !== i) })
+  // The single ordered "Encounter" content list (every item type). Adding takes a
+  // ready-built item so EncounterContent owns its id; all edits persist via patch.
+  const setContentItem = (id, fields) => patch({ content: content.map((c) => (c.id === id ? { ...c, ...fields } : c)) })
+  const addContentItem = (item) => patch({ content: [...content, item] })
+  const removeContentItem = (id) => patch({ content: content.filter((c) => c.id !== id) })
+  const reorderContent = (fromId, toId) => patch({ content: reorderById(content, fromId, toId) })
 
   // Exits: the room's connectivity edges. Each targets another encounter (a soft
   // reference) or an external destination named by label. Empty rows drop on save.
@@ -341,6 +253,21 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               {roomTypeLabel(budget.roomType)}
             </span>
           )}
+          <button
+            type="button"
+            className="budget-chip"
+            data-testid="treasure-chip"
+            aria-expanded={showBudget}
+            title="Treasure budget for this difficulty — click for the full table"
+            onClick={() => setShowBudget((s) => !s)}
+          >
+            Treasure:{' '}
+            {(() => {
+              if (!isCombatRoom(budget.roomType)) return '—'
+              const t = treasureBudget(effectiveParty.level, budget.threat, effectiveParty.size)
+              return t == null ? '—' : `${t} gp`
+            })()}
+          </button>
           <span className="status">{enc.status}</span>
           <button type="button" className="link" onClick={() => setPrinting(true)}>Print / PDF</button>
           <button type="button" className="link danger" aria-label={`Delete ${enc.name || 'Untitled encounter'}`} onClick={del}>Delete</button>
@@ -427,187 +354,32 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               disabled={released}
               onChange={(next) => patch({ party_level: next.party_level, party_size: next.party_size })}
             />
-          </div>
-        )}
-
-        {tab === 'description' && (
-          <div role="tabpanel" id="encpanel-description" aria-labelledby="enctab-description">
-            <MarkdownSections
-              name="description"
-              blocks={descBlocks}
-              editing={descEditing}
-              released={released}
-              siblings={siblingEncounters}
-              onOpenEncounter={onOpenEncounter}
-              h={descH}
-            />
             <label className="field">
               <span>Notes</span>
-              <textarea
-                value={enc.notes || ''}
-                disabled={released}
-                onChange={(e) => patch({ notes: e.target.value })}
-              />
+              <textarea value={enc.notes || ''} disabled={released} onChange={(e) => patch({ notes: e.target.value })} />
             </label>
           </div>
         )}
 
-        {tab === 'challenges' && (
-          <div role="tabpanel" id="encpanel-challenges" aria-labelledby="enctab-challenges">
-            <ChallengeList
-              challenges={challenges}
+        {tab === 'encounter' && (
+          <div role="tabpanel" id="encpanel-encounter" aria-labelledby="enctab-encounter">
+            {showBudget && (
+              <TreasureBudget budget={budget} partyLevel={effectiveParty.level} partySize={effectiveParty.size} />
+            )}
+            <EncounterContent
+              content={content}
               entryOf={budget.entryOf}
               released={released}
               siblings={siblingEncounters}
               onOpenEncounter={onOpenEncounter}
-              onSetItem={setChallengeItem}
-              onAdd={addChallengeItem}
-              onRemove={removeChallengeItem}
-              onReorder={reorderChallenges}
-              onAddLoadoutToTreasure={addLoadoutToTreasure}
+              onSetItem={setContentItem}
+              onAdd={addContentItem}
+              onRemove={removeContentItem}
+              onReorder={reorderContent}
             />
           </div>
         )}
 
-        {tab === 'rewards' && (
-          <div role="tabpanel" id="encpanel-rewards" aria-labelledby="enctab-rewards">
-            <fieldset>
-              <legend>Treasure</legend>
-              {pools.map((pool) => (
-                <TreasurePoolSection
-                  key={pool.id}
-                  pool={pool}
-                  lines={treasure.map((t, i) => ({ t, i })).filter(({ t }) => t.pool_id === pool.id)}
-                  disabled={released}
-                  canRemove={pools.length > 1}
-                  onPoolChange={(fields) => setPool(pool.id, fields)}
-                  onPoolRemove={() => removePool(pool.id)}
-                  onLineChange={setTreasure}
-                  onLineRemove={(i) => patch({ treasure: treasure.filter((_, j) => j !== i) })}
-                  onAddLine={() => addLineToPool(pool.id)}
-                />
-              ))}
-              {!released && (
-                <div className="treasure-actions">
-                  <button type="button" onClick={addTreasure}>+ treasure</button>
-                  <button type="button" className="link add-pool" onClick={addPool}>+ pool</button>
-                </div>
-              )}
-            </fieldset>
-
-            <fieldset className="coins">
-              <legend>Coin</legend>
-              {CURRENCIES.map((c) => (
-                <label key={c} className="coin">
-                  {c}
-                  <input
-                    type="number"
-                    min="0"
-                    value={enc.currency?.[c] || 0}
-                    disabled={released}
-                    onChange={(e) => patch({ currency: { ...enc.currency, [c]: Number(e.target.value) } })}
-                  />
-                </label>
-              ))}
-            </fieldset>
-
-            <fieldset>
-              <legend>XP awards</legend>
-              <p className="muted">
-                Flat XP for non-combat accomplishments — story milestones, exploration, a
-                recruited ally. Counts toward the party’s XP, not the encounter’s combat difficulty.
-              </p>
-              {awards.map((a, i) => (
-                <div className="xp-award" data-testid="xp-award" key={a._key}>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    className="award-amount"
-                    aria-label="XP amount"
-                    placeholder="XP"
-                    value={a.amount || ''}
-                    disabled={released}
-                    onChange={(e) => setAward(i, { amount: Number(e.target.value) })}
-                  />
-                  <input
-                    className="award-reason"
-                    aria-label="award reason"
-                    placeholder="Reason (e.g. gained Augrael as an ally)"
-                    value={a.reason || ''}
-                    disabled={released}
-                    onChange={(e) => setAward(i, { reason: e.target.value })}
-                  />
-                  {!released && (
-                    <RemoveButton label="XP award" onRemove={() => removeAward(i)} />
-                  )}
-                </div>
-              ))}
-              {!released && (
-                <button type="button" className="add-award" onClick={addAward}>
-                  + XP award
-                </button>
-              )}
-            </fieldset>
-
-            <fieldset>
-              <legend>Rewards</legend>
-              <p className="muted">
-                Non-treasure rewards — information/lore unlocked, a ritual granted, an ally
-                recruited, a unique item. Recorded for the GM; no gp or XP effect.
-              </p>
-              {rewards.map((r, i) => (
-                <div className="reward" data-testid="reward" key={r._key}>
-                  <div className="reward-head">
-                    <select
-                      aria-label="reward kind"
-                      value={r.kind || 'information'}
-                      disabled={released}
-                      onChange={(e) => setReward(i, { kind: e.target.value })}
-                    >
-                      {REWARD_KINDS.map((k) => (
-                        <option key={k} value={k}>{REWARD_KIND_LABELS[k]}</option>
-                      ))}
-                    </select>
-                    <input
-                      className="reward-label"
-                      aria-label="reward label"
-                      placeholder="Name (e.g. The Whispering Reeds)"
-                      value={r.label || ''}
-                      disabled={released}
-                      onChange={(e) => setReward(i, { label: e.target.value })}
-                    />
-                    {!released && (
-                      <RemoveButton label="reward" onRemove={() => removeReward(i)} />
-                    )}
-                  </div>
-                  {!released ? (
-                    <textarea
-                      className="reward-description"
-                      aria-label="reward description"
-                      placeholder="Details — GM notes (markdown)"
-                      value={r.description || ''}
-                      onChange={(e) => setReward(i, { description: e.target.value })}
-                    />
-                  ) : r.description ? (
-                    <WikiMarkdown text={r.description} encounters={siblingEncounters} onOpenEncounter={onOpenEncounter} />
-                  ) : null}
-                </div>
-              ))}
-              {!released && (
-                <button type="button" className="add-reward" onClick={addReward}>
-                  + reward
-                </button>
-              )}
-            </fieldset>
-
-            <TreasureBudget
-              budget={budget}
-              partyLevel={effectiveParty.level}
-              partySize={effectiveParty.size}
-            />
-          </div>
-        )}
 
         {tab === 'exits' && (
           <div role="tabpanel" id="encpanel-exits" aria-labelledby="enctab-exits">
