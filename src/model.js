@@ -357,6 +357,9 @@ export function migrateContent(e) {
   for (const t of treasure) if (!t.pool_id || !poolIds.has(t.pool_id)) add('treasure', t, 'treasure') // default (headerless) group first
   for (const p of pools) {
     if (p.name || p.gate) add('pool', { name: p.name || '', gate: p.gate || null }, 'pool') // bare default pool → no header
+    // A pool's GM prose (the old TreasurePool.description) is preserved as a markdown
+    // item under its header rather than dropped.
+    if (p.description) add('markdown', { title: '', body: p.description }, 'markdown')
     for (const t of treasure) if (t.pool_id === p.id) add('treasure', t, 'treasure')
   }
   const cur = e?.currency || {}

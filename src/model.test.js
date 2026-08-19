@@ -12,6 +12,9 @@ import {
   encounterBlocks,
   reindexEditingAfterRemove,
   migrateChallenges,
+  migrateContent,
+  emptyContentItem,
+  contentCurrency,
   emptyChallenge,
   challengeMonsters,
   challengeHazards,
@@ -339,6 +342,54 @@ test('keyed migrates treasure to positional content: a named/gated pool → a he
 
 test('keyed leaves an empty encounter with no content', () => {
   assert.deepEqual(keyed({ treasure: [] }).content, [])
+})
+
+test('migrateContent preserves a pool description as a markdown item (not dropped)', () => {
+  const content = migrateContent({
+    treasure_pools: [{ id: 'p1', name: 'Altar', description: '# hidden nook' }],
+    treasure: [{ ref: { game_id: 'W:1' }, qty: 1, pool_id: 'p1' }],
+  })
+  const shape = content.map((c) => (c.type === 'pool' ? `pool:${c.pool.name}` : c.type === 'markdown' ? `md:${c.markdown.body}` : `t:${c.treasure.ref.game_id}`))
+  assert.deepEqual(shape, ['pool:Altar', 'md:# hidden nook', 't:W:1']) // header, prose, then loot
+})
+
+test('migrateContent passes an already-migrated content list through, filling missing ids', () => {
+  const out = migrateContent({ content: [{ type: 'markdown', markdown: { body: 'x' } }, { id: 'k', type: 'coin', coin: { gp: 1 } }] })
+  assert.equal(out.length, 2)
+  assert.ok(out[0].id) // minted
+  assert.equal(out[1].id, 'k') // kept
+  assert.equal(out[1].coin.gp, 1)
+})
+
+test('emptyContentItem builds the right empty payload per type, with an id', () => {
+  for (const t of ['monster', 'hazard', 'affliction']) {
+    const c = emptyContentItem(t)
+    assert.ok(c.id && c.type === t && c.monster.ref.game_id === '' && c.monster.count === 1)
+  }
+  assert.deepEqual(emptyContentItem('skill_check').skill_check, { skill: '', dc: 0, description: '' })
+  assert.deepEqual(emptyContentItem('markdown').markdown, { title: '', body: '' })
+  assert.deepEqual(emptyContentItem('box_text').markdown, { title: '', body: '' })
+  assert.deepEqual(emptyContentItem('pool').pool, { name: '', gate: null })
+  assert.ok(emptyContentItem('treasure').treasure._key) // a keyed treasure line
+  assert.deepEqual(emptyContentItem('coin').coin, {})
+  assert.deepEqual(emptyContentItem('xp_award').xp_award, { amount: 0, reason: '' })
+  assert.deepEqual(emptyContentItem('reward').reward, { kind: 'information', label: '', description: '' })
+})
+
+test('contentCurrency sums every coin item; contentInput cleans a coin (rounds, positive-only, drops empty)', () => {
+  const enc = {
+    content: [
+      { id: '1', type: 'coin', coin: { gp: 5, sp: 3 } },
+      { id: '2', type: 'coin', coin: { gp: 2, cp: 1 } },
+      { id: '3', type: 'coin', coin: {} }, // empty → dropped on save, contributes nothing
+    ],
+  }
+  assert.deepEqual(contentCurrency(enc), { cp: 1, sp: 3, gp: 7, pp: 0 }) // summed across coin items
+  const coins = toEncounterInput(enc).content.filter((c) => c.type === 'coin')
+  assert.equal(coins.length, 2) // the empty coin item is dropped
+  assert.deepEqual(coins[0].coin, { gp: 5, sp: 3 })
+  // un-migrated fallback: no content → the legacy currency field
+  assert.deepEqual(contentCurrency({ currency: { gp: 9 } }), { gp: 9 })
 })
 
 test('keyed migrates XP awards to content xp_award items; emptyAward strips cleanly', () => {
