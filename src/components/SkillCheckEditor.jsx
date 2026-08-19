@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { skillCheckLabel, SKILL_CHECK_DEGREES, SKILL_CHECK_DEGREE_LABELS } from '../model.js'
 import WikiMarkdown from './WikiMarkdown.jsx'
 import RemoveButton from './RemoveButton.jsx'
+import SkillInput from './SkillInput.jsx'
 
 // One structured skill check: skill + DC (+ required successes), an effect (markdown),
 // optional alternative skills (OR), and per-degree outcomes. Edits flow through onChange
@@ -24,13 +25,12 @@ export default function SkillCheckEditor({ value, disabled, siblings, onOpenEnco
         </div>
       ) : (
         <div className="skill-check-head">
-          <input
+          <SkillInput
             className="check-skill"
             aria-label="check skill"
             placeholder="Skill (e.g. Perception)"
-            list="skill-options"
-            value={s.skill || ''}
-            onChange={(e) => set({ skill: e.target.value })}
+            value={s.skill}
+            onChange={(v) => set({ skill: v })}
           />
           <input
             type="number"
@@ -99,13 +99,12 @@ export default function SkillCheckEditor({ value, disabled, siblings, onOpenEnco
           {(s.alternatives || []).map((a, j) => (
             <div className="check-alt" data-testid="check-alt" key={j}>
               <span className="muted">or</span>
-              <input
+              <SkillInput
                 className="check-skill"
                 aria-label="alternative skill"
                 placeholder="Skill"
-                list="skill-options"
-                value={a.skill || ''}
-                onChange={(e) => setAlt(j, { skill: e.target.value })}
+                value={a.skill}
+                onChange={(v) => setAlt(j, { skill: v })}
               />
               <input
                 type="number"
