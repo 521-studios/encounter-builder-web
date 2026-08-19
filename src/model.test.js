@@ -484,6 +484,7 @@ test('skillCheckInput serializes the richer fields (xhwl), omitting empties', ()
       { skill: '  Religion ', dc: '20' },
       { skill: '', dc: 18 }, // dc only → kept (partial, in-progress)
       { skill: 'Arcana', dc: 0 }, // skill only → kept (partial, in-progress)
+      { skill: '', dc: 0 }, // entirely blank → dropped (nothing to preserve)
     ],
     outcomes: { crit_success: 'extra clue', success: '', failure: 'alarm', crit_failure: '   ' },
   })
@@ -492,7 +493,7 @@ test('skillCheckInput serializes the richer fields (xhwl), omitting empties', ()
     { skill: 'Religion', dc: 20 },
     { skill: '', dc: 18 },
     { skill: 'Arcana', dc: 0 },
-  ])
+  ]) // the fully-blank row is dropped; the three with any data are kept
   assert.deepEqual(out.outcomes, { crit_success: 'extra clue', failure: 'alarm' })
 
   // Defaults stay absent: successes 1 (or 0), no alternatives, no outcomes.

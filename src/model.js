@@ -405,8 +405,6 @@ export function contentRewards(enc) {
   return enc?.content ? enc.content.filter((c) => c.type === 'reward').map((c) => c.reward || {}) : enc?.rewards || []
 }
 
-// Serialize the content list for a save: drop incomplete placeholders per type, clean
-// each payload through its existing serializer. Keeps id + type for reorder identity.
 // Serialize the unified "Encounter" list for a save. EVERY item the GM added
 // persists — including incomplete ones (a monster with no ref, a check without a
 // DC, a nameless pool, a labelless reward) — so in-progress work is never lost on a
