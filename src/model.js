@@ -405,8 +405,12 @@ export function contentRewards(enc) {
   return enc?.content ? enc.content.filter((c) => c.type === 'reward').map((c) => c.reward || {}) : enc?.rewards || []
 }
 
-// Serialize the content list for a save: drop incomplete placeholders per type, clean
-// each payload through its existing serializer. Keeps id + type for reorder identity.
+// Serialize the unified "Encounter" list for a save. EVERY item the GM added
+// persists — including incomplete ones (a monster with no ref, a check without a
+// DC, a nameless pool, a labelless reward) — so in-progress work is never lost on a
+// navigate-away. Payloads are only CLEANED (trimmed, numbers coerced) here; the
+// API's save-time validation is structural too. Completeness is a draft→done gate,
+// not a save gate. Keeps id + type so reorder identity is stable.
 export function contentInput(enc) {
   const out = []
   for (const c of enc?.content || []) {
@@ -414,45 +418,30 @@ export function contentInput(enc) {
       case 'monster':
       case 'hazard':
       case 'affliction':
-        if (hasRef(c.monster || {})) out.push({ id: c.id, type: c.type, monster: monsterInput(c.monster) })
+        out.push({ id: c.id, type: c.type, monster: monsterInput(c.monster || {}) })
         break
-      case 'skill_check': {
-        const s = skillCheckInput(c.skill_check || {})
-        if (s.skill && s.dc >= 1) out.push({ id: c.id, type: c.type, skill_check: s })
+      case 'skill_check':
+        out.push({ id: c.id, type: c.type, skill_check: skillCheckInput(c.skill_check || {}) })
         break
-      }
       case 'markdown':
-      case 'box_text': {
-        const [md] = blocksInput([c.markdown || {}])
-        if (md) out.push({ id: c.id, type: c.type, markdown: md })
+      case 'box_text':
+        out.push({ id: c.id, type: c.type, markdown: markdownBlockInput(c.markdown) })
         break
-      }
-      case 'pool': {
-        // Drop an empty pool header (no name, no complete gate) — a no-op divider; its
-        // loot just falls into the default (headerless) group.
-        const name = (c.pool?.name || '').trim()
-        const gate = gateInput(c.pool?.gate)
-        if (name || gate) out.push({ id: c.id, type: c.type, pool: { name, gate } })
+      case 'pool':
+        out.push({ id: c.id, type: c.type, pool: { name: (c.pool?.name || '').trim(), gate: gateInput(c.pool?.gate) } })
         break
-      }
       case 'treasure':
-        if (hasTreasureContent(c.treasure || {})) out.push({ id: c.id, type: c.type, treasure: treasureLineInput(c.treasure) })
+        out.push({ id: c.id, type: c.type, treasure: treasureLineInput(c.treasure || {}) })
         break
-      case 'coin': {
-        const coin = coinInput(c.coin)
-        if (coin) out.push({ id: c.id, type: c.type, coin })
+      case 'coin':
+        out.push({ id: c.id, type: c.type, coin: coinInput(c.coin) })
         break
-      }
-      case 'xp_award': {
-        const a = awardInput(c.xp_award || {})
-        if (a.amount > 0) out.push({ id: c.id, type: c.type, xp_award: a })
+      case 'xp_award':
+        out.push({ id: c.id, type: c.type, xp_award: awardInput(c.xp_award || {}) })
         break
-      }
-      case 'reward': {
-        const r = rewardInput(c.reward || {})
-        if (r.label) out.push({ id: c.id, type: c.type, reward: r })
+      case 'reward':
+        out.push({ id: c.id, type: c.type, reward: rewardInput(c.reward || {}) })
         break
-      }
       default:
         break
     }
@@ -460,22 +449,30 @@ export function contentInput(enc) {
   return out
 }
 
-// A coin drop: keep only the positive denominations; null if empty (drop the item).
+// A single markdown / box-text block, cleaned. Kept even when empty so a just-added
+// text block survives a navigate-away before the GM types anything.
+function markdownBlockInput(b) {
+  return { title: (b?.title || '').trim(), body: b?.body || '' }
+}
+
+// A coin drop: keep only the positive denominations. Always returns an object (never
+// null) — the item itself persists even when zeroed; the API accepts amounts >= 0.
 function coinInput(coin) {
   const out = {}
   for (const k of ['cp', 'sp', 'gp', 'pp']) {
     const n = Math.round(Number(coin?.[k]) || 0)
     if (n > 0) out[k] = n
   }
-  return Object.keys(out).length ? out : null
+  return out
 }
 
-// A pool's discovery gate — kept only when complete (skill + DC≥1), else null (ungated).
+// A pool's discovery gate. Kept when the GM entered EITHER a skill or a DC (partial
+// work is preserved); null only when the gate is entirely blank (ungated).
 function gateInput(gate) {
   if (!gate) return null
   const skill = (gate.skill || '').trim()
   const dc = Math.round(Number(gate.dc) || 0)
-  return skill && dc >= 1 ? { skill, dc } : null
+  return skill || dc ? { skill, dc } : null
 }
 
 // When markdown block `removed` is deleted, every higher block shifts down one, so the
@@ -573,10 +570,10 @@ export function emptyAward() {
 }
 
 // Serialize an XP award for the API: drop the client _key, coerce amount to a
-// whole number, trim the reason. Empty/zero-amount lines are filtered out by the
-// caller (the API rejects amount < 1). amount is rounded to an integer because the
-// API's Go `int` rejects a fractional JSON number outright — which would fail the
-// whole PUT and surface only as an opaque "Save failed" (XP is always whole anyway).
+// whole number, trim the reason. Zero-amount lines still persist (in-progress work).
+// amount is rounded to an integer because the API's Go `int` rejects a fractional
+// JSON number outright — which would fail the whole PUT and surface only as an opaque
+// "Save failed" (XP is always whole anyway).
 export function awardInput(a) {
   const { _key, ...rest } = a
   return { amount: Math.round(Number(rest.amount) || 0), reason: (rest.reason || '').trim() }
@@ -588,8 +585,8 @@ export function emptyReward() {
   return withKey({ kind: 'information', label: '', description: '' })
 }
 
-// Serialize a reward for the API: drop the client _key, trim the label. Rows with
-// an empty label are filtered out by the caller (the API requires a label).
+// Serialize a reward for the API: drop the client _key, trim the label. A labelless
+// row still persists (in-progress work); the API requires no label at save time.
 export function rewardInput(r) {
   const { _key, ...rest } = r
   return { kind: rest.kind, label: (rest.label || '').trim(), description: rest.description || '' }
@@ -610,10 +607,10 @@ export const SKILL_CHECK_DEGREE_LABELS = {
 }
 
 // Serialize a skill check for the API: drop the client _key, trim the skill, coerce
-// dc to a whole number. Incomplete rows (no skill or dc < 1) are filtered by the
-// caller (the API requires skill + dc >= 1). dc is rounded because the API's Go
-// `int` rejects a fractional JSON number outright — which would fail the whole PUT
-// as an opaque "Save failed" (DCs are always whole anyway).
+// dc to a whole number. Incomplete rows (no skill, no dc) still persist — the API
+// requires neither at save time. dc is rounded because the API's Go `int` rejects a
+// fractional JSON number outright — which would fail the whole PUT as an opaque
+// "Save failed" (DCs are always whole anyway).
 export function skillCheckInput(s) {
   const { _key, ...rest } = s
   const out = { skill: (rest.skill || '').trim(), dc: Math.round(Number(rest.dc) || 0), description: rest.description || '' }
@@ -624,7 +621,7 @@ export function skillCheckInput(s) {
   if (successes > 1) out.successes = successes
   const alternatives = (rest.alternatives || [])
     .map((a) => ({ skill: (a.skill || '').trim(), dc: Math.round(Number(a.dc) || 0) }))
-    .filter((a) => a.skill && a.dc >= 1)
+    .filter((a) => a.skill || a.dc) // keep partial rows (in-progress work); drop only fully-blank ones
   if (alternatives.length) out.alternatives = alternatives
   const outcomes = {}
   for (const k of SKILL_CHECK_DEGREES) if ((rest.outcomes?.[k] || '').trim()) outcomes[k] = rest.outcomes[k]
