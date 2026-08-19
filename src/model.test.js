@@ -366,7 +366,7 @@ test('emptyContentItem builds the right empty payload per type, with an id', () 
     const c = emptyContentItem(t)
     assert.ok(c.id && c.type === t && c.monster.ref.game_id === '' && c.monster.count === 1)
   }
-  assert.deepEqual(emptyContentItem('skill_check').skill_check, { skill: '', dc: 0, description: '' })
+  assert.deepEqual(emptyContentItem('skill_check').skill_check, { skill: 'Perception', dc: 0, description: '' })
   assert.deepEqual(emptyContentItem('markdown').markdown, { title: '', body: '' })
   assert.deepEqual(emptyContentItem('box_text').markdown, { title: '', body: '' })
   assert.deepEqual(emptyContentItem('pool').pool, { name: '', gate: null })

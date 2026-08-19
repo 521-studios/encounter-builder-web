@@ -28,6 +28,7 @@ export default function SkillCheckEditor({ value, disabled, siblings, onOpenEnco
             className="check-skill"
             aria-label="check skill"
             placeholder="Skill (e.g. Perception)"
+            list="skill-options"
             value={s.skill || ''}
             onChange={(e) => set({ skill: e.target.value })}
           />
@@ -102,6 +103,7 @@ export default function SkillCheckEditor({ value, disabled, siblings, onOpenEnco
                 className="check-skill"
                 aria-label="alternative skill"
                 placeholder="Skill"
+                list="skill-options"
                 value={a.skill || ''}
                 onChange={(e) => setAlt(j, { skill: e.target.value })}
               />
