@@ -28,6 +28,13 @@ test('SkillInput onChange fires the picked/typed value', () => {
   assert.equal(input.value, 'Nature')
 })
 
+test('SkillInput clears its display on click too (re-click while focused after a pick)', () => {
+  render(<SkillInput aria-label="skill" value="Nature" onChange={noop} />)
+  const input = screen.getByLabelText('skill')
+  fireEvent.click(input) // an already-focused input does not re-fire focus; click must clear
+  assert.equal(input.value, '') // full list, not just "Nature"
+})
+
 test('SkillInput references the shared #skill-options datalist', () => {
   render(<SkillInput aria-label="skill" value="" onChange={noop} />)
   assert.equal(screen.getByLabelText('skill').getAttribute('list'), 'skill-options')

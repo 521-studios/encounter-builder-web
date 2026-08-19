@@ -14,7 +14,11 @@ export default function SkillInput({ value, onChange, disabled, ...rest }) {
       list="skill-options"
       disabled={disabled}
       value={editing != null ? editing : value || ''}
+      // Clear the display on focus AND on click: clicking an already-focused input (e.g.
+      // right after picking a skill) doesn't re-fire focus, which would otherwise leave
+      // the datalist filtered to the just-picked value.
       onFocus={() => !disabled && setEditing('')}
+      onClick={() => !disabled && setEditing('')}
       onChange={(e) => {
         setEditing(e.target.value)
         onChange(e.target.value)
