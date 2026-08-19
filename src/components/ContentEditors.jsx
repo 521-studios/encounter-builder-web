@@ -1,6 +1,7 @@
 import { CURRENCIES, REWARD_KINDS, REWARD_KIND_LABELS } from '../model.js'
 import RemoveButton from './RemoveButton.jsx'
 import WikiMarkdown from './WikiMarkdown.jsx'
+import SkillInput from './SkillInput.jsx'
 
 // The small reward-section editors for the unified Encounter content list. Each is a
 // card with the standard corner ×; all edits flow through onChange with the whole
@@ -25,14 +26,13 @@ export function PoolHeaderEditor({ pool, disabled, onChange, onRemove }) {
       />
       <label className="pool-gate" title="Discovery check to find this pool (optional)">
         <span aria-hidden="true">🔒</span>
-        <input
+        <SkillInput
           className="check-skill"
           aria-label="pool gate skill"
           placeholder="Skill (optional)"
-          list="skill-options"
-          value={gate?.skill || ''}
+          value={gate?.skill}
           disabled={disabled}
-          onChange={(e) => setGate({ skill: e.target.value })}
+          onChange={(v) => setGate({ skill: v })}
         />
         <input
           type="number"
