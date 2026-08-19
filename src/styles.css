@@ -290,6 +290,26 @@ button.encounter { flex: 1; text-align: left; }
 .challenge-dialog-title { margin: 0 0 0.75rem; font-size: 1rem; }
 .challenge-type-grid { display: grid; gap: 0.4rem; margin-bottom: 0.75rem; }
 .challenge-type { text-align: left; }
+/* + Add dialog: grouped into Text / Challenges / Rewards sections. */
+.content-add-section { display: grid; gap: 0.35rem; margin-bottom: 0.75rem; }
+.content-add-section-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+
+/* Reward-section content editors (each a card with the standard corner ×). */
+.content-pool, .content-coin, .content-xp, .content-reward { position: relative; padding-right: 1.5rem; }
+.content-pool { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; border-bottom: 1px solid var(--border-strong); padding-bottom: 0.4rem; }
+.content-pool .pool-name { flex: 1; min-width: 10rem; font-weight: 600; }
+.content-pool .pool-gate { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted); }
+.content-coin, .content-xp { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.content-coin input, .content-xp .award-amount { width: 4.5rem; }
+.content-item-label { font-weight: 600; }
+.content-reward { display: grid; gap: 0.4rem; }
+
+/* Box text — the module read-aloud/highlighted callout. */
+.text-block--box { border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+
+/* Header budget chip (difficulty band + treasure target); click toggles the table. */
+.budget-chip { font: inherit; font-size: 0.85rem; padding: 0.15rem 0.5rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--card); color: var(--fg); cursor: pointer; white-space: nowrap; }
+.budget-chip:hover { border-color: var(--accent); }
 
 fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.5rem; }
 legend { padding: 0 0.4rem; opacity: 0.8; }
