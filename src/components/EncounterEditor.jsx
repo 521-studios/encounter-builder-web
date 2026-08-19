@@ -21,6 +21,7 @@ import { BAND_LABELS, BASE_PARTY, treasureBudget } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
 import { useSkills, abilityLabel } from '../useSkills.js'
 import EncounterContent from './EncounterContent.jsx'
+import SkillInput from './SkillInput.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
 import EncounterPrintSheet from './EncounterPrintSheet.jsx'
@@ -440,14 +441,13 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
                     />{' '}
                     Secret
                   </label>
-                  <input
+                  <SkillInput
                     className="exit-skill"
                     aria-label="exit skill check"
                     placeholder="Skill (optional)"
-                    list="skill-options"
-                    value={ex.skill || ''}
+                    value={ex.skill}
                     disabled={released}
-                    onChange={(e) => setExit(i, { skill: e.target.value })}
+                    onChange={(v) => setExit(i, { skill: v })}
                   />
                   <input
                     className="exit-dc"
