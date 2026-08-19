@@ -19,6 +19,7 @@ import { resolveParty } from '../party.js'
 import { naturalSort } from '../sort.js'
 import { BAND_LABELS, BASE_PARTY, treasureBudget } from '../pf2eRules.js'
 import { useEncounterBudget } from '../useEncounterBudget.js'
+import { useSkills, abilityLabel } from '../useSkills.js'
 import EncounterContent from './EncounterContent.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
@@ -46,6 +47,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [campaignSettings, setCampaignSettings] = useState(null) // party inheritance base (null = loading)
   const [partyContextError, setPartyContextError] = useState(false) // chapters/settings load failed
   const [showBudget, setShowBudget] = useState(false) // the treasure chip toggles the full budget table
+  const skills = useSkills() // Perception + the character skills, for the skill-check / exit pickers
 
   // encRef exposes the latest working copy to the flush handlers (for the error
   // label); syncedRef is the last sidebar-visible signature we told the parent
@@ -221,6 +223,16 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
 
   return (
     <section className="editor">
+      {/* Shared skill picker options (Perception + character skills), referenced by the
+          skill-check and exit skill inputs via list="skill-options". */}
+      <datalist id="skill-options">
+        {skills.map((s) => (
+          <option key={s.name} value={s.name}>
+            {s.name}
+            {s.ability ? ` (${abilityLabel(s.ability)})` : ''}
+          </option>
+        ))}
+      </datalist>
       {/* Title + tabs pin together as one sticky header; only the active panel scrolls. */}
       <div className="editor-header">
         <div className="editor-head">
@@ -432,6 +444,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
                     className="exit-skill"
                     aria-label="exit skill check"
                     placeholder="Skill (optional)"
+                    list="skill-options"
                     value={ex.skill || ''}
                     disabled={released}
                     onChange={(e) => setExit(i, { skill: e.target.value })}

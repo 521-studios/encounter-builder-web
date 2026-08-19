@@ -310,7 +310,7 @@ export function emptyContentItem(type) {
     case 'affliction':
       return { id, type, monster: { ref: { game_id: '' }, count: 1, adjustment: 'none', nickname: '', loadout: [] } }
     case 'skill_check':
-      return { id, type, skill_check: { skill: '', dc: 0, description: '' } }
+      return { id, type, skill_check: { skill: 'Perception', dc: 0, description: '' } } // Perception is the common default
     case 'box_text':
     case 'markdown':
       return { id, type, markdown: { title: '', body: '' } }
