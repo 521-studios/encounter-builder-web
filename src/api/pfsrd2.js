@@ -20,6 +20,8 @@ function gameIdPath(gameId) {
 const ITEM_TYPES = ['equipment', 'weapons', 'armor', 'shields']
 
 export const pfsrd2 = {
+  // The standard character skills (name + key ability) for the skill-check picker.
+  listSkills: (opts) => request('GET', '/api/pfsrd2/skills', opts),
   // Autocomplete over monsters + NPCs. The library CreatureSearch calls this as
   // search(q, filters); filters = { traits: string[] } → the API's comma-separated
   // traits param. Returns [{ game_id, name, type, level, edition, ... }].

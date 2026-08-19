@@ -29,6 +29,7 @@ export function PoolHeaderEditor({ pool, disabled, onChange, onRemove }) {
           className="check-skill"
           aria-label="pool gate skill"
           placeholder="Skill (optional)"
+          list="skill-options"
           value={gate?.skill || ''}
           disabled={disabled}
           onChange={(e) => setGate({ skill: e.target.value })}
