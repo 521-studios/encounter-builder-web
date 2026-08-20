@@ -157,3 +157,12 @@ test('EncounterPrintSheet falls back to legacy description for an un-migrated en
   render(<EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
   assert.match(document.body.textContent, /An old single-body encounter\./)
 })
+
+test('EncounterPrintSheet does NOT resurrect a stale description for a MIGRATED encounter with no prose (3zbl guard)', () => {
+  // content present (even empty) means migrated — the cleared-but-lingering description
+  // must never print. Weakening the guard to `content?.length` would break exactly this.
+  const enc = { ...baseEnc, content: [], description: 'STALE migrated-away body — must not print' }
+  render(<EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
+  assert.equal(screen.queryByTestId('print-block'), null)
+  assert.doesNotMatch(document.body.textContent, /STALE/)
+})
