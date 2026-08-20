@@ -317,7 +317,6 @@ button.encounter { flex: 1; text-align: left; }
 .budget-flag--low { color: var(--accent); }
 .budget-flag--high { color: var(--gold); }
 .budget-flag--on { color: var(--muted); }
-
 /* Draft→done completeness gate (rvd4): the release-blocked panel listing unfinished
    items, and the transient flash on an item jumped-to from that list. */
 .release-gaps { border: 1px solid var(--accent); border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 12%, var(--card)); padding: 0.6rem 0.75rem; margin: 0.5rem 0; }
