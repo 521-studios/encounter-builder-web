@@ -18,6 +18,8 @@ import {
 import { resolveParty } from '../party.js'
 import { naturalSort } from '../sort.js'
 import { BAND_LABELS, BASE_PARTY, treasureBudget } from '../pf2eRules.js'
+import { treasureStanding } from '../budget.js'
+import { formatGp } from '@521studios/pfsrd2-display'
 import { useEncounterBudget } from '../useEncounterBudget.js'
 import { useSkills, abilityLabel } from '../useSkills.js'
 import EncounterContent from './EncounterContent.jsx'
@@ -32,6 +34,9 @@ const ENCOUNTER_TABS = [
   { id: 'encounter', label: 'Encounter' },
   { id: 'exits', label: 'Exits' },
 ]
+
+// The low/on/high flag shown beside the actual treasure value in the header chip.
+const TREASURE_FLAG_LABELS = { low: 'low', on: 'on budget', high: 'high' }
 
 export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onSaveOk, onOpenEncounter }) {
   const [tab, setTab] = useState('config')
@@ -125,6 +130,15 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     campaign: campaignSettings || null,
   })
   const budget = useEncounterBudget(enc || {}, effectiveParty.level, effectiveParty.size)
+
+  // The header treasure chip shows the encounter's ACTUAL loot value with a low/on/high
+  // flag against the difficulty's budget target (null target = Trivial / non-combat, so
+  // no flag). The value is a "floor" while items are still loading/unpriced.
+  const treasureTargetGp = isCombatRoom(budget.roomType)
+    ? treasureBudget(effectiveParty.level, budget.threat, effectiveParty.size)
+    : null
+  const treasureIncomplete = budget.loading || budget.failedCount > 0 || budget.unpricedCount > 0 || budget.unknownCount > 0
+  const treasureStand = treasureStanding(budget.cp, treasureTargetGp, treasureIncomplete)
 
   if (error && !enc) return <p className="error" role="alert">{error}</p>
   if (!enc) return <p>Loading encounter…</p>
@@ -271,15 +285,31 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
             className="budget-chip"
             data-testid="treasure-chip"
             aria-expanded={showBudget}
-            title="Treasure budget for this difficulty — click for the full table"
+            title={
+              treasureTargetGp == null
+                ? `Treasure in this encounter: ${formatGp(budget.cp)}${treasureStand.floor ? ' (floor)' : ''} — click for the full table`
+                : `Treasure in this encounter: ${formatGp(budget.cp)}${treasureStand.floor ? ' (floor)' : ''} vs ${BAND_LABELS[budget.threat]} target ${formatGp(treasureTargetGp * 100)} — click for the full table`
+            }
             onClick={() => setShowBudget((s) => !s)}
           >
             Treasure:{' '}
-            {(() => {
-              if (!isCombatRoom(budget.roomType)) return '—'
-              const t = treasureBudget(effectiveParty.level, budget.threat, effectiveParty.size)
-              return t == null ? '—' : `${t} gp`
-            })()}
+            {budget.cp === 0 && !treasureIncomplete ? (
+              // No loot added yet (or an intentionally empty room): show a neutral dash,
+              // NOT "0 gp low" — under-budget is the normal top-down building state, and
+              // the click-through table still spells out the shortfall.
+              '—'
+            ) : (
+              <>
+                <span data-testid="treasure-actual">{formatGp(budget.cp)}</span>
+                {treasureStand.floor && budget.cp > 0 ? ' (floor)' : ''}
+                {treasureStand.verdict && (
+                  <span className={`budget-flag budget-flag--${treasureStand.verdict}`} data-testid="treasure-flag">
+                    {' '}
+                    {TREASURE_FLAG_LABELS[treasureStand.verdict]}
+                  </span>
+                )}
+              </>
+            )}
           </button>
           <span className="status">{enc.status}</span>
           <button type="button" className="link" onClick={() => setPrinting(true)}>Print / PDF</button>
