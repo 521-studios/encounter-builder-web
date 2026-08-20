@@ -68,6 +68,23 @@ export function treasureValueCp(treasure, currency, entryOf) {
   return { cp, unpriced }
 }
 
+// treasureStanding compares an encounter's ACTUAL loot value (copper) against its
+// treasure-budget target, for the header chip. Mirrors the TreasureBudget panel's
+// floor reasoning: "over" is safe on a floor (true value ≥ the shown value), while
+// "under" is only knowable once the value is COMPLETE — so a floor that's below
+// target reports no verdict rather than a false "low". `targetGp` null (a Trivial
+// or non-combat encounter has no target) → no verdict. Returns { verdict, floor }
+// where verdict ∈ 'low' | 'on' | 'high' | null and floor marks an incomplete value.
+export function treasureStanding(cp, targetGp, incomplete) {
+  if (targetGp == null) return { verdict: null, floor: !!incomplete }
+  const targetCp = targetGp * 100
+  if (cp > targetCp) return { verdict: 'high', floor: !!incomplete }
+  if (cp === targetCp) return { verdict: 'on', floor: !!incomplete }
+  // cp < targetCp — only call it "low" once the value is complete (a floor might
+  // still climb to/over target once the unpriced/unloaded items resolve).
+  return incomplete ? { verdict: null, floor: true } : { verdict: 'low', floor: false }
+}
+
 // hazardXp sums the hazards' XP: a Hazard N contributes the same XP as a Creature N
 // (no elite/weak). Level comes from the indexed entry; a hazard whose level can't be
 // read is returned in `unknown`.

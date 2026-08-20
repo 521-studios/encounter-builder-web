@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { treasureValueCp, encounterXp, hazardXp, afflictionXp, awardXp, refGameId, gameIdsInEncounter } from './budget.js'
+import { treasureValueCp, treasureStanding, encounterXp, hazardXp, afflictionXp, awardXp, refGameId, gameIdsInEncounter } from './budget.js'
 
 // Minimal fake entries keyed by game_id.
 const ITEMS = {
@@ -93,6 +93,21 @@ test('treasureValueCp flags a custom item with no entered value as unpriced (flo
   )
   assert.equal(cp, 0)
   assert.equal(unpriced.length, 1)
+})
+
+test('treasureStanding: low/on/high vs target, and no false low on an incomplete floor', () => {
+  const target = 100 // gp
+  // Complete values compare directly against the target (in copper).
+  assert.deepEqual(treasureStanding(6000, target, false), { verdict: 'low', floor: false }) // 60 gp < 100
+  assert.deepEqual(treasureStanding(10000, target, false), { verdict: 'on', floor: false }) // exactly 100 gp
+  assert.deepEqual(treasureStanding(15000, target, false), { verdict: 'high', floor: false }) // 150 gp > 100
+  // A floor below target yields NO verdict (the unpriced items might still fill it),
+  // but a floor already over target is safely "high".
+  assert.deepEqual(treasureStanding(6000, target, true), { verdict: null, floor: true })
+  assert.deepEqual(treasureStanding(15000, target, true), { verdict: 'high', floor: true })
+  // No target (Trivial / non-combat) → no verdict, floor flag still passes through.
+  assert.deepEqual(treasureStanding(6000, null, false), { verdict: null, floor: false })
+  assert.deepEqual(treasureStanding(0, null, true), { verdict: null, floor: true })
 })
 
 test('treasureValueCp budgets a value_tiers line at the Success tier × qty (best case)', () => {
