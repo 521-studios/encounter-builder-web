@@ -14,6 +14,7 @@ import {
   emptyExit,
   incomingLinks,
   keyed,
+  CONTENT_TYPE_LABELS,
 } from '../model.js'
 import { resolveParty } from '../party.js'
 import { naturalSort } from '../sort.js'
@@ -43,6 +44,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
   const [releasing, setReleasing] = useState(false)
+  const [releaseGaps, setReleaseGaps] = useState(null) // rvd4: unfinished items blocking release, or null
   const [printing, setPrinting] = useState(false) // full-screen print/PDF sheet overlay
   // The save indicator now reflects the store's flush layer (rtd8b): edits are
   // written to the store optimistically and it owns the debounced backend write.
@@ -206,21 +208,45 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   // Release hands the loot to the party: it saves current edits first (so the
   // released encounter matches what the GM sees), then flips it to released —
   // after which the editor renders read-only.
-  async function release() {
-    if (!window.confirm('Release this encounter to the party? It becomes read-only.')) return
+  // force skips the draft→done completeness gate (rvd4). The first click confirms;
+  // if the API reports unfinished items (422), we surface them and let the GM either
+  // fix each or "Release anyway" (which calls this again with force=true, no re-confirm).
+  async function release(force = false) {
+    if (!force && !window.confirm('Release this encounter to the party? It becomes read-only.')) return
     encounters.cancel(campaignId, encounterId) // drop the pending debounced flush; we save explicitly here
     setReleasing(true)
     setError(null)
+    setReleaseGaps(null)
     try {
       await encounters.update(campaignId, encounterId, buildInput(enc))
-      const result = await encounters.release(campaignId, encounterId)
+      const result = await encounters.release(campaignId, encounterId, { force })
       setEnc(keyed(result))
       onSaved && onSaved(result)
     } catch (e) {
-      setError(errorMessage(e))
+      // 422 = unfinished content: show the gaps instead of a raw error.
+      if (e && e.status === 422 && Array.isArray(e.body?.incomplete)) {
+        setReleaseGaps(e.body.incomplete)
+        setTab('encounter')
+      } else {
+        setError(errorMessage(e))
+      }
     } finally {
       setReleasing(false)
     }
+  }
+
+  // Jump the GM to an unfinished item: switch to the Encounter tab, scroll it into
+  // view, and flash it. The tab may need a frame to render, hence the short defer.
+  function jumpToGap(itemId) {
+    setTab('encounter')
+    setTimeout(() => {
+      const el = document.getElementById(`content-item-${itemId}`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.remove('content-flash')
+      void el.offsetWidth // restart the animation if it's already flashed
+      el.classList.add('content-flash')
+    }, 60)
   }
 
   const saveLabel = { saving: 'Saving…', unsaved: 'Unsaved changes…', error: 'Save failed', saved: 'Saved' }[saveState]
@@ -320,6 +346,33 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         {released && <p className="muted">Released — read-only.</p>}
         {error && <p className="error" role="alert">{error}</p>}
 
+        {releaseGaps && (
+          <div className="release-gaps" role="alert" data-testid="release-gaps">
+            <p className="release-gaps-head">
+              This encounter has unfinished items — finish them, or release anyway.
+            </p>
+            <ul className="release-gaps-list">
+              {releaseGaps.map((g) => (
+                <li key={g.item_id}>
+                  <button type="button" className="link" onClick={() => jumpToGap(g.item_id)}>
+                    {CONTENT_TYPE_LABELS[g.type] || g.type}
+                  </button>
+                  {' — missing '}
+                  {g.missing.join(', ')}
+                </li>
+              ))}
+            </ul>
+            <div className="release-gaps-actions">
+              <button type="button" onClick={() => release(true)} disabled={releasing}>
+                Release anyway
+              </button>
+              <button type="button" className="link" onClick={() => setReleaseGaps(null)}>
+                Keep editing
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="editor-tabrow">
           <div className="tabs" role="tablist" aria-label="Encounter sections">
             {ENCOUNTER_TABS.map((t) => (
@@ -346,7 +399,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               >
                 {saveLabel}
               </span>
-              <button onClick={release} disabled={releasing || saveState === 'saving'}>
+              <button onClick={() => release()} disabled={releasing || saveState === 'saving'}>
                 {releasing ? 'Releasing…' : 'Release to party'}
               </button>
             </div>

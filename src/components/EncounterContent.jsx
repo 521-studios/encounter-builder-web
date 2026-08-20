@@ -91,6 +91,7 @@ export default function EncounterContent({
       {content.map((c) => (
         <div
           key={c.id}
+          id={`content-item-${c.id}`}
           className="challenge-row"
           data-type={c.type}
           data-dragging={dragId === c.id || undefined}

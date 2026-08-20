@@ -318,6 +318,16 @@ button.encounter { flex: 1; text-align: left; }
 .budget-flag--high { color: var(--gold); }
 .budget-flag--on { color: var(--muted); }
 
+/* Draft→done completeness gate (rvd4): the release-blocked panel listing unfinished
+   items, and the transient flash on an item jumped-to from that list. */
+.release-gaps { border: 1px solid var(--accent); border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 12%, var(--card)); padding: 0.6rem 0.75rem; margin: 0.5rem 0; }
+.release-gaps-head { margin: 0 0 0.4rem; font-weight: 600; }
+.release-gaps-list { margin: 0 0 0.5rem; padding-left: 1.1rem; display: grid; gap: 0.2rem; }
+.release-gaps-actions { display: flex; align-items: center; gap: 0.75rem; }
+@keyframes content-flash { from { background: color-mix(in srgb, var(--accent) 40%, transparent); } to { background: transparent; } }
+.content-flash { animation: content-flash 1.6s ease-out; border-radius: var(--radius); }
+@media (prefers-reduced-motion: reduce) { .content-flash { animation: none; outline: 2px solid var(--accent); } }
+
 fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; display: grid; gap: 0.5rem; }
 legend { padding: 0 0.4rem; opacity: 0.8; }
 

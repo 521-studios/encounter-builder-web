@@ -81,6 +81,18 @@ test('api backend: release writes through — the cache reflects the released st
   assert.equal(calls.filter((c) => c.method === 'GET').length, 1, 'release updated the cache — no re-fetch')
 })
 
+test('api backend: release threads force=true onto the query string (rvd4 gate override)', async () => {
+  const calls = stubFetch(() => res({ id: 'e1', name: 'A', status: 'released' }))
+  await store.encounters.release('c1', 'e1', { force: true })
+  const post = calls.find((c) => c.method === 'POST')
+  assert.ok(post.url.endsWith('/e1/release?force=true'), `forced release URL = ${post.url}`)
+
+  calls.length = 0
+  await store.encounters.release('c1', 'e1') // default: no force → no query string
+  const plain = calls.find((c) => c.method === 'POST')
+  assert.ok(plain.url.endsWith('/e1/release'), `plain release URL = ${plain.url}`)
+})
+
 test('api backend: list evicts a since-deleted record (map is replaced, not merged)', async () => {
   let listing = [{ id: 'e1', name: 'A', status: 'draft' }, { id: 'e2', name: 'B', status: 'draft' }]
   const calls = stubFetch((url, o) => {
