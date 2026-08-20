@@ -166,3 +166,37 @@ test('EncounterPrintSheet does NOT resurrect a stale description for a MIGRATED 
   assert.equal(screen.queryByTestId('print-block'), null)
   assert.doesNotMatch(document.body.textContent, /STALE/)
 })
+
+test('EncounterPrintSheet prints a treasure-pool header + its discovery gate, then the pool loot', () => {
+  // The pool grouping + gate are the ugom structure the old category-grouped sheet
+  // dropped entirely; the loot that follows the pool header is its find.
+  const enc = {
+    ...baseEnc,
+    content: [
+      { id: 'p1', type: 'pool', pool: { name: 'the altar', gate: { skill: 'Perception', dc: 18 } } },
+      { id: 't1', type: 'treasure', treasure: { ref: { game_id: 'Items:1' }, qty: 1 } },
+      { id: 'c1', type: 'coin', coin: { gp: 12 } },
+    ],
+  }
+  render(<EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
+  const pool = screen.getByTestId('print-pool')
+  assert.match(pool.textContent, /the altar/)
+  assert.match(pool.textContent, /🔒 Perception DC 18/) // discovery gate
+  assert.match(screen.getByTestId('print-treasure-item').textContent, /Healing Potion/)
+  assert.match(screen.getByTestId('print-coin').textContent, /12 gp/)
+})
+
+test('EncounterPrintSheet renders content in the GM’s list order (not regrouped by category)', () => {
+  const enc = {
+    ...baseEnc,
+    content: [
+      { id: 'b1', type: 'box_text', markdown: { body: 'FIRST read-aloud' } },
+      { id: 's1', type: 'skill_check', skill_check: { skill: 'Perception', dc: 15 } },
+      { id: 'b2', type: 'markdown', markdown: { body: 'LAST note' } },
+    ],
+  }
+  render(<EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
+  const text = document.body.textContent
+  assert.ok(text.indexOf('FIRST read-aloud') < text.indexOf('Perception DC 15'), 'prose before check')
+  assert.ok(text.indexOf('Perception DC 15') < text.indexOf('LAST note'), 'check before later prose')
+})

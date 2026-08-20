@@ -404,18 +404,6 @@ export function contentXPAwards(enc) {
 export function contentRewards(enc) {
   return enc?.content ? enc.content.filter((c) => c.type === 'reward').map((c) => c.reward || {}) : enc?.rewards || []
 }
-// Prose blocks for read-only surfaces (the print sheet): the markdown + box_text
-// content items in list order, each carrying whether it's a call-out box. Falls back
-// to the legacy text_blocks/description (via encounterBlocks) for a not-yet-migrated
-// encounter — the migration cleared enc.description, so print must read content now.
-export function contentTextBlocks(enc) {
-  if (enc?.content) {
-    return enc.content
-      .filter((c) => c.type === 'markdown' || c.type === 'box_text')
-      .map((c) => ({ block: c.markdown || { title: '', body: '' }, box: c.type === 'box_text' }))
-  }
-  return encounterBlocks(enc).map((b) => ({ block: b, box: false }))
-}
 
 // Serialize the unified "Encounter" list for a save. EVERY item the GM added
 // persists — including incomplete ones (a monster with no ref, a check without a

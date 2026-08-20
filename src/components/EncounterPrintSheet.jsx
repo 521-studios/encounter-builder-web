@@ -5,20 +5,13 @@ import {
   roomTypeLabel,
   gameIdOf,
   isCustomTreasure,
+  hasTreasureContent,
   REWARD_KIND_LABELS,
   CURRENCIES,
   skillCheckLabel,
   SKILL_CHECK_DEGREES,
   SKILL_CHECK_DEGREE_LABELS,
-  contentMonsters,
-  contentHazards,
-  contentAfflictions,
-  contentSkillChecks,
-  contentTreasure,
-  contentCurrency,
-  contentXPAwards,
-  contentRewards,
-  contentTextBlocks,
+  migrateContent,
 } from '../model.js'
 import { BAND_LABELS } from '../pf2eRules.js'
 import { creatureHeader } from '../creatureHeader.js'
@@ -73,21 +66,162 @@ function afflictionLabel(gid, entryOf) {
 }
 
 export default function EncounterPrintSheet({ enc, budget, effectiveParty, siblings = [], onClose }) {
-  const textBlocks = contentTextBlocks(enc)
-  const monsters = contentMonsters(enc)
-  const hazards = contentHazards(enc)
-  const afflictions = contentAfflictions(enc)
-  const treasure = contentTreasure(enc)
-  const awards = contentXPAwards(enc)
-  const rewards = contentRewards(enc)
-  const skillChecks = contentSkillChecks(enc)
-  const exits = enc.exits || []
   const combat = isCombatRoom(budget.roomType)
-
-  const coins = CURRENCIES.map((c) => [c, contentCurrency(enc)?.[c] || 0]).filter(([, n]) => n > 0)
+  const exits = enc.exits || []
+  // Walk the single ordered content list — the post-ugom source of truth — so the
+  // sheet mirrors the GM's arrangement (prose, creatures, gated treasure pools, …)
+  // instead of regrouping into fixed category sections and dropping the pool/gate
+  // structure. `keyed()` always populates enc.content; `?? migrateContent` only fires
+  // for a raw/legacy encounter (content absent), never for a migrated-but-empty one.
+  const items = enc.content ?? migrateContent(enc)
+  const entryOf = budget.entryOf
   const exitTargetName = (id) => {
-    const t = (siblings).find((s) => String(s.id) === String(id))
+    const t = siblings.find((s) => String(s.id) === String(id))
     return t ? t.name || 'Untitled' : null
+  }
+
+  // Render one content item by type, in place. Returns null for a blank in-progress
+  // row (no creature/loot/text yet) so a half-filled item doesn't print as noise.
+  const renderItem = (c, i) => {
+    const key = c.id || i
+    switch (c.type) {
+      case 'markdown':
+      case 'box_text': {
+        const b = c.markdown || {}
+        if (!b.title && !b.body) return null
+        return (
+          <section className={`print-section${c.type === 'box_text' ? ' print-boxtext' : ''}`} key={key} data-testid="print-block">
+            {b.title && <h2 className="print-block-title">{b.title}</h2>}
+            {b.body && <WikiMarkdown text={b.body} encounters={siblings} onOpenEncounter={noop} />}
+          </section>
+        )
+      }
+      case 'monster': {
+        const m = c.monster || {}
+        const gid = gameIdOf(m)
+        if (!gid) return null
+        const hdr = creatureHeader(entryOf ? entryOf(gid) : null, m)
+        const count = m.count || 1
+        const name = m.nickname || (entryOf && entryOf(gid)?.name) || m.ref?.json?.name || gid
+        return (
+          <div className="print-entry" data-testid="print-monster" key={key}>
+            <h3 className="print-entry-head">
+              {name}{count > 1 ? ` (${count})` : ''}
+              {hdr.level != null && <span className="print-entry-level"> — CREATURE {hdr.level}</span>}
+            </h3>
+            <MonsterView monster={m} onChange={noop} disabled />
+          </div>
+        )
+      }
+      case 'hazard': {
+        const h = c.monster || {}
+        const gid = gameIdOf(h)
+        if (!gid) return null
+        const level = hazardLevel(gid, entryOf)
+        const count = h.count || 1
+        const name = h.nickname || (entryOf && entryOf(gid)?.name) || gid
+        return (
+          <div className="print-entry" data-testid="print-hazard" key={key}>
+            <h3 className="print-entry-head">
+              {name}{count > 1 ? ` (${count})` : ''}
+              {level != null && <span className="print-entry-level"> — HAZARD {level}</span>}
+            </h3>
+            <HazardView gameId={gid} />
+          </div>
+        )
+      }
+      case 'affliction': {
+        const a = c.monster || {}
+        const gid = gameIdOf(a)
+        if (!gid) return null
+        const label = afflictionLabel(gid, entryOf)
+        const count = a.count || 1
+        const name = (entryOf && entryOf(gid)?.name) || gid
+        return (
+          <div className="print-entry" data-testid="print-affliction" key={key}>
+            <h3 className="print-entry-head">
+              {name}{count > 1 ? ` (${count})` : ''}
+              {label && <span className="print-entry-level"> — {label}</span>}
+            </h3>
+            <AfflictionView gameId={gid} />
+          </div>
+        )
+      }
+      case 'skill_check': {
+        const s = c.skill_check || {}
+        if (!s.skill && !(s.dc > 0)) return null
+        return (
+          <div className="print-skill-check" data-testid="print-skill-check" key={key}>
+            <h3 className="print-entry-head">{skillCheckLabel(s)}</h3>
+            {s.description && <WikiMarkdown text={s.description} encounters={siblings} onOpenEncounter={noop} />}
+            {s.outcomes && SKILL_CHECK_DEGREES.some((d) => (s.outcomes[d] || '').trim()) && (
+              <ul className="print-outcomes">
+                {SKILL_CHECK_DEGREES.filter((d) => (s.outcomes[d] || '').trim()).map((d) => (
+                  <li key={d}><strong>{SKILL_CHECK_DEGREE_LABELS[d]}</strong> {s.outcomes[d]}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      }
+      case 'pool': {
+        // A treasure-pool HEADER: the loot items that follow it (until the next pool)
+        // are its finds; a discovery gate reads "🔒 Skill DC N". A bare default pool
+        // (no name, no gate) is a positional no-op — nothing to print.
+        const p = c.pool || {}
+        const gate = p.gate
+        const hasGate = gate && (gate.skill || gate.dc)
+        if (!p.name && !hasGate) return null
+        return (
+          <div className="print-pool" data-testid="print-pool" key={key}>
+            <h2 className="print-pool-head">
+              {p.name || 'Treasure'}
+              {hasGate && (
+                <span className="print-pool-gate"> — 🔒 {gate.skill || 'Skill'}{gate.dc ? ` DC ${gate.dc}` : ''}</span>
+              )}
+            </h2>
+          </div>
+        )
+      }
+      case 'treasure': {
+        const t = c.treasure || {}
+        if (!hasTreasureContent(t)) return null
+        return (
+          <div className="print-treasure-line" data-testid="print-treasure-item" key={key}>
+            {(t.qty || 1) > 1 ? `${t.qty} × ` : ''}{treasureName(t, entryOf)}
+            {t.masked ? ` (masked: ${t.mask_label || 'Unidentified Item'})` : ''}
+            {t.state && t.state !== 'intact' ? ` — ${t.state}` : ''}
+          </div>
+        )
+      }
+      case 'coin': {
+        const coin = c.coin || {}
+        const parts = CURRENCIES.map((cc) => [cc, coin[cc] || 0]).filter(([, n]) => n > 0)
+        if (!parts.length) return null
+        return (
+          <p className="print-coin" data-testid="print-coin" key={key}>
+            Coin: {parts.map(([cc, n]) => `${n} ${cc}`).join(' · ')}
+          </p>
+        )
+      }
+      case 'xp_award': {
+        const a = c.xp_award || {}
+        if (!(a.amount > 0)) return null
+        return <p className="print-xp" key={key}>{a.amount} XP — {a.reason || ''}</p>
+      }
+      case 'reward': {
+        const r = c.reward || {}
+        if (!r.label && !r.description) return null
+        return (
+          <div className="print-reward" data-testid="print-reward" key={key}>
+            <h3 className="print-entry-head">{REWARD_KIND_LABELS[r.kind] || r.kind}: {r.label || ''}</h3>
+            {r.description && <WikiMarkdown text={r.description} encounters={siblings} onOpenEncounter={noop} />}
+          </div>
+        )
+      }
+      default:
+        return null
+    }
   }
 
   // Portal to <body> so the sheet is NOT nested inside the editor's `.main`
@@ -116,152 +250,14 @@ export default function EncounterPrintSheet({ enc, budget, effectiveParty, sibli
         </p>
       </header>
 
-      {/* Prose: the content markdown + box_text blocks in list order (the post-ugom
-          home of the read-aloud/description text; enc.description is cleared on save).
-          A box_text block prints as a bordered read-aloud call-out. */}
-      {textBlocks.map(({ block, box }, i) =>
-        block.title || block.body ? (
-          <section className={`print-section${box ? ' print-boxtext' : ''}`} key={i} data-testid="print-block">
-            {block.title && <h2 className="print-block-title">{block.title}</h2>}
-            {block.body && <WikiMarkdown text={block.body} encounters={siblings} onOpenEncounter={noop} />}
-          </section>
-        ) : null,
-      )}
+      {/* The encounter body, in the GM's own order (prose, creatures, skill checks,
+          treasure pools with their gated loot, coin, XP, rewards). */}
+      {items.map(renderItem)}
 
       {enc.notes && (
         <section className="print-section">
           <h2>GM Notes</h2>
           <p className="print-notes">{enc.notes}</p>
-        </section>
-      )}
-
-      {coins.length > 0 && (
-        <section className="print-section">
-          <h2>Coin</h2>
-          <p>{coins.map(([c, n]) => `${n} ${c}`).join(' · ')}</p>
-        </section>
-      )}
-
-      {monsters.length > 0 && (
-        <section className="print-section">
-          <h2>Monsters</h2>
-          {monsters.map((m, i) => {
-            const gid = gameIdOf(m)
-            if (!gid) return null
-            const hdr = creatureHeader(budget.entryOf ? budget.entryOf(gid) : null, m)
-            const count = m.count || 1
-            const name = m.nickname || (budget.entryOf && budget.entryOf(gid)?.name) || m.ref?.json?.name || gid
-            return (
-              <div className="print-entry" data-testid="print-monster" key={m._key || i}>
-                <h3 className="print-entry-head">
-                  {name}{count > 1 ? ` (${count})` : ''}
-                  {hdr.level != null && <span className="print-entry-level"> — CREATURE {hdr.level}</span>}
-                </h3>
-                <MonsterView monster={m} onChange={noop} disabled />
-              </div>
-            )
-          })}
-        </section>
-      )}
-
-      {hazards.length > 0 && (
-        <section className="print-section">
-          <h2>Hazards</h2>
-          {hazards.map((h, i) => {
-            const gid = gameIdOf(h)
-            if (!gid) return null
-            const level = hazardLevel(gid, budget.entryOf)
-            const count = h.count || 1
-            const name = h.nickname || (budget.entryOf && budget.entryOf(gid)?.name) || gid
-            return (
-              <div className="print-entry" data-testid="print-hazard" key={h._key || i}>
-                <h3 className="print-entry-head">
-                  {name}{count > 1 ? ` (${count})` : ''}
-                  {level != null && <span className="print-entry-level"> — HAZARD {level}</span>}
-                </h3>
-                <HazardView gameId={gid} />
-              </div>
-            )
-          })}
-        </section>
-      )}
-
-      {afflictions.length > 0 && (
-        <section className="print-section">
-          <h2>Afflictions</h2>
-          {afflictions.map((a, i) => {
-            const gid = gameIdOf(a)
-            if (!gid) return null
-            const label = afflictionLabel(gid, budget.entryOf)
-            const count = a.count || 1
-            const name = (budget.entryOf && budget.entryOf(gid)?.name) || gid
-            return (
-              <div className="print-entry" data-testid="print-affliction" key={a._key || i}>
-                <h3 className="print-entry-head">
-                  {name}{count > 1 ? ` (${count})` : ''}
-                  {label && <span className="print-entry-level"> — {label}</span>}
-                </h3>
-                <AfflictionView gameId={gid} />
-              </div>
-            )
-          })}
-        </section>
-      )}
-
-      {treasure.length > 0 && (
-        <section className="print-section">
-          <h2>Treasure</h2>
-          <ul className="print-treasure">
-            {treasure.map((t, i) => (
-              <li data-testid="print-treasure-item" key={t._key || i}>
-                {(t.qty || 1) > 1 ? `${t.qty} × ` : ''}{treasureName(t, budget.entryOf)}
-                {t.masked ? ` (masked: ${t.mask_label || 'Unidentified Item'})` : ''}
-                {t.state && t.state !== 'intact' ? ` — ${t.state}` : ''}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {awards.length > 0 && (
-        <section className="print-section">
-          <h2>XP Awards</h2>
-          <ul>
-            {awards.map((a, i) => (
-              <li key={a._key || i}>{a.amount || 0} XP — {a.reason || ''}</li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {rewards.length > 0 && (
-        <section className="print-section">
-          <h2>Rewards</h2>
-          {rewards.map((r, i) => (
-            <div className="print-reward" key={r._key || i}>
-              <h3 className="print-entry-head">{REWARD_KIND_LABELS[r.kind] || r.kind}: {r.label || ''}</h3>
-              {r.description && <WikiMarkdown text={r.description} encounters={siblings} onOpenEncounter={noop} />}
-            </div>
-          ))}
-        </section>
-      )}
-
-      {skillChecks.length > 0 && (
-        <section className="print-section">
-          <h2>Skill Checks</h2>
-          {skillChecks.map((s, i) => (
-            <div className="print-skill-check" key={s._key || i}>
-              <h3 className="print-entry-head">{skillCheckLabel(s)}</h3>
-              {s.description && <WikiMarkdown text={s.description} encounters={siblings} onOpenEncounter={noop} />}
-              {s.outcomes && SKILL_CHECK_DEGREES.some((d) => (s.outcomes[d] || '').trim()) && (
-                <ul className="print-outcomes">
-                  {SKILL_CHECK_DEGREES.filter((d) => (s.outcomes[d] || '').trim()).map((d) => (
-                    <li key={d}><strong>{SKILL_CHECK_DEGREE_LABELS[d]}</strong> {s.outcomes[d]}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
         </section>
       )}
 
