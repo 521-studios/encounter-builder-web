@@ -132,3 +132,28 @@ test('EncounterPrintSheet omits entity sections entirely when empty (no lazy sta
   assert.equal(screen.queryByTestId('print-hazard'), null)
   assert.equal(screen.queryByTestId('print-affliction'), null)
 })
+
+test('EncounterPrintSheet prints content prose (markdown + box_text) in order; box_text is boxed (3zbl)', () => {
+  const enc = {
+    ...baseEnc,
+    description: '', // migrated: legacy description cleared — must NOT be the source
+    content: [
+      { id: 'b1', type: 'box_text', markdown: { title: '', body: 'The reeds whisper as you enter.' } },
+      { id: 'b2', type: 'markdown', markdown: { title: 'Tactics', body: 'The mitflits ambush from the water.' } },
+    ],
+  }
+  render(<EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
+  const blocks = screen.getAllByTestId('print-block')
+  assert.equal(blocks.length, 2)
+  assert.match(blocks[0].textContent, /The reeds whisper/) // box_text first, in list order
+  assert.ok(blocks[0].className.includes('print-boxtext')) // read-aloud is boxed
+  assert.match(blocks[1].textContent, /Tactics/)
+  assert.match(blocks[1].textContent, /mitflits ambush/)
+  assert.ok(!blocks[1].className.includes('print-boxtext')) // plain markdown is not boxed
+})
+
+test('EncounterPrintSheet falls back to legacy description for an un-migrated encounter (3zbl)', () => {
+  const enc = { ...baseEnc, description: 'An old single-body encounter.' } // no content array
+  render(<EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
+  assert.match(document.body.textContent, /An old single-body encounter\./)
+})

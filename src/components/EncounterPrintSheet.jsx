@@ -18,6 +18,7 @@ import {
   contentCurrency,
   contentXPAwards,
   contentRewards,
+  contentTextBlocks,
 } from '../model.js'
 import { BAND_LABELS } from '../pf2eRules.js'
 import { creatureHeader } from '../creatureHeader.js'
@@ -72,6 +73,7 @@ function afflictionLabel(gid, entryOf) {
 }
 
 export default function EncounterPrintSheet({ enc, budget, effectiveParty, siblings = [], onClose }) {
+  const textBlocks = contentTextBlocks(enc)
   const monsters = contentMonsters(enc)
   const hazards = contentHazards(enc)
   const afflictions = contentAfflictions(enc)
@@ -114,10 +116,16 @@ export default function EncounterPrintSheet({ enc, budget, effectiveParty, sibli
         </p>
       </header>
 
-      {enc.description && (
-        <section className="print-section">
-          <WikiMarkdown text={enc.description} encounters={siblings} onOpenEncounter={noop} />
-        </section>
+      {/* Prose: the content markdown + box_text blocks in list order (the post-ugom
+          home of the read-aloud/description text; enc.description is cleared on save).
+          A box_text block prints as a bordered read-aloud call-out. */}
+      {textBlocks.map(({ block, box }, i) =>
+        block.title || block.body ? (
+          <section className={`print-section${box ? ' print-boxtext' : ''}`} key={i} data-testid="print-block">
+            {block.title && <h2 className="print-block-title">{block.title}</h2>}
+            {block.body && <WikiMarkdown text={block.body} encounters={siblings} onOpenEncounter={noop} />}
+          </section>
+        ) : null,
       )}
 
       {enc.notes && (
