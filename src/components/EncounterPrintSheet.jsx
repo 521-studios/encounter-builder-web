@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { formatGp } from '@521studios/pfsrd2-display'
 import {
@@ -73,7 +74,9 @@ export default function EncounterPrintSheet({ enc, budget, effectiveParty, sibli
   // instead of regrouping into fixed category sections and dropping the pool/gate
   // structure. `keyed()` always populates enc.content; `?? migrateContent` only fires
   // for a raw/legacy encounter (content absent), never for a migrated-but-empty one.
-  const items = enc.content ?? migrateContent(enc)
+  // Memoized on enc: the fallback mints fresh UUIDs, so recomputing every render would
+  // give unstable keys and remount the lazy stat-block views on each editor re-render.
+  const items = useMemo(() => enc.content ?? migrateContent(enc), [enc])
   const entryOf = budget.entryOf
   const exitTargetName = (id) => {
     const t = siblings.find((s) => String(s.id) === String(id))

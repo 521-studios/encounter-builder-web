@@ -186,6 +186,45 @@ test('EncounterPrintSheet prints a treasure-pool header + its discovery gate, th
   assert.match(screen.getByTestId('print-coin').textContent, /12 gp/)
 })
 
+test('EncounterPrintSheet pool header variants: name-only (no gate span), skill-only + dc-only gates', () => {
+  const enc = {
+    ...baseEnc,
+    content: [
+      { id: 'p1', type: 'pool', pool: { name: 'the shelf', gate: null } },       // name only
+      { id: 'p2', type: 'pool', pool: { name: 'the vault', gate: { skill: 'Perception', dc: 0 } } }, // skill, no DC
+      { id: 'p3', type: 'pool', pool: { name: '', gate: { skill: '', dc: 20 } } },// DC only, no name
+    ],
+  }
+  render(<EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
+  const pools = screen.getAllByTestId('print-pool')
+  assert.equal(pools.length, 3)
+  assert.match(pools[0].textContent, /the shelf/)
+  assert.equal(pools[0].querySelector('.print-pool-gate'), null) // no gate → no gate span
+  assert.match(pools[1].textContent, /the vault — 🔒 Perception/) // skill shown, no " DC"
+  assert.doesNotMatch(pools[1].textContent, /DC/)
+  assert.match(pools[2].textContent, /🔒 Skill DC 20/) // dc-only → skill placeholder + DC
+})
+
+test('EncounterPrintSheet skips blank in-progress rows (renders nothing for them)', () => {
+  const enc = {
+    ...baseEnc,
+    content: [
+      { id: 'm', type: 'monster', monster: {} },                 // no ref
+      { id: 't', type: 'treasure', treasure: {} },               // no item
+      { id: 's', type: 'skill_check', skill_check: {} },         // no skill/dc
+      { id: 'p', type: 'pool', pool: { name: '', gate: null } }, // bare default pool
+      { id: 'x', type: 'xp_award', xp_award: { amount: 0 } },    // no amount
+      { id: 'r', type: 'reward', reward: { kind: 'information', label: '' } }, // no label/desc
+    ],
+  }
+  render(<EncounterPrintSheet enc={enc} budget={budget} effectiveParty={effectiveParty} onClose={noop} />)
+  assert.equal(screen.queryByTestId('print-monster'), null)
+  assert.equal(screen.queryByTestId('print-treasure-item'), null)
+  assert.equal(screen.queryByTestId('print-skill-check'), null)
+  assert.equal(screen.queryByTestId('print-pool'), null)
+  assert.equal(screen.queryByTestId('print-reward'), null)
+})
+
 test('EncounterPrintSheet renders content in the GM’s list order (not regrouped by category)', () => {
   const enc = {
     ...baseEnc,

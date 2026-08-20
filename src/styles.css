@@ -699,9 +699,13 @@ button.chapter-name:hover { color: var(--gold); }
 .print-sheet .print-pool { margin: 0.6rem 0 0.1rem; }
 .print-sheet .print-pool-head { color: #5e0000; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid #c9a54a; padding-bottom: 0.15rem; margin: 0.3rem 0 0.3rem; }
 .print-sheet .print-pool-gate { font-weight: normal; text-transform: none; letter-spacing: 0; color: #333; }
+/* Loot/grant lines share one indent so a pool's finds (and anything the GM placed
+   under a pool header) read as one grouped block — the indent is the only connector
+   on a B&W handout, so it must be consistent, not just on treasure/coin. */
 .print-sheet .print-treasure-line { padding: 0.05rem 0 0.05rem 0.6rem; }
 .print-sheet .print-coin { padding-left: 0.6rem; margin: 0.15rem 0; }
-.print-sheet .print-xp { margin: 0.15rem 0; }
+.print-sheet .print-xp { padding-left: 0.6rem; margin: 0.15rem 0; }
+.print-sheet .print-reward { padding-left: 0.6rem; }
 .print-sheet .print-entry-level {
   color: #5e0000;
   font-size: 0.8rem;
