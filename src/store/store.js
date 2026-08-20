@@ -31,7 +31,12 @@ const apiBackend = {
     create: (cid, input, opts = {}) => request('POST', encBase(cid), { body: input, ...opts }),
     update: (cid, id, input, opts = {}) => request('PUT', `${encBase(cid)}/${enc(id)}`, { body: input, ...opts }),
     remove: (cid, id, opts = {}) => request('DELETE', `${encBase(cid)}/${enc(id)}`, opts),
-    release: (cid, id, opts = {}) => request('POST', `${encBase(cid)}/${enc(id)}/release`, opts),
+    release: (cid, id, opts = {}) => {
+      // force=true releases past the draft→done completeness gate (rvd4); the API
+      // reads it off the query string, not the body.
+      const { force, ...rest } = opts
+      return request('POST', `${encBase(cid)}/${enc(id)}/release${force ? '?force=true' : ''}`, rest)
+    },
   },
   chapters: {
     list: (cid, opts = {}) => request('GET', chBase(cid), opts),
