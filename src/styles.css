@@ -310,10 +310,11 @@ button.encounter { flex: 1; text-align: left; }
 /* Header budget chip (difficulty band + treasure target); click toggles the table. */
 .budget-chip { font: inherit; font-size: 0.85rem; padding: 0.15rem 0.5rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--card); color: var(--fg); cursor: pointer; white-space: nowrap; }
 .budget-chip:hover { border-color: var(--accent); }
-/* Low/on/high flag beside the actual treasure value: under target draws attention
-   (red), over is generous (gold), on-budget is unremarkable (muted). */
+/* Low/on/high flag beside the actual treasure value. Under-budget is a normal
+   building state, not an error — it gets attention-orange (--accent), NOT the app's
+   error red; over is generous (gold); on-budget is unremarkable (muted). */
 .budget-flag { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600; }
-.budget-flag--low { color: var(--danger); }
+.budget-flag--low { color: var(--accent); }
 .budget-flag--high { color: var(--gold); }
 .budget-flag--on { color: var(--muted); }
 

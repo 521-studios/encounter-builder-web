@@ -293,12 +293,15 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
             onClick={() => setShowBudget((s) => !s)}
           >
             Treasure:{' '}
-            {budget.cp === 0 && treasureTargetGp == null && !treasureIncomplete ? (
+            {budget.cp === 0 && !treasureIncomplete ? (
+              // No loot added yet (or an intentionally empty room): show a neutral dash,
+              // NOT "0 gp low" — under-budget is the normal top-down building state, and
+              // the click-through table still spells out the shortfall.
               '—'
             ) : (
               <>
                 <span data-testid="treasure-actual">{formatGp(budget.cp)}</span>
-                {treasureStand.floor ? ' (floor)' : ''}
+                {treasureStand.floor && budget.cp > 0 ? ' (floor)' : ''}
                 {treasureStand.verdict && (
                   <span className={`budget-flag budget-flag--${treasureStand.verdict}`} data-testid="treasure-flag">
                     {' '}
