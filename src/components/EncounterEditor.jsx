@@ -45,6 +45,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [error, setError] = useState(null)
   const [releasing, setReleasing] = useState(false)
   const [releaseGaps, setReleaseGaps] = useState(null) // rvd4: unfinished items blocking release, or null
+  const gapsRef = useRef(null) // the gaps panel — focused when it appears so keyboard/SR users land on it
   const [printing, setPrinting] = useState(false) // full-screen print/PDF sheet overlay
   // The save indicator now reflects the store's flush layer (rtd8b): edits are
   // written to the store optimistically and it owns the debounced backend write.
@@ -122,6 +123,12 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
       encounters.flush(campaignId, encounterId)
     }
   }, [campaignId, encounterId])
+
+  // Move focus to the release-gaps panel when it appears so keyboard/screen-reader
+  // users land on the to-do list (it precedes the release button in the DOM).
+  useEffect(() => {
+    if (releaseGaps) gapsRef.current?.focus()
+  }, [releaseGaps])
 
   // Effective party (own override → chapter → campaign → app default) and the
   // shared treasure/difficulty budget. Computed before the early returns to
@@ -236,17 +243,21 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   }
 
   // Jump the GM to an unfinished item: switch to the Encounter tab, scroll it into
-  // view, and flash it. The tab may need a frame to render, hence the short defer.
+  // view, and flash it. Switching tabs may need a render+paint before the row exists,
+  // so wait two animation frames (after React commits + paints) rather than guess a
+  // timeout — and no-op safely if the row still isn't there.
   function jumpToGap(itemId) {
     setTab('encounter')
-    setTimeout(() => {
-      const el = document.getElementById(`content-item-${itemId}`)
-      if (!el) return
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.classList.remove('content-flash')
-      void el.offsetWidth // restart the animation if it's already flashed
-      el.classList.add('content-flash')
-    }, 60)
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`content-item-${itemId}`)
+        if (!el) return
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.remove('content-flash')
+        void el.offsetWidth // restart the animation if it's already flashed
+        el.classList.add('content-flash')
+      }),
+    )
   }
 
   const saveLabel = { saving: 'Saving…', unsaved: 'Unsaved changes…', error: 'Save failed', saved: 'Saved' }[saveState]
@@ -347,7 +358,14 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         {error && <p className="error" role="alert">{error}</p>}
 
         {releaseGaps && (
-          <div className="release-gaps" role="alert" data-testid="release-gaps">
+          <div
+            className="release-gaps"
+            role="group"
+            aria-label="Unfinished items blocking release"
+            tabIndex={-1}
+            ref={gapsRef}
+            data-testid="release-gaps"
+          >
             <p className="release-gaps-head">
               This encounter has unfinished items — finish them, or release anyway.
             </p>
@@ -363,11 +381,13 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               ))}
             </ul>
             <div className="release-gaps-actions">
-              <button type="button" onClick={() => release(true)} disabled={releasing}>
-                Release anyway
-              </button>
-              <button type="button" className="link" onClick={() => setReleaseGaps(null)}>
+              {/* Fixing is the primary path (boxed); the override stays discoverable
+                  but subordinate (link). */}
+              <button type="button" onClick={() => setReleaseGaps(null)}>
                 Keep editing
+              </button>
+              <button type="button" className="link" onClick={() => release(true)} disabled={releasing}>
+                Release anyway
               </button>
             </div>
           </div>
