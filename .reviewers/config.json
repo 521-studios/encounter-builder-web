@@ -14,6 +14,10 @@
     "terraform-reviewer": {
       "overlaps_with": "code-reviewer",
       "reason": "CLAUDE.md says this repo SHALL NOT own CloudFront/DNS; terraform-reviewer owns that layering rule and code-reviewer defers to it."
+    },
+    "silent-failure-hunter": {
+      "overlaps_with": "code-reviewer",
+      "reason": "code-reviewer's null/undefined handling overlaps swallowed-error checks; silent-failure-hunter owns error paths and fallbacks and code-reviewer defers to it."
     }
   }
 }
