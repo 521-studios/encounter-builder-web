@@ -58,7 +58,7 @@ Issues in files NOT in the diff are out of scope.
 - General quality concerns (test coverage, vague security) unless CLAUDE.md mandates them — those are test-coverage-reviewer's and silent-failure-hunter's domain
 - Issues silenced with a comment (`// lint-ignore: X`) where the rationale is sound
 - "Violates the spirit of CLAUDE.md" findings without a quotable rule
-- Defects a specialist reviewer owns: swallowed errors and fallbacks (silent-failure-hunter), UX laws (ux-guidelines-reviewer). Leave those to them
+- Swallowed errors and fallbacks: silent-failure-hunter owns those
 - CLAUDE.md rules a specialist owns: layering / "SHALL NOT own CloudFront/DNS" (terraform-reviewer), missing tests (test-coverage-reviewer), prop threading (prop-coupling-reviewer), UX laws (ux-guidelines-reviewer)
 
 **When flagging, suggest:**
