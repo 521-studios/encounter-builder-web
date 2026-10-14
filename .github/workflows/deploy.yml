@@ -36,7 +36,7 @@ jobs:
       SITE_DOMAIN: encounters.staging.521studios.com
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -101,7 +101,7 @@ jobs:
       SITE_DOMAIN: encounters.521studios.com
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Require main branch for production
         if: github.ref != 'refs/heads/main'
