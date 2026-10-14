@@ -60,7 +60,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: encounter-builder-web-deploy-staging
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
@@ -131,7 +131,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: encounter-builder-web-deploy-production
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
