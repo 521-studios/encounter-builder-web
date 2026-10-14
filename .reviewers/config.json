@@ -1,0 +1,23 @@
+{
+  "bots": {
+    "gemini": false
+  },
+  "overlap_acknowledged": {
+    "prop-coupling-reviewer": {
+      "overlaps_with": "code-reviewer",
+      "reason": "code-reviewer can quote CLAUDE.md; prop-coupling-reviewer owns this app's module-singleton auth/API pattern and its exemptions."
+    },
+    "test-coverage-reviewer": {
+      "overlaps_with": "code-reviewer",
+      "reason": "test-coverage-reviewer owns missing tests; code-reviewer defers to it."
+    },
+    "terraform-reviewer": {
+      "overlaps_with": "code-reviewer",
+      "reason": "CLAUDE.md says this repo SHALL NOT own CloudFront/DNS; terraform-reviewer owns that layering rule and code-reviewer defers to it."
+    },
+    "silent-failure-hunter": {
+      "overlaps_with": "code-reviewer",
+      "reason": "code-reviewer's null/undefined handling overlaps swallowed-error checks; silent-failure-hunter owns error paths and fallbacks and code-reviewer defers to it."
+    }
+  }
+}
