@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { settings as settingsApi } from '../api/settings.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { encounters as encountersApi } from '../api/encounters.js'
@@ -171,16 +171,24 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
   // Persist the map: the GM's hand-arranged layout and/or the image's rotate/scale.
   // Round-trips name + party (party is full-replace, so omitting it would clear the
   // override).
+  // saveMap reads the LATEST state, not its render's closure: its callers can be
+  // stale by the time they fire (a map upload resolves seconds later, the drag
+  // flush runs on unmount), and a full-replace PUT built from a stale closure would
+  // revert name/party edits made in between.
+  const latest = useRef(null)
+  latest.current = { value, mapPositions, mapImage }
   function saveMap(patch) {
-    const name = value.name.trim() || chapter.name
+    const cur = latest.current
+    const name = cur.value.name.trim() || chapter.name
     if (!name) return
-    const { map_positions, map_image } = mergeMapPatch(patch, mapPositions, mapImage)
+    const { map_positions, map_image } = mergeMapPatch(patch, cur.mapPositions, cur.mapImage)
+    latest.current = { ...cur, mapPositions: map_positions, mapImage: map_image } // a second save this tick builds on this one
     setMapPositions(map_positions) // reflect locally so a map remount seeds off the fresh layout
     setMapImage(map_image)
     chaptersApi.edit(
       campaignId,
       chapter.id,
-      { name, order: chapter.order, ...partyFields(value), ...mapSaveFields(map_positions, map_image) },
+      { name, order: chapter.order, ...partyFields(cur.value), ...mapSaveFields(map_positions, map_image) },
       {
         onSaved: (updated) => onSaved && onSaved(updated),
         onError: () => onSaveError && onSaveError(`chapter “${name}” map`, chapter.id),

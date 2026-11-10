@@ -247,3 +247,32 @@ test('ChapterDetail: the upload control is disabled and announces progress while
     delete globalThis.createImageBitmap
   }
 })
+
+// An edit made while the upload is in flight must survive the image save.
+test('ChapterDetail: a party edit during an upload is not reverted by the image save', async () => {
+  setAnon(false)
+  const puts = []
+  let release
+  const gate = new Promise((r) => { release = r })
+  const base = mapTabFetch(puts)
+  globalThis.fetch = async (url, init) => (String(url).endsWith('/map-image/upload-url') ? (await gate, base(url, init)) : base(url, init))
+  globalThis.createImageBitmap = async () => ({ width: 10, height: 10, close() {} })
+  try {
+    render(<ChapterDetail campaignId="c1" chapter={chapter} onClose={() => {}} onOpenEncounter={() => {}} />)
+    await screen.findByRole('tablist')
+    fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
+    fireEvent.change(screen.getByLabelText(/Upload map image/), { target: { files: [new File(['x'], 'm.png', { type: 'image/png' })] } })
+    await screen.findByRole('status')
+    fireEvent.click(screen.getByRole('tab', { name: 'Config' }))
+    fireEvent.change(screen.getByLabelText('party level'), { target: { value: '7' } })
+    release()
+    await screen.findByRole('tab', { name: 'Map' })
+    await new Promise((r) => setTimeout(r, 0))
+    await store.chapters.flush('c1', 'ch1')
+    const last = puts.at(-1)
+    assert.equal(last.map_image?.key, 'maps/c1/ch1/new.png')
+    assert.equal(last.party_level, 7)
+  } finally {
+    delete globalThis.createImageBitmap
+  }
+})
