@@ -60,11 +60,15 @@ test('ChapterMap: no map image → no image toggle', () => {
   assert.equal(screen.queryByRole('button', { name: /map image/ }), null)
 })
 
-test('ChapterMap: a map image shows the canvas + a hide/show toggle, even with no exits', () => {
+test('ChapterMap: a map image renders behind the graph (even with no exits) and the toggle hides/shows it', () => {
   render(<ChapterMap encounters={[{ id: 1, name: 'Lone', exits: [] }]} onOpenEncounter={() => {}} mapImage={mapImage} />)
   assert.ok(screen.getByTestId('map-canvas'))
-  const toggle = screen.getByRole('button', { name: 'Hide map image' })
-  assert.equal(toggle.getAttribute('aria-pressed'), 'true')
-  fireEvent.click(toggle)
-  assert.equal(screen.getByRole('button', { name: 'Show map image' }).getAttribute('aria-pressed'), 'false')
+  const img = screen.getByAltText('Chapter map')
+  assert.equal(img.getAttribute('src'), mapImage.url)
+  assert.equal(img.getAttribute('width'), '800')
+  assert.equal(img.getAttribute('height'), '600')
+  fireEvent.click(screen.getByRole('button', { name: 'Hide map image' }))
+  assert.equal(screen.queryByAltText('Chapter map'), null)
+  fireEvent.click(screen.getByRole('button', { name: 'Show map image' }))
+  assert.ok(screen.getByAltText('Chapter map'))
 })

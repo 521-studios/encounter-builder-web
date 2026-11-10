@@ -207,7 +207,7 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
               </ReactFlow>
             </div>
             {imageNode && (
-              <button type="button" className="link" aria-pressed={showImage} onClick={() => setShowImage((v) => !v)}>
+              <button type="button" className="link" onClick={() => setShowImage((v) => !v)}>
                 {showImage ? 'Hide map image' : 'Show map image'}
               </button>
             )}
