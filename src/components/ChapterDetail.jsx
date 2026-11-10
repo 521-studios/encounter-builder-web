@@ -50,8 +50,8 @@ const CHAPTER_TABS = [
 // fields, so every save round-trips them via the shared clear-encoding. The body is
 // tabbed (Config / Summary / Map); the rollup hook runs unconditionally so its tab
 // shows fresh numbers regardless of which tab is active.
-export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted, onSaveError, onOpenEncounter }) {
-  const [tab, setTab] = useState('config')
+export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted, onSaveError, onOpenEncounter, initialTab = 'config' }) {
+  const [tab, setTab] = useState(initialTab)
   const [value, setValue] = useState({
     name: chapter.name || '',
     party_level: chapter.party_level ?? null,

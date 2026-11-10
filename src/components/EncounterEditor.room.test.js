@@ -81,3 +81,26 @@ test('EncounterEditor: a room image upload that lands after an edit keeps the ed
     globalThis.createImageBitmap = realBitmap
   }
 })
+
+test('EncounterEditor: the Room tab links to connected rooms and out to its chapter (muz0.8)', async () => {
+  setAnon(false)
+  const me = { ...enc, exits: [{ to_encounter_id: 'e2', label: 'door' }] }
+  const siblings = [me, { id: 'e2', name: 'A2', exits: [] }, { id: 'e3', name: 'A3', exits: [{ to_encounter_id: 'e1', label: 'stairs' }] }]
+  globalThis.fetch = async (url) => {
+    const u = String(url)
+    if (u.endsWith('/encounters/e1')) return res(me)
+    if (u.endsWith('/encounters')) return res(siblings)
+    if (u.endsWith('/chapters')) return res(chapters)
+    if (u.endsWith('/settings')) return res({ party_level: 1, party_size: 4 })
+    return res({})
+  }
+  const opened = []
+  const openedChapters = []
+  render(<EncounterEditor campaignId="c1" encounterId="e1" onClose={() => {}} onOpenEncounter={(id) => opened.push(id)} onOpenChapter={(ch) => openedChapters.push(ch.id)} />)
+  fireEvent.click(await screen.findByRole('tab', { name: 'Room' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'A2 (door)' }))
+  fireEvent.click(screen.getByRole('button', { name: 'A3 (stairs)' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Open chapter map' }))
+  assert.deepEqual(opened, ['e2', 'e3'])
+  assert.deepEqual(openedChapters, ['ch2'])
+})

@@ -9,6 +9,7 @@ import {
   emptyAffliction,
   emptyTreasure,
   toEncounterInput,
+  roomNeighbours,
   encounterBlocks,
   reindexEditingAfterRemove,
   migrateChallenges,
@@ -807,4 +808,26 @@ test('toEncounterInput: room view fields go out in write shape, null when unset 
   const unset = toEncounterInput({ name: 'A' })
   assert.equal(unset.map_region, null)
   assert.equal(unset.map_image, null)
+})
+
+test('roomNeighbours: own linked exits first, then rooms that lead here; deduped, deleted skipped (muz0.8)', () => {
+  const siblings = [
+    { id: 'a', name: 'A1', exits: [{ to_encounter_id: 'me', label: 'stairs' }] },
+    { id: 'b', name: 'A2', exits: [{ to_encounter_id: 'me', label: 'back door' }] },
+    { id: 'c', name: '', exits: [] },
+    { id: 'me', name: 'Me', exits: [] },
+  ]
+  const exits = [
+    { to_encounter_id: 'c', label: 'hall' },
+    { to_encounter_id: 'gone', label: 'deleted' },
+    { to_encounter_id: '', label: 'Exterior' },
+    { to_encounter_id: 'a', label: 'up' },
+    { to_encounter_id: 'c', label: 'second door' },
+  ]
+  assert.deepEqual(roomNeighbours('me', exits, siblings), [
+    { id: 'c', name: 'Untitled', label: 'hall' },
+    { id: 'a', name: 'A1', label: 'up' },
+    { id: 'b', name: 'A2', label: 'back door' },
+  ])
+  assert.deepEqual(roomNeighbours('me', [], []), [])
 })
