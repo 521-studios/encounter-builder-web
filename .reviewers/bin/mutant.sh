@@ -27,12 +27,16 @@ for p in "$f" "$@"; do
 done
 run() {
   systemd-run --user --scope -q -p MemoryMax=2G -p MemorySwapMax=0 \
-    timeout 120 node --import ./test/support/setup-dom.mjs --test --test-concurrency=1 "$@" >/dev/null 2>&1
+    timeout 120 node --import ./test/support/setup-dom.mjs --test --test-concurrency=1 "$@" >"$tmp/out" 2>&1
 }
 # A failing baseline (broken tests, or systemd-run itself failing) would read as KILLED.
 run "$@" || { echo "BROKEN (exit $?): the unmutated tests fail, so no mutant can be judged"; exit 2; }
+# Zero tests, or all skipped, also pass and would read as SURVIVED. An empty file
+# shows as one passing "test" named after its path, so require a real one.
+grep -E '^ *✔ ' "$tmp/out" | grep -qvE '^ *✔ [^ ]+\.test\.js \(' ||
+  { echo "BROKEN: the unmutated tests pass no real test, so no mutant can be judged"; exit 2; }
 cp "$f" "$tmp/orig"
-sed -i "$expr" "$f"
+sed --sandbox -i "$expr" "$f"
 cmp -s "$f" "$tmp/orig" && { echo "NOOP: $expr matched nothing in $f"; exit 2; }
 if run "$@"
 then echo "SURVIVED: $expr"
