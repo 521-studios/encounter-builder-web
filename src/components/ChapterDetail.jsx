@@ -12,21 +12,63 @@ import { useRollup } from '../useRollup.js'
 import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
 import ChapterMap from './ChapterMap.jsx'
+import { isAnon } from '../api/anon.js'
+import { uploadMapImage, MAP_IMAGE_TYPES } from '../api/mapUpload.js'
 
 // The map fields of a chapter PUT. Both are touch-only-when-supplied on the API, and
 // every map save sends BOTH current values: the store keeps only the latest pending
-// record, so a positions save must not drop a pending image edit. map_image goes out
-// in its write shape only (the strict decoder rejects the GET-only `url`), and only
-// when the chapter has one.
+// record, so a positions save must not drop a pending image edit (or removal).
+// map_image goes out in its write shape only (the strict decoder rejects the
+// GET-only `url`), and as null when there's no image (the API's remove).
 // A map save patches one field; the other keeps its current (possibly pending) value.
+// `in`, not ??, so an explicit map_image: null (remove) isn't mistaken for "unpatched".
 export function mergeMapPatch(patch, map_positions, map_image) {
-  return { map_positions: patch.map_positions ?? map_positions, map_image: patch.map_image ?? map_image }
+  return {
+    map_positions: 'map_positions' in patch ? patch.map_positions : map_positions,
+    map_image: 'map_image' in patch ? patch.map_image : map_image,
+  }
 }
 
 export function mapSaveFields(map_positions, map_image) {
-  if (!map_image) return { map_positions }
+  if (!map_image) return { map_positions, map_image: null }
   const { key, width, height, rotation, scale } = map_image
   return { map_positions, map_image: { key, width, height, rotation, scale } }
+}
+
+// Upload, replace or remove the chapter's map image (muz0.5). The file goes straight
+// to S3 via a presigned POST; onChange receives the new map_image, or null to remove.
+function MapImageUpload({ campaignId, chapterId, mapImage, onChange }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  async function pick(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-picking the same file after an error
+    if (!file) return
+    setBusy(true)
+    setError('')
+    try {
+      onChange(await uploadMapImage(campaignId, chapterId, file))
+    } catch (err) {
+      setError(err.message || 'Map image upload failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="map-image-upload">
+      <label>
+        {mapImage ? 'Replace map image' : 'Upload map image'}{' '}
+        <input type="file" accept={MAP_IMAGE_TYPES.join(',')} disabled={busy} onChange={pick} />
+      </label>
+      {mapImage && (
+        <button type="button" className="link" disabled={busy} onClick={() => onChange(null)}>
+          Remove map image
+        </button>
+      )}
+      {busy && <span role="status">Uploading…</span>}
+      {error && <p className="error" role="alert">{error}</p>}
+    </div>
+  )
 }
 
 // The chapter detail's three tabs: Config (party override), Summary (treasure/XP
@@ -233,6 +275,10 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
 
       {tab === 'map' && (
         <div role="tabpanel" id="chpanel-map" aria-labelledby="chtab-map">
+          {/* Uploads need the API; the no-account (anon) builder has no bucket. */}
+          {!isAnon() && (
+            <MapImageUpload campaignId={campaignId} chapterId={chapter.id} mapImage={mapImage} onChange={(map_image) => saveMap({ map_image })} />
+          )}
           <ChapterMap
             encounters={chapterEncounters}
             onOpenEncounter={onOpenEncounter}
