@@ -22,7 +22,6 @@ const userManager = new UserManager({
   authority: config.authority, // discovery at ${authority}/.well-known/openid-configuration
   client_id: config.clientId,
   redirect_uri: redirectUri,
-  post_logout_redirect_uri: window.location.origin,
   response_type: 'code', // PKCE is applied automatically for the code flow
   scope: 'openid',
   automaticSilentRenew: true, // uses the refresh token (15-min access token)
@@ -54,7 +53,7 @@ export function completeLogin() {
 }
 
 // Local logout: clear the SPA session and return home. (RP-initiated logout at
-// the provider is a later slice — depends on Doorkeeper end_session support.)
+// the provider needs lets-roll end_session support, bead 2l4x.)
 export async function logout() {
   await userManager.removeUser()
   window.location.assign('/')
