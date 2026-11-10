@@ -183,7 +183,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
       { name, order: chapter.order, ...partyFields(value), ...mapSaveFields(map_positions, map_image) },
       {
         onSaved: (updated) => onSaved && onSaved(updated),
-        onError: () => onSaveError && onSaveError(`chapter “${name}” map layout`, chapter.id),
+        onError: () => onSaveError && onSaveError(`chapter “${name}” map`, chapter.id),
       },
     )
   }

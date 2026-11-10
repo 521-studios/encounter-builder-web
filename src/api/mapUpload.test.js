@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { uploadMapImage, MAP_IMAGE_MAX_BYTES } from './mapUpload.js'
+import { uploadMapImage, imageSize, MAP_IMAGE_MAX_BYTES } from './mapUpload.js'
 
 const file = (type = 'image/png', size = 10) => new File([new Uint8Array(size)], 'map.png', { type })
 
@@ -41,4 +41,28 @@ test('uploadMapImage: rejects wrong types and oversize files before any request'
 test('uploadMapImage: an S3 rejection is an error, not a map image', async () => {
   const { opts } = fakes({ s3Status: 403 })
   await assert.rejects(uploadMapImage('c1', 'ch1', file(), opts), /upload failed \(403\)/)
+})
+
+test('imageSize: reads the natural size and releases the bitmap', async () => {
+  let closed = false
+  globalThis.createImageBitmap = async () => ({ width: 640, height: 480, close: () => { closed = true } })
+  try {
+    assert.deepEqual(await imageSize(file()), { width: 640, height: 480 })
+    assert.equal(closed, true)
+  } finally {
+    delete globalThis.createImageBitmap
+  }
+})
+
+test('uploadMapImage: an undecodable file fails before any request', async () => {
+  const { calls, opts } = fakes()
+  opts.measure = async () => { throw new DOMException('bad image', 'InvalidStateError') }
+  await assert.rejects(uploadMapImage('c1', 'ch1', file(), opts), /Could not read that image file/)
+  assert.equal(calls.requests.length, 0)
+})
+
+test('uploadMapImage: a network failure on the S3 POST gets a readable error', async () => {
+  const { opts } = fakes()
+  opts.fetchImpl = async () => { throw new TypeError('Failed to fetch') }
+  await assert.rejects(uploadMapImage('c1', 'ch1', file(), opts), /network error/)
 })

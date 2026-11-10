@@ -19,13 +19,17 @@ export async function imageSize(file) {
 export async function uploadMapImage(campaignId, chapterId, file, { requestImpl = request, fetchImpl = fetch, measure = imageSize } = {}) {
   if (!MAP_IMAGE_TYPES.includes(file.type)) throw new Error('Map image must be a PNG, JPEG or WebP file.')
   if (file.size > MAP_IMAGE_MAX_BYTES) throw new Error('Map image must be 15 MB or smaller.')
-  const { width, height } = await measure(file)
+  const { width, height } = await measure(file).catch(() => {
+    throw new Error('Could not read that image file.')
+  })
   const path = `/api/app/campaigns/${encodeURIComponent(campaignId)}/chapters/${encodeURIComponent(chapterId)}/map-image/upload-url`
   const { key, url, fields } = await requestImpl('POST', path, { body: { content_type: file.type } })
   const form = new FormData()
   for (const [k, v] of Object.entries(fields)) form.append(k, v)
   form.append('file', file) // S3 requires the file to be the last field
-  const res = await fetchImpl(url, { method: 'POST', body: form })
+  const res = await fetchImpl(url, { method: 'POST', body: form }).catch(() => {
+    throw new Error('Map image upload failed (network error).') // fetch's own "Failed to fetch" says nothing
+  })
   if (!res.ok) throw new Error(`Map image upload failed (${res.status}).`)
   return { key, url: `/${key}`, width, height, rotation: 0, scale: 1 }
 }

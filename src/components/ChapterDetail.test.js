@@ -222,3 +222,28 @@ test('ChapterDetail: the no-account builder has no map upload', async () => {
   fireEvent.click(await screen.findByRole('tab', { name: 'Map' }))
   assert.equal(screen.queryByLabelText(/Upload map image/), null)
 })
+
+test('ChapterDetail: the upload control is disabled and announces progress while uploading', async () => {
+  setAnon(false)
+  const puts = []
+  let release
+  const gate = new Promise((r) => { release = r })
+  const base = mapTabFetch(puts)
+  globalThis.fetch = async (url, init) => (String(url).endsWith('/map-image/upload-url') ? (await gate, base(url, init)) : base(url, init))
+  globalThis.createImageBitmap = async () => ({ width: 10, height: 10, close() {} })
+  try {
+    render(<ChapterDetail campaignId="c1" chapter={chapter} onClose={() => {}} onOpenEncounter={() => {}} />)
+    await screen.findByRole('tablist')
+    fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
+    const input = screen.getByLabelText(/Upload map image/)
+    fireEvent.change(input, { target: { files: [new File(['x'], 'm.png', { type: 'image/png' })] } })
+    assert.match((await screen.findByRole('status')).textContent, /Uploading/)
+    assert.equal(input.disabled, true)
+    release()
+    const replace = await screen.findByLabelText(/Replace map image/)
+    assert.equal(replace.disabled, false)
+    assert.equal(screen.queryByRole('status'), null)
+  } finally {
+    delete globalThis.createImageBitmap
+  }
+})
