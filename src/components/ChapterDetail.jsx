@@ -18,6 +18,11 @@ import ChapterMap from './ChapterMap.jsx'
 // record, so a positions save must not drop a pending image edit. map_image goes out
 // in its write shape only (the strict decoder rejects the GET-only `url`), and only
 // when the chapter has one.
+// A map save patches one field; the other keeps its current (possibly pending) value.
+export function mergeMapPatch(patch, map_positions, map_image) {
+  return { map_positions: patch.map_positions ?? map_positions, map_image: patch.map_image ?? map_image }
+}
+
 export function mapSaveFields(map_positions, map_image) {
   if (!map_image) return { map_positions }
   const { key, width, height, rotation, scale } = map_image
@@ -127,8 +132,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
   function saveMap(patch) {
     const name = value.name.trim() || chapter.name
     if (!name) return
-    const map_positions = patch.map_positions ?? mapPositions
-    const map_image = patch.map_image ?? mapImage
+    const { map_positions, map_image } = mergeMapPatch(patch, mapPositions, mapImage)
     setMapPositions(map_positions) // reflect locally so a map remount seeds off the fresh layout
     setMapImage(map_image)
     chaptersApi.edit(
