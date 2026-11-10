@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, useReactFlow, EdgeLabelRenderer } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { buildChapterGraph, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, withBends, layoutSnapshot } from '../chapterGraph.js'
+import { buildChapterGraph, boundaryPoint, sideText, seedPositions, reseedBends, insertWaypoint, withBends, layoutSnapshot } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
 // 8hda: an INTERACTIVE node-link map of a chapter — pan (drag canvas), zoom (scroll),
@@ -239,13 +239,10 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
   const dirtyRef = useRef(false)
   const latestRef = useRef({ nodes: [], waypoints: {} })
 
-  // muz0.4: each edge's bend points, re-seeded when the graph structure changes. Once
-  // the GM has edited, the unsaved local bends win (the saved layout would resurrect a
-  // removed bend); gone edges are pruned either way.
+  // muz0.4: each edge's bend points, re-seeded when the graph structure changes.
   const [waypoints, setWaypoints] = useState({})
   useEffect(() => {
-    const source = dirtyRef.current ? latestRef.current.waypoints : positionsRef.current
-    setWaypoints(storedWaypoints(source, [...passages, ...exitEdges].map((e) => e.id)))
+    setWaypoints(reseedBends(dirtyRef.current, latestRef.current.waypoints, positionsRef.current, [...passages, ...exitEdges].map((e) => e.id)))
   }, [passages, exitEdges])
   const onWaypointsChange = useCallback((id, pts) => {
     dirtyRef.current = true

@@ -1,6 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, withBends, layoutSnapshot } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, withBends, reseedBends, layoutSnapshot } from './chapterGraph.js'
+
+test('reseedBends: saved layout until edited; after an edit a removed bend stays removed', () => {
+  const saved = { 'p:1|2': [{ x: 1, y: 1 }], 'p:2|3': [{ x: 2, y: 2 }] }
+  const local = { 'p:2|3': [{ x: 9, y: 9 }], 'p:gone|4': [{ x: 3, y: 3 }] } // p:1|2's bend removed this session
+  const ids = ['p:1|2', 'p:2|3']
+  assert.deepEqual(reseedBends(false, {}, saved, ids), saved)
+  assert.deepEqual(reseedBends(true, local, saved, ids), { 'p:2|3': [{ x: 9, y: 9 }] })
+})
 
 test('withBends: replaces one edge, drops it when emptied, never mutates the input', () => {
   const w = { 'p:1|2': [{ x: 1, y: 1 }], 'p:2|3': [{ x: 2, y: 2 }] }

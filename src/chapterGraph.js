@@ -143,6 +143,13 @@ export function insertWaypoint(from, wps, to, pt) {
   return [...wps.slice(0, best), pt, ...wps.slice(best)]
 }
 
+// The bends to re-seed with when the graph structure changes. Once the GM has edited
+// (dirty), the unsaved local bends win: the saved layout would resurrect a bend
+// removed this session. Gone edges are pruned either way.
+export function reseedBends(dirty, local, saved, edgeIds) {
+  return storedWaypoints(dirty ? local : saved, edgeIds)
+}
+
 // One edge's bends replaced (an empty list drops the edge's entry).
 export function withBends(waypoints, id, pts) {
   const next = { ...waypoints }
