@@ -4,6 +4,8 @@
 // `node --import ./test/support/setup-dom.mjs`. Pure-logic tests ignore all this.
 import { register } from 'node:module'
 import { JSDOM } from 'jsdom'
+import assert from 'node:assert/strict'
+import { inspect, isDeepStrictEqual } from 'node:util'
 
 register('./jsx-loader.mjs', import.meta.url)
 
@@ -49,3 +51,22 @@ if (typeof window.matchMedia !== 'function') {
 
 // React 18 wants this flag set to route state updates through act() cleanly.
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
+
+// A failing `assert.equal(screen.queryBy…(), null)` formats the React-rendered node
+// with a deep inspect, even when a message is given. The node drags in the whole fiber
+// graph, so the error grows past 2 GB in seconds, and a heap cap doesn't stop it (the
+// four 14 GB ares OOMs on 2026-11-10). When a DOM node is compared, decide pass/fail
+// here (the same strict check) and fail with short stand-ins instead.
+const short = (v) => (v instanceof window.Node ? (v.outerHTML ?? v.nodeName).slice(0, 200) : inspect(v, { depth: 2 }))
+for (const name of ['equal', 'notEqual', 'deepEqual', 'notDeepEqual', 'strictEqual', 'notStrictEqual', 'deepStrictEqual', 'notDeepStrictEqual']) {
+  const orig = assert[name]
+  const wrapped = function (actual, expected, message) {
+    if (!(actual instanceof window.Node || expected instanceof window.Node)) return orig.call(this, actual, expected, message)
+    const same = /deep/i.test(name) ? isDeepStrictEqual(actual, expected) : Object.is(actual, expected)
+    if (same === name.startsWith('not')) {
+      if (message instanceof Error) throw message
+      throw new assert.AssertionError({ actual: short(actual), expected: short(expected), operator: name, message, stackStartFn: wrapped })
+    }
+  }
+  assert[name] = wrapped
+}
