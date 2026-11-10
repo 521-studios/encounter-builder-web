@@ -38,7 +38,10 @@ npm install
 npm run dev     # http://localhost:5173 — auths against staging lets-roll,
                 # proxies /api to the staging edge (vite.config.js)
 npm test        # node --test — pure logic AND React component/hook tests (no Jest/Vitest;
-                # jsdom + @testing-library/react via test/support/setup-dom.mjs)
+                # jsdom + @testing-library/react via test/support/setup-dom.mjs).
+                # test/run.sh: one run per checkout (flock), 2 workers, 2 GB heap each
+npm test -- src/foo.test.js   # one file, same limits (prefer this to bare node --test)
+.reviewers/bin/mutant.sh <src> <sed-expr> <test>...  # one mutant: scratch copy, 2G scope, 120 s; OOM/timeout = killed
 npm run build   # dist/ (needs VITE_OIDC_AUTHORITY)
 ```
 
