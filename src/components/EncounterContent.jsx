@@ -88,7 +88,7 @@ export default function EncounterContent({
 
   return (
     <div className="challenge-list" data-testid="encounter-content">
-      {content.map((c) => (
+      {content.map((c, i) => (
         <div
           key={c.id}
           id={`content-item-${c.id}`}
@@ -110,8 +110,20 @@ export default function EncounterContent({
             <span
               className="drag-handle"
               draggable
-              aria-label="drag to reorder"
-              title="Drag to reorder"
+              role="button"
+              tabIndex={0}
+              aria-label="reorder: drag, or press up/down arrow"
+              aria-keyshortcuts="ArrowUp ArrowDown"
+              title="Drag, or focus and press ↑/↓, to reorder"
+              onKeyDown={(e) => {
+                if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return // leave browser/AT shortcuts alone
+                const to = content[e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : -1]
+                if (!to) return
+                e.preventDefault()
+                onReorder(c.id, to.id)
+                // The row's DOM node moves, which drops focus; put it back on this handle.
+                requestAnimationFrame(() => document.querySelector(`#content-item-${c.id} .drag-handle`)?.focus())
+              }}
               onDragStart={(e) => {
                 setDragId(c.id)
                 e.dataTransfer.effectAllowed = 'move'
