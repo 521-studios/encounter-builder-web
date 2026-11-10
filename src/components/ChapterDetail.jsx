@@ -13,7 +13,8 @@ import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
 import ChapterMap from './ChapterMap.jsx'
 import { isAnon } from '../api/anon.js'
-import { uploadMapImage, MAP_IMAGE_TYPES } from '../api/mapUpload.js'
+import { uploadMapImage } from '../api/mapUpload.js'
+import MapImageUpload from './MapImageUpload.jsx'
 
 // The map fields of a chapter PUT. Both are touch-only-when-supplied on the API, and
 // every map save sends BOTH current values: the store keeps only the latest pending
@@ -33,42 +34,6 @@ export function mapSaveFields(map_positions, map_image) {
   if (!map_image) return { map_positions, map_image: null }
   const { key, width, height, rotation, scale } = map_image
   return { map_positions, map_image: { key, width, height, rotation, scale } }
-}
-
-// Upload, replace or remove the chapter's map image (muz0.5). The file goes straight
-// to S3 via a presigned POST; onChange receives the new map_image, or null to remove.
-function MapImageUpload({ campaignId, chapterId, mapImage, onChange }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  async function pick(e) {
-    const file = e.target.files?.[0]
-    e.target.value = '' // allow re-picking the same file after an error
-    if (!file) return
-    setBusy(true)
-    setError('')
-    try {
-      onChange(await uploadMapImage(campaignId, chapterId, file))
-    } catch (err) {
-      setError(err.message || 'Map image upload failed.')
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <div className="map-image-upload">
-      <label>
-        {mapImage ? 'Replace map image' : 'Upload map image'}{' '}
-        <input type="file" accept={MAP_IMAGE_TYPES.join(',')} disabled={busy} onChange={pick} />
-      </label>
-      {mapImage && (
-        <button type="button" className="link" disabled={busy} onClick={() => onChange(null)}>
-          Remove map image
-        </button>
-      )}
-      {busy && <span role="status">Uploading…</span>}
-      {error && <p className="error" role="alert">{error}</p>}
-    </div>
-  )
 }
 
 // The chapter detail's three tabs: Config (party override), Summary (treasure/XP
@@ -285,7 +250,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
         <div role="tabpanel" id="chpanel-map" aria-labelledby="chtab-map">
           {/* Uploads need the API; the no-account (anon) builder has no bucket. */}
           {!isAnon() && (
-            <MapImageUpload campaignId={campaignId} chapterId={chapter.id} mapImage={mapImage} onChange={(map_image) => saveMap({ map_image })} />
+            <MapImageUpload upload={(file) => uploadMapImage(campaignId, chapter.id, file)} mapImage={mapImage} onChange={(map_image) => saveMap({ map_image })} />
           )}
           <ChapterMap
             encounters={chapterEncounters}

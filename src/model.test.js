@@ -799,3 +799,12 @@ test('clearSaveErrorOnSave is a no-op when there is no banner, no saved record, 
   assert.deepEqual(clearSaveErrorOnSave(err, {}), err) // saved has no id → can't match, keep banner
   assert.deepEqual(clearSaveErrorOnSave({ what: 'x' }, { id: 'e1' }), { what: 'x' }) // banner has no id
 })
+
+test('toEncounterInput: room view fields go out in write shape, null when unset (muz0.7)', () => {
+  const set = toEncounterInput({ name: 'A', map_region: { x: 1, y: 2, w: 3, h: 4, extra: 1 }, map_image: { key: 'maps/c/encounters/e/a.png', url: '/maps/c/encounters/e/a.png', width: 10, height: 20 } })
+  assert.deepEqual(set.map_region, { x: 1, y: 2, w: 3, h: 4 })
+  assert.deepEqual(set.map_image, { key: 'maps/c/encounters/e/a.png', width: 10, height: 20 }) // no url: the API's strict decoder rejects it
+  const unset = toEncounterInput({ name: 'A' })
+  assert.equal(unset.map_region, null)
+  assert.equal(unset.map_image, null)
+})
