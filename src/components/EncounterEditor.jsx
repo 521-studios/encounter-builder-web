@@ -179,8 +179,11 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   // copy into the store, which debounces the backend write. rtd8b's forward-
   // compatible seam — when the editor goes store-first, `patch` becomes edit()
   // over the store's record with no local enc.
+  // It merges into encRef, not this render's enc: an async caller (a room image
+  // upload resolving seconds later) would otherwise revert edits made meanwhile.
   const patch = (fields) => {
-    const next = { ...enc, ...fields }
+    const next = { ...encRef.current, ...fields }
+    encRef.current = next
     setEnc(next)
     encounters.edit(campaignId, encounterId, next, { onSaved: onFlushSaved, onError: onFlushError })
   }

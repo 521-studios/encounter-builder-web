@@ -2,8 +2,12 @@ import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import RoomView from './RoomView.jsx'
+import { setAnon } from '../api/anon.js'
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  setAnon(false)
+})
 
 const chapterImg = { key: 'maps/c/ch/a.png', url: '/maps/c/ch/a.png', width: 1000, height: 800, rotation: 0, scale: 1 }
 const chapter = { id: 'ch', map_image: chapterImg, map_positions: { e1: { x: 100, y: 200 } } }
@@ -51,4 +55,22 @@ test('RoomView: clear area sends null; released is read-only', () => {
   assert.deepEqual(calls, [{ map_region: null }])
   rerender(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={chapter} released onChange={() => {}} />)
   assert.equal(screen.queryByRole('button'), null)
+})
+
+test("RoomView: the crop draws the image at the chapter's rotation and scale", () => {
+  const turned = { ...chapter, map_image: { ...chapterImg, rotation: 90, scale: 0.5 } }
+  render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={turned} onChange={() => {}} />)
+  const image = screen.getByRole('img', { name: 'Room on the chapter map' }).querySelector('image')
+  assert.deepEqual([image.getAttribute('width'), image.getAttribute('height')], ['500', '400'])
+  assert.equal(image.getAttribute('transform'), 'rotate(90 250 200)')
+})
+
+test('RoomView: no room image upload in anonymous mode', () => {
+  render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={() => {}} />)
+  assert.ok(screen.getByLabelText(/Upload room image/))
+  cleanup()
+  setAnon(true)
+  render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={() => {}} />)
+  assert.equal(screen.queryByLabelText(/Upload room image/), null)
+  assert.ok(screen.getByRole('button', { name: 'Mark area on chapter map' })) // the area itself still works locally
 })

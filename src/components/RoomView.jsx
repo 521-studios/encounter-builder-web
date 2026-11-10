@@ -52,6 +52,10 @@ function AreaPicker({ img, region, card, onPick, onCancel }) {
           setCur(null)
           if (r) onPick(r)
         }}
+        onPointerCancel={() => {
+          setStart(null)
+          setCur(null)
+        }}
       >
         {card && <Box r={card} className="room-card-outline" />}
         {region && !drawn && <Box r={region} className="room-region" />}
