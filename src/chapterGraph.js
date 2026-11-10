@@ -143,6 +143,14 @@ export function insertWaypoint(from, wps, to, pt) {
   return [...wps.slice(0, best), pt, ...wps.slice(best)]
 }
 
+// One edge's bends replaced (an empty list drops the edge's entry).
+export function withBends(waypoints, id, pts) {
+  const next = { ...waypoints }
+  if (pts.length) next[id] = pts
+  else delete next[id]
+  return next
+}
+
 // The layout blob saved back as map_positions: every live node's {x, y} plus every
 // bent edge's waypoints, rounded to whole pixels.
 export function layoutSnapshot(nodes, waypoints) {

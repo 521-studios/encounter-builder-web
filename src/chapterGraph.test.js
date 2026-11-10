@@ -1,6 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, layoutSnapshot } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, withBends, layoutSnapshot } from './chapterGraph.js'
+
+test('withBends: replaces one edge, drops it when emptied, never mutates the input', () => {
+  const w = { 'p:1|2': [{ x: 1, y: 1 }], 'p:2|3': [{ x: 2, y: 2 }] }
+  const moved = withBends(w, 'p:1|2', [{ x: 5, y: 5 }])
+  assert.deepEqual(moved, { 'p:1|2': [{ x: 5, y: 5 }], 'p:2|3': [{ x: 2, y: 2 }] })
+  assert.deepEqual(withBends(w, 'p:2|3', []), { 'p:1|2': [{ x: 1, y: 1 }] })
+  assert.deepEqual(w, { 'p:1|2': [{ x: 1, y: 1 }], 'p:2|3': [{ x: 2, y: 2 }] })
+})
 
 test('storedWaypoints: picks live edges, drops malformed points + empty/gone entries', () => {
   const stored = {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, useReactFlow, EdgeLabelRenderer } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { buildChapterGraph, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, layoutSnapshot } from '../chapterGraph.js'
+import { buildChapterGraph, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, withBends, layoutSnapshot } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
 // 8hda: an INTERACTIVE node-link map of a chapter — pan (drag canvas), zoom (scroll),
@@ -233,27 +233,25 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
   )
   const allNodes = useMemo(() => (imageNode ? [imageNode, ...nodes] : nodes), [imageNode, nodes])
 
-  // muz0.4: each edge's bend points, seeded from the saved layout (like node positions,
-  // re-seeded only when the graph structure changes).
-  const [waypoints, setWaypoints] = useState({})
-  useEffect(() => {
-    setWaypoints(storedWaypoints(positionsRef.current, [...passages, ...exitEdges].map((e) => e.id)))
-  }, [passages, exitEdges])
-  const onWaypointsChange = useCallback((id, pts) => {
-    dirtyRef.current = true
-    setWaypoints((w) => {
-      const next = { ...w }
-      if (pts.length) next[id] = pts
-      else delete next[id]
-      return next
-    })
-  }, [])
-
   // Drags (rooms, ports, bends) only mutate local state; mark the layout dirty and flush
   // ONE save of the full layout (live nodes + bends, gone ones pruned) on unmount —
   // leaving the Map tab or closing the chapter — instead of a PUT per drag.
   const dirtyRef = useRef(false)
-  const latestRef = useRef(null)
+  const latestRef = useRef({ nodes: [], waypoints: {} })
+
+  // muz0.4: each edge's bend points, re-seeded when the graph structure changes. Once
+  // the GM has edited, the unsaved local bends win (the saved layout would resurrect a
+  // removed bend); gone edges are pruned either way.
+  const [waypoints, setWaypoints] = useState({})
+  useEffect(() => {
+    const source = dirtyRef.current ? latestRef.current.waypoints : positionsRef.current
+    setWaypoints(storedWaypoints(source, [...passages, ...exitEdges].map((e) => e.id)))
+  }, [passages, exitEdges])
+  const onWaypointsChange = useCallback((id, pts) => {
+    dirtyRef.current = true
+    setWaypoints((w) => withBends(w, id, pts))
+  }, [])
+
   latestRef.current = { nodes, waypoints }
   const onNodeDragStop = useCallback(() => {
     dirtyRef.current = true
