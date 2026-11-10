@@ -2,7 +2,7 @@ name: Staging E2E
 
 # Runs the Playwright functional suite against the DEPLOYED staging SPA, after a
 # staging deploy finishes (or on demand). No AWS creds needed — it drives the
-# real site over HTTPS with the non-secret staging test account.
+# real site over HTTPS as the staging test GM (EB_EMAIL / EB_PASSWORD secrets).
 on:
   workflow_run:
     workflows: ["Deploy encounter-builder-web"]
@@ -39,6 +39,9 @@ jobs:
       - run: npm run e2e:install
       - name: Run E2E
         run: npm run e2e
+        env:
+          EB_EMAIL: ${{ secrets.EB_EMAIL }}
+          EB_PASSWORD: ${{ secrets.EB_PASSWORD }}
 
       - uses: actions/upload-artifact@v4
         if: always()
