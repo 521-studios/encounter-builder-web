@@ -74,3 +74,40 @@ test('RoomView: no room image upload in anonymous mode', () => {
   assert.equal(screen.queryByLabelText(/Upload room image/), null)
   assert.ok(screen.getByRole('button', { name: 'Mark area on chapter map' })) // the area itself still works locally
 })
+
+// jsdom has no SVG screen matrix: map client coordinates 1:1 so the drag can be driven.
+function identityScreen(svg) {
+  svg.getScreenCTM = () => ({ inverse: () => ({}) })
+  svg.setPointerCapture = () => {}
+}
+
+test('RoomView: dragging a box on the picker saves it as map_region; a bare click saves nothing', () => {
+  const realPoint = globalThis.DOMPoint
+  globalThis.DOMPoint = class {
+    constructor(x, y) {
+      this.x = x
+      this.y = y
+    }
+    matrixTransform() {
+      return { x: this.x, y: this.y }
+    }
+  }
+  try {
+    const calls = []
+    render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={(p) => calls.push(p)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mark area on chapter map' }))
+    let svg = screen.getByTestId('room-picker')
+    identityScreen(svg)
+    fireEvent.pointerDown(svg, { clientX: 300, clientY: 300, pointerId: 1 })
+    fireEvent.pointerUp(svg, { clientX: 301, clientY: 300, pointerId: 1 })
+    assert.deepEqual(calls, []) // too small to be a box; the picker stays open
+    svg = screen.getByTestId('room-picker')
+    fireEvent.pointerDown(svg, { clientX: 600.4, clientY: 300, pointerId: 1 })
+    fireEvent.pointerMove(svg, { clientX: 400, clientY: 200, pointerId: 1 })
+    fireEvent.pointerUp(svg, { clientX: 200, clientY: 100, pointerId: 1 })
+    assert.deepEqual(calls, [{ map_region: { x: 200, y: 100, w: 400, h: 200 } }])
+    assert.equal(screen.queryByTestId('room-picker'), null) // a pick closes the picker
+  } finally {
+    globalThis.DOMPoint = realPoint
+  }
+})
