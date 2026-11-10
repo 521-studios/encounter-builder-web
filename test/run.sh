@@ -8,4 +8,5 @@ if command -v flock >/dev/null; then
 fi
 # shellcheck disable=SC2046 # test paths have no spaces
 [ "$#" -gt 0 ] || set -- $(find src -name '*.test.js')
+[ "$#" -gt 0 ] || { echo 'npm test: no *.test.js files under src/' >&2; exit 1; }
 NODE_OPTIONS="--max-old-space-size=2048 ${NODE_OPTIONS:-}" exec node --import ./test/support/setup-dom.mjs --test --test-concurrency=2 "$@"
