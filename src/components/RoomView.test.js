@@ -48,13 +48,14 @@ test("RoomView: the picker shows the whole map with this room's card outlined; c
   assert.equal(screen.queryByTestId('room-picker'), null)
 })
 
-test('RoomView: clear area sends null; released is read-only', () => {
+test('RoomView: clear area sends null; released is read-only but still navigable', () => {
   const calls = []
   const { rerender } = render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={chapter} onChange={(p) => calls.push(p)} />)
   fireEvent.click(screen.getByRole('button', { name: 'Clear area' }))
   assert.deepEqual(calls, [{ map_region: null }])
   rerender(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={chapter} released onChange={() => {}} />)
-  assert.equal(screen.queryByRole('button'), null)
+  assert.deepEqual(screen.getAllByRole('button').map((b) => b.textContent), ['Open chapter map'])
+  assert.equal(screen.queryByLabelText(/room image/), null)
 })
 
 test("RoomView: the crop draws the image at the chapter's rotation and scale", () => {

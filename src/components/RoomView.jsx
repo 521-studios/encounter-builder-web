@@ -113,11 +113,10 @@ export default function RoomView({ campaignId, enc, chapter, released, onChange,
       ) : chapterImg && region ? (
         <MapSvg img={chapterImg} view={paddedView(region)} role="img" aria-label="Room on the chapter map">
           <Box r={region} className="room-region" />
-          {onOpenEncounter &&
-            neighbours.map((n) => {
-              const at = chapter.map_positions?.[n.id]
-              return at ? <NeighbourCard key={n.id} n={n} at={at} onOpen={onOpenEncounter} /> : null
-            })}
+          {neighbours.map((n) => {
+            const at = chapter.map_positions?.[n.id]
+            return at ? <NeighbourCard key={n.id} n={n} at={at} onOpen={onOpenEncounter} /> : null
+          })}
         </MapSvg>
       ) : (
         <p className="muted">
@@ -128,15 +127,14 @@ export default function RoomView({ campaignId, enc, chapter, released, onChange,
               : 'No area set yet. Mark this room on the chapter map, or upload a room image.'}
         </p>
       )}
-      {(neighbours.length > 0 || (chapter && onOpenChapter)) && (
+      {(neighbours.length > 0 || chapter) && (
         <nav className="room-nav" aria-label="Connected rooms">
-          {onOpenEncounter &&
-            neighbours.map((n) => (
-              <button type="button" className="link" key={n.id} onClick={() => onOpenEncounter(n.id)}>
-                {n.label ? `${n.name} (${n.label})` : n.name}
-              </button>
-            ))}
-          {chapter && onOpenChapter && (
+          {neighbours.map((n) => (
+            <button type="button" className="link" key={n.id} onClick={() => onOpenEncounter(n.id)}>
+              {n.label ? `${n.name} (${n.label})` : n.name}
+            </button>
+          ))}
+          {chapter && (
             <button type="button" onClick={() => onOpenChapter(chapter)}>
               Open chapter map
             </button>
