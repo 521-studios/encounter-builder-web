@@ -212,6 +212,7 @@ button.encounter { flex: 1; text-align: left; }
 /* Height leaves room for the top chrome + the map title + the legend line below, so
    the pane doesn't overflow into a scrollbar (the fixed chrome doesn't scale with vh). */
 .map-canvas { height: calc(100vh - 300px); min-height: 380px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.map-image { display: block; pointer-events: none; user-select: none; }
 .map-room {
   width: 132px;
   padding: 6px 8px;
