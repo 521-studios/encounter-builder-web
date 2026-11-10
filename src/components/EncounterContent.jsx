@@ -116,6 +116,7 @@ export default function EncounterContent({
               aria-keyshortcuts="ArrowUp ArrowDown"
               title="Drag, or focus and press ↑/↓, to reorder"
               onKeyDown={(e) => {
+                if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return // leave browser/AT shortcuts alone
                 const to = content[e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : -1]
                 if (!to) return
                 e.preventDefault()
