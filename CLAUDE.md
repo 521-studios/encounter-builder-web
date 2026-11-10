@@ -41,6 +41,7 @@ npm test        # node --test — pure logic AND React component/hook tests (no 
                 # jsdom + @testing-library/react via test/support/setup-dom.mjs).
                 # test/run.sh: one run per checkout (flock), 2 workers, 2 GB heap each
 npm test -- src/foo.test.js   # one file, same limits (prefer this to bare node --test)
+.reviewers/bin/mutant.sh <src> <sed-expr> <test>...  # one mutant: scratch copy, 2G scope, 120 s; OOM/timeout = killed
 npm run build   # dist/ (needs VITE_OIDC_AUTHORITY)
 ```
 
