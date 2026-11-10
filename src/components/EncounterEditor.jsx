@@ -29,11 +29,13 @@ import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
 import EncounterPrintSheet from './EncounterPrintSheet.jsx'
 import RemoveButton from './RemoveButton.jsx'
+import RoomView from './RoomView.jsx'
 
 const ENCOUNTER_TABS = [
   { id: 'config', label: 'Config' },
   { id: 'encounter', label: 'Encounter' },
   { id: 'exits', label: 'Exits' },
+  { id: 'room', label: 'Room' },
 ]
 
 // The low/on/high flag shown beside the actual treasure value in the header chip.
@@ -595,6 +597,11 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
                 </div>
               )}
             </fieldset>
+          </div>
+        )}
+        {tab === 'room' && (
+          <div role="tabpanel" id="encpanel-room" aria-labelledby="enctab-room">
+            <RoomView campaignId={campaignId} enc={enc} chapter={chapters.find((c) => c.id === enc.chapter_id) || null} released={released} onChange={patch} />
           </div>
         )}
       </div>

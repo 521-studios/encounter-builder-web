@@ -507,6 +507,11 @@ export function toEncounterInput(enc) {
   // when nil so the full-replace PUT clears back to inherit (encounter -> chapter
   // -> campaign).
   Object.assign(input, partyFields(enc))
+  // muz0.7 room view: the API keeps these when omitted, so always send the current
+  // value (null clears). map_image goes in its write shape only: the strict decoder
+  // rejects the GET-only url.
+  input.map_region = enc.map_region ? { x: enc.map_region.x, y: enc.map_region.y, w: enc.map_region.w, h: enc.map_region.h } : null
+  input.map_image = enc.map_image ? { key: enc.map_image.key, width: enc.map_image.width, height: enc.map_image.height } : null
   if (enc.status) input.status = enc.status
   return input
 }
