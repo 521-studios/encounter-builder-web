@@ -1,8 +1,8 @@
 import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import ChapterDetail from './ChapterDetail.jsx'
-import { resetStore } from '../store/store.js'
+import ChapterDetail, { mapSaveFields, mergeMapPatch } from './ChapterDetail.jsx'
+import { resetStore, store } from '../store/store.js'
 import { setAnon } from '../api/anon.js'
 
 // ChapterDetail routes settings/encounters through the store's api backend → client.js
@@ -63,4 +63,95 @@ test('ChapterDetail: the Map tab renders the chapter map_image', async () => {
   await screen.findByRole('tablist')
   fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
   assert.equal(screen.getByAltText('Chapter map').getAttribute('src'), 'https://e.test/x.png')
+})
+
+// muz0.3: rotating the map image saves map_image (with the transform) AND the current
+// map_positions in one PUT, so a later positions save can't drop a pending image edit.
+test('ChapterDetail: rotating the map image PUTs map_image + current map_positions', async () => {
+  setAnon(false)
+  const puts = []
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url)
+    if (init.method === 'PUT') { puts.push(JSON.parse(init.body)); return res({ ...chapter, ...JSON.parse(init.body) }) }
+    if (u.endsWith('/settings')) return res({ party_level: 3, party_size: 4 })
+    if (u.endsWith('/encounters')) return res([])
+    return res({})
+  }
+  const withImage = { ...chapter, map_positions: { a: { x: 1, y: 2 } }, map_image: { key: 'maps/c1/ch1/x.png', url: 'https://e.test/x.png', width: 800, height: 600 } }
+  render(<ChapterDetail campaignId="c1" chapter={withImage} onClose={() => {}} onOpenEncounter={() => {}} />)
+  await screen.findByRole('tablist')
+  fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
+  fireEvent.click(screen.getByRole('button', { name: /Rotate 90°/ }))
+  await store.chapters.flush('c1', 'ch1')
+  assert.equal(puts.length, 1)
+  assert.deepEqual(puts[0].map_positions, { a: { x: 1, y: 2 } })
+  assert.equal(puts[0].map_image.rotation, 90)
+  assert.equal(puts[0].map_image.scale, 1)
+  assert.equal(puts[0].map_image.key, 'maps/c1/ch1/x.png')
+  assert.equal('url' in puts[0].map_image, false) // GET-only field never goes back
+})
+
+// A second rotate must build on the first (setMapImage reflects the saved transform).
+test('ChapterDetail: rotating twice saves 180, not 90 again', async () => {
+  setAnon(false)
+  const puts = []
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url)
+    if (init.method === 'PUT') { puts.push(JSON.parse(init.body)); return res({ ...chapter, ...JSON.parse(init.body) }) }
+    if (u.endsWith('/settings')) return res({ party_level: 3, party_size: 4 })
+    if (u.endsWith('/encounters')) return res([])
+    return res({})
+  }
+  const withImage = { ...chapter, map_image: { key: 'maps/c1/ch1/x.png', url: 'https://e.test/x.png', width: 800, height: 600 } }
+  render(<ChapterDetail campaignId="c1" chapter={withImage} onClose={() => {}} onOpenEncounter={() => {}} />)
+  await screen.findByRole('tablist')
+  fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
+  fireEvent.click(screen.getByRole('button', { name: /Rotate 90°/ }))
+  fireEvent.click(screen.getByRole('button', { name: /Rotate 90°/ }))
+  await store.chapters.flush('c1', 'ch1')
+  assert.equal(puts.at(-1).map_image.rotation, 180)
+})
+
+// A positions-only save (the drag flush) keeps the pending image edit, and vice versa.
+test('mergeMapPatch: the unpatched field keeps its current value', () => {
+  const img = { key: 'k', rotation: 90 }
+  assert.deepEqual(mergeMapPatch({ map_positions: { a: 1 } }, { a: 0 }, img), { map_positions: { a: 1 }, map_image: img })
+  assert.deepEqual(mergeMapPatch({ map_image: { key: 'k2' } }, { a: 0 }, img), { map_positions: { a: 0 }, map_image: { key: 'k2' } })
+})
+
+test('ChapterDetail: a chapter without a map image never sends map_image', async () => {
+  setAnon(false)
+  const puts = []
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method === 'PUT') { puts.push(JSON.parse(init.body)); return res({}) }
+    return String(url).endsWith('/settings') ? res({ party_level: 3, party_size: 4 }) : res([])
+  }
+  render(<ChapterDetail campaignId="c1" chapter={chapter} onClose={() => {}} onOpenEncounter={() => {}} />)
+  await screen.findByRole('tablist')
+  fireEvent.change(screen.getByLabelText('party level'), { target: { value: '6' } })
+  await store.chapters.flush('c1', 'ch1')
+  assert.ok(puts.length >= 1)
+  assert.equal('map_image' in puts.at(-1), false)
+})
+
+test('mapSaveFields: a positions-only save still carries the current image, in its write shape', () => {
+  const img = { key: 'k', url: 'https://e.test/x.png', width: 800, height: 600, rotation: 90, scale: 0.5 }
+  assert.deepEqual(mapSaveFields({ a: { x: 1, y: 2 } }, img), {
+    map_positions: { a: { x: 1, y: 2 } },
+    map_image: { key: 'k', width: 800, height: 600, rotation: 90, scale: 0.5 },
+  })
+  assert.deepEqual(mapSaveFields({ a: { x: 1, y: 2 } }, null), { map_positions: { a: { x: 1, y: 2 } } })
+})
+
+test('ChapterDetail: opening a different chapter re-seeds the map image', async () => {
+  setAnon(false)
+  globalThis.fetch = async (url) => (String(url).endsWith('/settings') ? res({ party_level: 3, party_size: 4 }) : res([]))
+  const img = (u) => ({ key: u, url: `https://e.test/${u}`, width: 10, height: 10 })
+  const props = { campaignId: 'c1', onClose: () => {}, onOpenEncounter: () => {} }
+  const { rerender } = render(<ChapterDetail {...props} chapter={{ ...chapter, map_image: img('a.png') }} />)
+  await screen.findByRole('tablist')
+  fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
+  assert.equal(screen.getByAltText('Chapter map').getAttribute('src'), 'https://e.test/a.png')
+  rerender(<ChapterDetail {...props} chapter={{ ...chapter, id: 'ch2', map_image: img('b.png') }} />)
+  assert.equal((await screen.findByAltText('Chapter map')).getAttribute('src'), 'https://e.test/b.png')
 })
