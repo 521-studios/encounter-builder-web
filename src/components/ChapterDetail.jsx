@@ -216,6 +216,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
             onOpenEncounter={onOpenEncounter}
             positions={mapPositions}
             onPositionsChange={savePositions}
+            mapImage={chapter.map_image}
           />
         </div>
       )}

@@ -53,7 +53,14 @@ function ExitNode() {
     </div>
   )
 }
-const nodeTypes = { room: RoomNode, exit: ExitNode }
+// muz0.2: the chapter's battle-map image, drawn as a fixed node at the flow origin
+// (natural pixel size) underneath the rooms, so it pans/zooms with the graph and the
+// GM can drag rooms onto their real spots. Not draggable/selectable; never saved.
+const MAP_IMAGE_ID = '__map-image'
+function MapImageNode({ data }) {
+  return <img className="map-image" src={data.url} alt="Chapter map" width={data.width} height={data.height} draggable={false} />
+}
+const nodeTypes = { room: RoomNode, exit: ExitNode, mapImage: MapImageNode }
 
 // The centre + half-extents of an internal React Flow node (measured, with fallbacks).
 function boxOf(n) {
@@ -109,8 +116,9 @@ function PassageEdge({ source, target, data }) {
 }
 const edgeTypes = { passage: PassageEdge }
 
-export default function ChapterMap({ encounters, onOpenEncounter, positions, onPositionsChange }) {
+export default function ChapterMap({ encounters, onOpenEncounter, positions, onPositionsChange, mapImage }) {
   const [collapsed, setCollapsed] = useState(false)
+  const [showImage, setShowImage] = useState(true)
   const { nodes: rooms, exitPorts, passages, exitEdges, layout, deadEnds, stats } = useMemo(() => buildChapterGraph(encounters), [encounters])
 
   // The GM's saved layout, read via a ref so a save doesn't re-seed (which would fight
@@ -128,6 +136,16 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
       ...exitPorts.map((p) => ({ id: p.id, type: 'exit', position: seeded[p.id], data: {}, draggable: true })),
     ])
   }, [rooms, exitPorts, layout, deadEnds, setNodes])
+
+  // The image node is derived, not part of the dragged/saved node state.
+  const imageNode = useMemo(
+    () =>
+      mapImage?.url
+        ? { id: MAP_IMAGE_ID, type: 'mapImage', position: { x: 0, y: 0 }, data: mapImage, zIndex: -1, draggable: false, selectable: false, focusable: false, hidden: !showImage }
+        : null,
+    [mapImage, showImage],
+  )
+  const allNodes = useMemo(() => (imageNode ? [imageNode, ...nodes] : nodes), [imageNode, nodes])
 
   // Drags only mutate local node state; stash the latest full layout (rooms + ports,
   // pruning gone nodes, including auto-placed new ones) and flush ONE save on unmount —
@@ -154,7 +172,7 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
   )
 
   const onNodeClick = useCallback((_, node) => node.type === 'room' && onOpenEncounter(node.id), [onOpenEncounter])
-  const hasContent = passages.length > 0 || exitPorts.length > 0
+  const hasContent = passages.length > 0 || exitPorts.length > 0 || Boolean(imageNode)
 
   return (
     <section className="chapter-map" data-testid="chapter-map">
@@ -171,7 +189,7 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
           <>
             <div className="map-canvas" data-testid="map-canvas">
               <ReactFlow
-                nodes={nodes}
+                nodes={allNodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
@@ -185,9 +203,14 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
               >
                 <Background gap={20} color="#2a3033" />
                 <Controls showInteractive={false} />
-                <MiniMap pannable zoomable nodeColor={(n) => (n.type === 'exit' ? '#8a8f98' : ROOM_FILL[n.data?.roomType] || ROOM_FILL.empty)} />
+                <MiniMap pannable zoomable nodeColor={(n) => (n.type === 'mapImage' ? 'transparent' : n.type === 'exit' ? '#8a8f98' : ROOM_FILL[n.data?.roomType] || ROOM_FILL.empty)} />
               </ReactFlow>
             </div>
+            {imageNode && (
+              <button type="button" className="link" onClick={() => setShowImage((v) => !v)}>
+                {showImage ? 'Hide map image' : 'Show map image'}
+              </button>
+            )}
             <p className="map-legend muted">
               <strong>→</strong> one-way exit · <strong>—</strong> two-way · <span className="map-legend-dash">– –</span> secret door (🔒 = the side it's hidden from) ·{' '}
               ○ exit leaving the chapter · red outline = dead-end. Drag to pan, scroll to zoom, drag a room to rearrange, click a room to open it.

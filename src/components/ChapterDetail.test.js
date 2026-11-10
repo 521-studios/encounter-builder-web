@@ -53,3 +53,14 @@ test('ChapterDetail: switching tabs swaps the panel — Summary→rollup, Map→
   assert.ok(screen.getByTestId('chapter-map'))
   assert.equal(screen.queryByTestId('treasure-rollup'), null) // Summary panel unmounted
 })
+
+// muz0.2: the chapter's map_image reaches the Map tab.
+test('ChapterDetail: the Map tab renders the chapter map_image', async () => {
+  setAnon(false)
+  globalThis.fetch = async (url) => (String(url).endsWith('/settings') ? res({ party_level: 3, party_size: 4 }) : res([]))
+  const withImage = { ...chapter, map_image: { key: 'maps/c1/ch1/x.png', url: 'https://e.test/x.png', width: 800, height: 600 } }
+  render(<ChapterDetail campaignId="c1" chapter={withImage} onClose={() => {}} onOpenEncounter={() => {}} />)
+  await screen.findByRole('tablist')
+  fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
+  assert.equal(screen.getByAltText('Chapter map').getAttribute('src'), 'https://e.test/x.png')
+})

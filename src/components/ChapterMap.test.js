@@ -51,3 +51,24 @@ test('ChapterMap: an empty chapter (no rooms) shows the no-encounters hint', () 
   assert.equal(screen.queryByTestId('map-canvas'), null)
   assert.match(screen.getByText(/No encounters in this chapter/).textContent, /No encounters/)
 })
+
+// muz0.2: the chapter's battle-map image renders behind the graph, with a toggle.
+const mapImage = { url: 'https://example.test/maps/a.png', width: 800, height: 600 }
+
+test('ChapterMap: no map image → no image toggle', () => {
+  render(<ChapterMap encounters={chapter} onOpenEncounter={() => {}} />)
+  assert.equal(screen.queryByRole('button', { name: /map image/ }), null)
+})
+
+test('ChapterMap: a map image renders behind the graph (even with no exits) and the toggle hides/shows it', () => {
+  render(<ChapterMap encounters={[{ id: 1, name: 'Lone', exits: [] }]} onOpenEncounter={() => {}} mapImage={mapImage} />)
+  assert.ok(screen.getByTestId('map-canvas'))
+  const img = screen.getByAltText('Chapter map')
+  assert.equal(img.getAttribute('src'), mapImage.url)
+  assert.equal(img.getAttribute('width'), '800')
+  assert.equal(img.getAttribute('height'), '600')
+  fireEvent.click(screen.getByRole('button', { name: 'Hide map image' }))
+  assert.equal(screen.queryByAltText('Chapter map'), null)
+  fireEvent.click(screen.getByRole('button', { name: 'Show map image' }))
+  assert.ok(screen.getByAltText('Chapter map'))
+})
