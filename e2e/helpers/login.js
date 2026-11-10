@@ -1,7 +1,6 @@
 import { expect } from '@playwright/test'
 
 // Staging test GM credentials: env only (EB_EMAIL / EB_PASSWORD), never in source.
-// CI reads them from repo secrets (.github/workflows/staging-e2e.yml).
 export function creds() {
   const email = process.env.EB_EMAIL
   const password = process.env.EB_PASSWORD
