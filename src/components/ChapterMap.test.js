@@ -1,7 +1,7 @@
 import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import ChapterMap from './ChapterMap.jsx'
+import ChapterMap, { imageTransform } from './ChapterMap.jsx'
 
 afterEach(() => cleanup())
 
@@ -71,4 +71,29 @@ test('ChapterMap: a map image renders behind the graph (even with no exits) and 
   assert.equal(screen.queryByAltText('Chapter map'), null)
   fireEvent.click(screen.getByRole('button', { name: 'Show map image' }))
   assert.ok(screen.getByAltText('Chapter map'))
+})
+
+// muz0.3: rotate/scale.
+test('imageTransform: defaults, quarter-turn snapping, and scale clamping', () => {
+  assert.deepEqual(imageTransform({}), { rotation: 0, scale: 1 })
+  assert.deepEqual(imageTransform(null), { rotation: 0, scale: 1 })
+  assert.deepEqual(imageTransform({ rotation: 450, scale: 9 }), { rotation: 90, scale: 4 })
+  assert.deepEqual(imageTransform({ rotation: -90, scale: 0.01 }), { rotation: 270, scale: 0.1 })
+  assert.deepEqual(imageTransform({ rotation: 'x', scale: -1 }), { rotation: 0, scale: 1 })
+})
+
+test('ChapterMap: rotate steps a quarter-turn and the scale slider reports the new scale', () => {
+  const changes = []
+  render(<ChapterMap encounters={chapter} onOpenEncounter={() => {}} mapImage={{ ...mapImage, rotation: 270 }} onMapImageChange={(m) => changes.push(m)} />)
+  fireEvent.click(screen.getByRole('button', { name: /Rotate 90° \(270°\)/ }))
+  assert.equal(changes[0].rotation, 0) // 270 → 0 wraps
+  fireEvent.change(screen.getByLabelText('map image scale'), { target: { value: '150' } })
+  assert.equal(changes[1].scale, 1.5)
+  assert.equal(changes[1].url, mapImage.url) // the rest of map_image rides along
+})
+
+test('ChapterMap: no onMapImageChange → toggle only, no rotate/scale controls', () => {
+  render(<ChapterMap encounters={chapter} onOpenEncounter={() => {}} mapImage={mapImage} />)
+  assert.ok(screen.getByRole('button', { name: 'Hide map image' }))
+  assert.equal(screen.queryByRole('button', { name: /Rotate/ }), null)
 })

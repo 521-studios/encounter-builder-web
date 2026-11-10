@@ -44,7 +44,11 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
   // map remounts (e.g. switching away from the Map tab and back) — the `chapter` prop
   // isn't refreshed after a save, so seeding off it would revert to the last page-load.
   const [mapPositions, setMapPositions] = useState(chapter.map_positions)
-  useEffect(() => setMapPositions(chapter.map_positions), [chapter.id]) // re-init when a different chapter opens
+  const [mapImage, setMapImage] = useState(chapter.map_image)
+  useEffect(() => { // re-init when a different chapter opens
+    setMapPositions(chapter.map_positions)
+    setMapImage(chapter.map_image)
+  }, [chapter.id])
 
   // Autosave now runs through the store's flush layer (rtd8b-2): the indicator
   // reads flush state; commit() mirrors the built input into the store, which
@@ -106,17 +110,23 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
     }
   }
 
-  // Persist the GM's hand-arranged map layout. Round-trips name + party (party is
-  // full-replace, so omitting it would clear the override); map_positions is
-  // touch-only-when-supplied on the API, so only this send updates it.
-  function savePositions(map_positions) {
+  // Persist the map: the GM's hand-arranged layout and/or the image's rotate/scale.
+  // Round-trips name + party (party is full-replace, so omitting it would clear the
+  // override). map_positions and map_image are touch-only-when-supplied on the API;
+  // every map save sends BOTH current values, because the store keeps only the
+  // latest pending record — a positions save must not drop a pending image edit.
+  // map_image is sent only when the chapter has one (the API rejects it pre-muz0.1).
+  function saveMap(patch) {
     const name = value.name.trim() || chapter.name
     if (!name) return
+    const map_positions = patch.map_positions ?? mapPositions
+    const map_image = patch.map_image ?? mapImage
     setMapPositions(map_positions) // reflect locally so a map remount seeds off the fresh layout
+    setMapImage(map_image)
     chaptersApi.edit(
       campaignId,
       chapter.id,
-      { name, order: chapter.order, ...partyFields(value), map_positions },
+      { name, order: chapter.order, ...partyFields(value), map_positions, ...(map_image ? { map_image } : {}) },
       {
         onSaved: (updated) => onSaved && onSaved(updated),
         onError: () => onSaveError && onSaveError(`chapter “${name}” map layout`, chapter.id),
@@ -215,8 +225,9 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
             encounters={chapterEncounters}
             onOpenEncounter={onOpenEncounter}
             positions={mapPositions}
-            onPositionsChange={savePositions}
-            mapImage={chapter.map_image}
+            onPositionsChange={(map_positions) => saveMap({ map_positions })}
+            mapImage={mapImage}
+            onMapImageChange={(map_image) => saveMap({ map_image })}
           />
         </div>
       )}
