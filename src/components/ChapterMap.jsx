@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, getStraightPath, EdgeLabelRenderer } from '@xyflow/react'
+import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, useReactFlow, EdgeLabelRenderer } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { buildChapterGraph, boundaryPoint, sideText, seedPositions } from '../chapterGraph.js'
+import { buildChapterGraph, boundaryPoint, sideText, seedPositions, reseedBends, insertWaypoint, withBends, layoutSnapshot } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
 // 8hda: an INTERACTIVE node-link map of a chapter — pan (drag canvas), zoom (scroll),
@@ -123,33 +123,67 @@ function boxOf(n) {
   return { x, y, hw: w / 2, hh: h / 2 }
 }
 
-// A passage between two rooms (or a room and an exit port). Line runs centre-to-centre;
-// a one-way passage adds an arrowhead at the target's card edge; each side's label sits
-// at its own card edge; a secret side is dashed with a lock.
-function PassageEdge({ source, target, data }) {
+// Unit vector a → b (zero-length → +x, so a label still has a direction).
+function unit(a, b) {
+  const len = Math.hypot(b.x - a.x, b.y - a.y)
+  return len ? { x: (b.x - a.x) / len, y: (b.y - a.y) / len } : { x: 1, y: 0 }
+}
+
+// A passage between two rooms (or a room and an exit port). Line runs centre-to-centre
+// through the GM's bend points (muz0.4); a one-way passage adds an arrowhead at the
+// target's card edge; each side's label sits at its own card edge; a secret side is
+// dashed with a lock. Double-click the line to add a bend; drag a bend to move it;
+// double-click a bend to remove it.
+function PassageEdge({ id, source, target, data }) {
   const s = useInternalNode(source)
   const t = useInternalNode(target)
+  const { screenToFlowPosition } = useReactFlow()
   if (!s || !t) return null
   const sc = boxOf(s)
   const tc = boxOf(t)
-  const [path] = getStraightPath({ sourceX: sc.x, sourceY: sc.y, targetX: tc.x, targetY: tc.y })
-  const tb = boundaryPoint(sc, tc) // target card edge — arrow sits here
-  const sb = boundaryPoint(tc, sc) // source card edge
+  const wps = data.waypoints || []
+  const first = wps[0] || tc // the point the line leaves the source toward
+  const last = wps[wps.length - 1] || sc // the point the line enters the target from
+  const path = `M ${[sc, ...wps, tc].map((p) => `${p.x},${p.y}`).join(' L ')}`
+  const tb = boundaryPoint(last, tc) // target card edge — arrow sits here
+  const sb = boundaryPoint(first, sc) // source card edge
   const secret = data.sourceSecret || data.targetSecret
-  const ang = (Math.atan2(tb.y - sc.y, tb.x - sc.x) * 180) / Math.PI
-  // Push each label a bit off its own card, into the open gap along the line, so the
-  // node doesn't cover it. Unit vector source→target.
-  const len = Math.hypot(tc.x - sc.x, tc.y - sc.y) || 1
-  const ux = (tc.x - sc.x) / len
-  const uy = (tc.y - sc.y) / len
+  const ang = (Math.atan2(tb.y - last.y, tb.x - last.x) * 180) / Math.PI
+  // Push each label a bit off its own card, into the open gap along its end segment,
+  // so the node doesn't cover it.
   const OFF = 40
-  const sLabel = { x: sb.x + ux * OFF, y: sb.y + uy * OFF } // just past the source card
-  const tLabel = { x: tb.x - ux * OFF, y: tb.y - uy * OFF } // just past the target card
+  const su = unit(sc, first)
+  const tu = unit(last, tc)
+  const sLabel = { x: sb.x + su.x * OFF, y: sb.y + su.y * OFF } // just past the source card
+  const tLabel = { x: tb.x - tu.x * OFF, y: tb.y - tu.y * OFF } // just past the target card
   const sText = sideText(data.sourceSecret, data.sourceLabel, data.sourceSkill, data.sourceDC)
   const tText = sideText(data.targetSecret, data.targetLabel, data.targetSkill, data.targetDC)
+  const onChange = data.onWaypointsChange
+  const at = (e) => screenToFlowPosition({ x: e.clientX, y: e.clientY })
   return (
     <>
       <path className="react-flow__edge-path" d={path} fill="none" stroke={EDGE_COLOR} strokeWidth={1.6} strokeDasharray={secret ? '6 4' : undefined} />
+      {onChange && (
+        // A wide invisible stroke so the thin line is easy to double-click.
+        <path className="map-edge-hit nodrag nopan" d={path} fill="none" stroke="transparent" strokeWidth={14} onDoubleClick={(e) => onChange(id, insertWaypoint(sc, wps, tc, at(e)))}>
+          <title>Double-click to add a bend</title>
+        </path>
+      )}
+      {onChange &&
+        wps.map((p, i) => (
+          <circle
+            key={i}
+            className="map-bend nodrag nopan"
+            cx={p.x}
+            cy={p.y}
+            r={5}
+            onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
+            onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && onChange(id, wps.map((q, j) => (j === i ? at(e) : q)))}
+            onDoubleClick={() => onChange(id, wps.filter((_, j) => j !== i))}
+          >
+            <title>Drag to move · double-click to remove</title>
+          </circle>
+        ))}
       {!data.twoWay && (
         <g transform={`translate(${tb.x} ${tb.y}) rotate(${ang})`}>
           <polygon points="0,0 -10,-4.5 -10,4.5" fill={EDGE_COLOR} />
@@ -199,29 +233,40 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
   )
   const allNodes = useMemo(() => (imageNode ? [imageNode, ...nodes] : nodes), [imageNode, nodes])
 
-  // Drags only mutate local node state; stash the latest full layout (rooms + ports,
-  // pruning gone nodes, including auto-placed new ones) and flush ONE save on unmount —
+  // Drags (rooms, ports, bends) only mutate local state; mark the layout dirty and flush
+  // ONE save of the full layout (live nodes + bends, gone ones pruned) on unmount —
   // leaving the Map tab or closing the chapter — instead of a PUT per drag.
-  const pendingRef = useRef(null)
+  const dirtyRef = useRef(false)
+  const latestRef = useRef({ nodes: [], waypoints: {} })
+
+  // muz0.4: each edge's bend points, re-seeded when the graph structure changes.
+  const [waypoints, setWaypoints] = useState({})
+  useEffect(() => {
+    setWaypoints(reseedBends(dirtyRef.current, latestRef.current.waypoints, positionsRef.current, [...passages, ...exitEdges].map((e) => e.id)))
+  }, [passages, exitEdges])
+  const onWaypointsChange = useCallback((id, pts) => {
+    dirtyRef.current = true
+    setWaypoints((w) => withBends(w, id, pts))
+  }, [])
+
+  latestRef.current = { nodes, waypoints }
   const onNodeDragStop = useCallback(() => {
-    const pos = {}
-    for (const n of nodes) pos[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) }
-    pendingRef.current = pos
-  }, [nodes])
+    dirtyRef.current = true
+  }, [])
   const saveRef = useRef(onPositionsChange)
   saveRef.current = onPositionsChange
   useEffect(() => () => {
-    if (pendingRef.current && saveRef.current) saveRef.current(pendingRef.current)
+    if (dirtyRef.current && saveRef.current) saveRef.current(layoutSnapshot(latestRef.current.nodes, latestRef.current.waypoints))
   }, [])
 
   // Passages (rooms) + boundary exits (room → port) both render via PassageEdge.
-  const edges = useMemo(
-    () => [
-      ...passages.map((p) => ({ id: p.id, source: p.source, target: p.target, type: 'passage', data: { twoWay: p.twoWay, sourceLabel: p.sourceLabel, targetLabel: p.targetLabel, sourceSecret: p.sourceSecret, targetSecret: p.targetSecret, sourceSkill: p.sourceSkill, sourceDC: p.sourceDC, targetSkill: p.targetSkill, targetDC: p.targetDC } })),
-      ...exitEdges.map((x) => ({ id: x.id, source: x.source, target: x.target, type: 'passage', data: { twoWay: false, sourceLabel: '', targetLabel: x.label, sourceSecret: false, targetSecret: x.secret, targetSkill: x.skill, targetDC: x.dc } })),
-    ],
-    [passages, exitEdges],
-  )
+  const edges = useMemo(() => {
+    const bend = (id) => ({ waypoints: waypoints[id], onWaypointsChange: onPositionsChange ? onWaypointsChange : undefined })
+    return [
+      ...passages.map((p) => ({ id: p.id, source: p.source, target: p.target, type: 'passage', data: { twoWay: p.twoWay, sourceLabel: p.sourceLabel, targetLabel: p.targetLabel, sourceSecret: p.sourceSecret, targetSecret: p.targetSecret, sourceSkill: p.sourceSkill, sourceDC: p.sourceDC, targetSkill: p.targetSkill, targetDC: p.targetDC, ...bend(p.id) } })),
+      ...exitEdges.map((x) => ({ id: x.id, source: x.source, target: x.target, type: 'passage', data: { twoWay: false, sourceLabel: '', targetLabel: x.label, sourceSecret: false, targetSecret: x.secret, targetSkill: x.skill, targetDC: x.dc, ...bend(x.id) } })),
+    ]
+  }, [passages, exitEdges, waypoints, onWaypointsChange, onPositionsChange])
 
   const onNodeClick = useCallback((_, node) => node.type === 'room' && onOpenEncounter(node.id), [onOpenEncounter])
   const hasContent = passages.length > 0 || exitPorts.length > 0 || Boolean(imageNode)
@@ -250,6 +295,7 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
                 onNodeClick={onNodeClick}
                 fitView
                 minZoom={0.1}
+                zoomOnDoubleClick={false} // double-click adds/removes passage bends
                 nodesConnectable={false}
                 proOptions={{ hideAttribution: false }}
               >
@@ -268,7 +314,8 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
             )}
             <p className="map-legend muted">
               <strong>→</strong> one-way exit · <strong>—</strong> two-way · <span className="map-legend-dash">– –</span> secret door (🔒 = the side it's hidden from) ·{' '}
-              ○ exit leaving the chapter · red outline = dead-end. Drag to pan, scroll to zoom, drag a room to rearrange, click a room to open it.
+              ○ exit leaving the chapter · red outline = dead-end. Drag to pan, scroll to zoom, drag a room to rearrange, click a room to open it. Double-click a passage to bend it;
+              drag a bend to move it, double-click it to remove.
             </p>
           </>
         ))}
