@@ -4,12 +4,16 @@
 # 120 s timeout. Prints KILLED (tests failed, OOM or timeout) or SURVIVED; never retries.
 set -eu
 f=$1 expr=$2; shift 2
+for p in "$f" "$@"; do
+  case $p in /*|*..*) echo "refusing $p: give paths relative to the repo root"; exit 2 ;; esac
+done
 repo=$(git rev-parse --show-toplevel)
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/mutant.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 cp -r "$repo/src" "$repo/test" "$repo/package.json" "$tmp/"
 ln -s "$repo/node_modules" "$tmp/node_modules"
 cd "$tmp"
+for p in "$f" "$@"; do [ -f "$p" ] || { echo "no such file: $p"; exit 2; }; done
 cp "$f" "$tmp/orig"
 sed -i "$expr" "$f"
 cmp -s "$f" "$tmp/orig" && { echo "NOOP: $expr matched nothing in $f"; exit 2; }
