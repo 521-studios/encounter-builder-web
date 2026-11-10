@@ -745,6 +745,7 @@ button.chapter-name:hover { color: var(--gold); }
 .print-sheet .Monster__section-text { color: #444; }
 .print-sheet .Monster__roll { color: #1a1a1a; }        /* no live rolls on paper */
 .print-sheet .Monster__level { color: #444; }
+.print-sheet .Monster__sidebar-type { color: #444; }  /* sidebar type label above its title (display #60) */
 
 /* Reuse the shared budget panel, but drop its dark-theme surface for the sheet.
    The chart's active-column rule uses color: var(--fg) (#e0e0e0, the DARK theme's
