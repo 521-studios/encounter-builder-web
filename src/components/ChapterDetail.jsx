@@ -13,6 +13,17 @@ import PartyFields from './PartyFields.jsx'
 import TreasureRollup from './TreasureRollup.jsx'
 import ChapterMap from './ChapterMap.jsx'
 
+// The map fields of a chapter PUT. Both are touch-only-when-supplied on the API, and
+// every map save sends BOTH current values: the store keeps only the latest pending
+// record, so a positions save must not drop a pending image edit. map_image goes out
+// in its write shape only (the strict decoder rejects the GET-only `url`), and only
+// when the chapter has one.
+export function mapSaveFields(map_positions, map_image) {
+  if (!map_image) return { map_positions }
+  const { key, width, height, rotation, scale } = map_image
+  return { map_positions, map_image: { key, width, height, rotation, scale } }
+}
+
 // The chapter detail's three tabs: Config (party override), Summary (treasure/XP
 // rollup), Map (connectivity graph). The title bar + name/error stay above the tabs.
 const CHAPTER_TABS = [
@@ -112,10 +123,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
 
   // Persist the map: the GM's hand-arranged layout and/or the image's rotate/scale.
   // Round-trips name + party (party is full-replace, so omitting it would clear the
-  // override). map_positions and map_image are touch-only-when-supplied on the API;
-  // every map save sends BOTH current values, because the store keeps only the
-  // latest pending record — a positions save must not drop a pending image edit.
-  // map_image is sent only when the chapter has one (the API rejects it pre-muz0.1).
+  // override).
   function saveMap(patch) {
     const name = value.name.trim() || chapter.name
     if (!name) return
@@ -126,7 +134,7 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
     chaptersApi.edit(
       campaignId,
       chapter.id,
-      { name, order: chapter.order, ...partyFields(value), map_positions, ...(map_image ? { map_image } : {}) },
+      { name, order: chapter.order, ...partyFields(value), ...mapSaveFields(map_positions, map_image) },
       {
         onSaved: (updated) => onSaved && onSaved(updated),
         onError: () => onSaveError && onSaveError(`chapter “${name}” map layout`, chapter.id),
