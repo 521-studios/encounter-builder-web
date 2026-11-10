@@ -271,6 +271,7 @@ export default function App() {
                   setReloadKey((k) => k + 1)
                 }}
                 onOpenEncounter={(id) => setView({ kind: 'encounter', enc: { id } })}
+                onOpenChapter={(chapter) => setView({ kind: 'chapter', chapter, tab: 'map' })}
               />
             )}
             {view.kind === 'campaign' && (
@@ -286,6 +287,7 @@ export default function App() {
                 key={view.chapter.id}
                 campaignId={campaign.id}
                 chapter={view.chapter}
+                initialTab={view.tab}
                 onClose={() => {
                   backToEmpty()
                   setReloadKey((k) => k + 1)
