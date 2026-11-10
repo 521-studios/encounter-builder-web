@@ -68,9 +68,24 @@ function AreaPicker({ img, region, card, onPick, onCancel }) {
   )
 }
 
+// muz0.8: a neighbour's card on the crop, clickable to open it. A mouse shortcut only
+// (it sits inside the role="img" crop); the Connected rooms buttons are the real path.
+function NeighbourCard({ n, at, onOpen }) {
+  return (
+    <g className="room-neighbour" aria-hidden="true" onClick={() => onOpen(n.id)}>
+      <title>{`Open ${n.name}`}</title>
+      <rect x={at.x} y={at.y} width={CARD.w} height={CARD.h} rx={6} vectorEffect="non-scaling-stroke" />
+      <text x={at.x + CARD.w / 2} y={at.y + CARD.h / 2} textAnchor="middle" dominantBaseline="central">
+        {n.name}
+      </text>
+    </g>
+  )
+}
+
 // muz0.7: the encounter's room view. Its own uploaded image wins; otherwise it's the
-// GM's box on the chapter map, padded to show the surroundings.
-export default function RoomView({ campaignId, enc, chapter, released, onChange }) {
+// GM's box on the chapter map, padded to show the surroundings. muz0.8: it links to
+// the rooms it connects to and out to the chapter map.
+export default function RoomView({ campaignId, enc, chapter, released, onChange, neighbours = [], onOpenEncounter, onOpenChapter }) {
   const [picking, setPicking] = useState(false)
   const chapterImg = chapter?.map_image
   const region = enc.map_region
@@ -98,6 +113,11 @@ export default function RoomView({ campaignId, enc, chapter, released, onChange 
       ) : chapterImg && region ? (
         <MapSvg img={chapterImg} view={paddedView(region)} role="img" aria-label="Room on the chapter map">
           <Box r={region} className="room-region" />
+          {onOpenEncounter &&
+            neighbours.map((n) => {
+              const at = chapter.map_positions?.[n.id]
+              return at ? <NeighbourCard key={n.id} n={n} at={at} onOpen={onOpenEncounter} /> : null
+            })}
         </MapSvg>
       ) : (
         <p className="muted">
@@ -107,6 +127,21 @@ export default function RoomView({ campaignId, enc, chapter, released, onChange 
               ? "Upload a map image on the chapter's Map tab, or upload a room image here."
               : 'No area set yet. Mark this room on the chapter map, or upload a room image.'}
         </p>
+      )}
+      {(neighbours.length > 0 || (chapter && onOpenChapter)) && (
+        <nav className="room-nav" aria-label="Connected rooms">
+          {onOpenEncounter &&
+            neighbours.map((n) => (
+              <button type="button" className="link" key={n.id} onClick={() => onOpenEncounter(n.id)}>
+                {n.label ? `${n.name} (${n.label})` : n.name}
+              </button>
+            ))}
+          {chapter && onOpenChapter && (
+            <button type="button" onClick={() => onOpenChapter(chapter)}>
+              Open chapter map
+            </button>
+          )}
+        </nav>
       )}
       {!released && (
         <div className="room-view-controls">

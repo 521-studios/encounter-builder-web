@@ -825,3 +825,8 @@ button.chapter-name:hover { color: var(--gold); }
 .room-region { fill: none; stroke: #f0c040; stroke-width: 2; stroke-dasharray: 6 4; }
 .room-card-outline { fill: rgba(240, 192, 64, 0.15); stroke: #8a8f98; stroke-width: 1.5; }
 .room-view-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
+.room-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
+.room-neighbour { cursor: pointer; }
+.room-neighbour rect { fill: rgba(27, 31, 34, 0.85); stroke: #8a8f98; stroke-width: 1.5; }
+.room-neighbour:hover rect { stroke: #f0c040; }
+.room-neighbour text { fill: #cbd0d6; font-size: 14px; pointer-events: none; }

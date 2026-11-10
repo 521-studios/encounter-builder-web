@@ -21,7 +21,7 @@ const chapter = { id: 'ch1', name: 'Chapter One', order: 0, party_level: 5, part
 
 // Mount with settings + an empty encounters list stubbed; the tab structure doesn't
 // need populated encounters (empty renders each panel's empty state).
-function mountChapterDetail() {
+function mountChapterDetail(extra = {}) {
   setAnon(false)
   globalThis.fetch = async (url) => {
     const u = String(url)
@@ -29,8 +29,14 @@ function mountChapterDetail() {
     if (u.endsWith('/encounters')) return res([])
     return res({})
   }
-  render(<ChapterDetail campaignId="c1" chapter={chapter} onClose={() => {}} onOpenEncounter={() => {}} />)
+  render(<ChapterDetail campaignId="c1" chapter={chapter} onClose={() => {}} onOpenEncounter={() => {}} {...extra} />)
 }
+
+test('ChapterDetail: initialTab="map" opens on the Map tab (muz0.8 room view -> chapter map)', async () => {
+  mountChapterDetail({ initialTab: 'map' })
+  assert.equal((await screen.findByRole('tab', { name: 'Map' })).getAttribute('aria-selected'), 'true')
+  assert.equal(screen.queryByLabelText('party level'), null)
+})
 
 test('ChapterDetail: Config is the default tab and shows the party fields (Summary/Map not mounted)', async () => {
   mountChapterDetail()

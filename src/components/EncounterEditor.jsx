@@ -13,6 +13,7 @@ import {
   reorderById,
   emptyExit,
   incomingLinks,
+  roomNeighbours,
   keyed,
   CONTENT_TYPE_LABELS,
 } from '../model.js'
@@ -41,7 +42,7 @@ const ENCOUNTER_TABS = [
 // The low/on/high flag shown beside the actual treasure value in the header chip.
 const TREASURE_FLAG_LABELS = { low: 'low', on: 'on budget', high: 'high' }
 
-export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onSaveOk, onOpenEncounter }) {
+export default function EncounterEditor({ campaignId, encounterId, onClose, onSaved, onDeleted, onSaveError, onSaveOk, onOpenEncounter, onOpenChapter }) {
   const [tab, setTab] = useState('config')
   const [enc, setEnc] = useState(null) // null = loading
   const [error, setError] = useState(null)
@@ -604,7 +605,16 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         )}
         {tab === 'room' && (
           <div role="tabpanel" id="encpanel-room" aria-labelledby="enctab-room">
-            <RoomView campaignId={campaignId} enc={enc} chapter={chapters.find((c) => c.id === enc.chapter_id) || null} released={released} onChange={patch} />
+            <RoomView
+              campaignId={campaignId}
+              enc={enc}
+              chapter={chapters.find((c) => c.id === enc.chapter_id) || null}
+              released={released}
+              onChange={patch}
+              neighbours={roomNeighbours(encounterId, exits, siblingEncounters)}
+              onOpenEncounter={onOpenEncounter}
+              onOpenChapter={onOpenChapter}
+            />
           </div>
         )}
       </div>

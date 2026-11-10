@@ -1,6 +1,6 @@
 import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
 import RoomView from './RoomView.jsx'
 import { setAnon } from '../api/anon.js'
 
@@ -110,4 +110,32 @@ test('RoomView: dragging a box on the picker saves it as map_region; a bare clic
   } finally {
     globalThis.DOMPoint = realPoint
   }
+})
+
+test('RoomView: connected rooms open their encounter; Open chapter map opens the chapter (muz0.8)', () => {
+  const opened = []
+  const chapters = []
+  const withNeighbour = { ...chapter, map_positions: { ...chapter.map_positions, n1: { x: 300, y: 150 } } }
+  const neighbours = [
+    { id: 'n1', name: 'A2', label: 'door' },
+    { id: 'n2', name: 'A3', label: '' },
+  ]
+  render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={withNeighbour} neighbours={neighbours} onOpenEncounter={(id) => opened.push(id)} onOpenChapter={(ch) => chapters.push(ch.id)} onChange={() => {}} />)
+  const nav = screen.getByRole('navigation', { name: 'Connected rooms' })
+  fireEvent.click(within(nav).getByRole('button', { name: 'A2 (door)' }))
+  fireEvent.click(within(nav).getByRole('button', { name: 'A3' }))
+  fireEvent.click(within(nav).getByRole('button', { name: 'Open chapter map' }))
+  assert.deepEqual(opened, ['n1', 'n2'])
+  assert.deepEqual(chapters, ['ch'])
+  // Only the neighbour with a map position gets a card on the crop, and it opens too.
+  const cards = screen.getByRole('img', { name: 'Room on the chapter map' }).querySelectorAll('.room-neighbour')
+  assert.equal(cards.length, 1)
+  assert.deepEqual([cards[0].querySelector('rect').getAttribute('x'), cards[0].querySelector('rect').getAttribute('y')], ['300', '150'])
+  fireEvent.click(cards[0])
+  assert.deepEqual(opened, ['n1', 'n2', 'n1'])
+})
+
+test('RoomView: no navigation when there are no neighbours and no chapter', () => {
+  render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={null} neighbours={[]} onOpenEncounter={() => {}} onOpenChapter={() => {}} onChange={() => {}} />)
+  assert.equal(screen.queryByRole('navigation', { name: 'Connected rooms' }), null)
 })

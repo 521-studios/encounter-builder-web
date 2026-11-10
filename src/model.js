@@ -671,6 +671,28 @@ export function incomingLinks(encounterId, siblingEncounters, currentExits) {
   return out
 }
 
+// muz0.8: the rooms this one connects to either way, for the Room tab's navigation.
+// Its own linked exits come first (exit order), then rooms whose exits lead here that
+// it doesn't link back to. Targets not among the siblings (deleted) are skipped.
+export function roomNeighbours(encounterId, exits, siblings) {
+  const byId = new Map((siblings || []).map((s) => [String(s.id), s]))
+  const seen = new Set([String(encounterId)])
+  const out = []
+  for (const x of exits || []) {
+    const id = String(x.to_encounter_id || '')
+    const s = byId.get(id)
+    if (!s || seen.has(id)) continue
+    seen.add(id)
+    out.push({ id, name: s.name || 'Untitled', label: x.label || '' })
+  }
+  for (const inc of incomingLinks(encounterId, siblings, exits)) {
+    if (seen.has(inc.id)) continue
+    seen.add(inc.id)
+    out.push({ id: inc.id, name: inc.name, label: inc.label })
+  }
+  return out
+}
+
 // Serialize an exit for the API: drop the client _key, trim the label/skill, round DC.
 export function exitInput(e) {
   const { _key, ...rest } = e
