@@ -1,7 +1,7 @@
 import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import ChapterDetail from './ChapterDetail.jsx'
+import ChapterDetail, { mapSaveFields } from './ChapterDetail.jsx'
 import { resetStore, store } from '../store/store.js'
 import { setAnon } from '../api/anon.js'
 
@@ -88,6 +88,7 @@ test('ChapterDetail: rotating the map image PUTs map_image + current map_positio
   assert.equal(puts[0].map_image.rotation, 90)
   assert.equal(puts[0].map_image.scale, 1)
   assert.equal(puts[0].map_image.key, 'maps/c1/ch1/x.png')
+  assert.equal('url' in puts[0].map_image, false) // GET-only field never goes back
 })
 
 test('ChapterDetail: a chapter without a map image never sends map_image', async () => {
@@ -103,4 +104,26 @@ test('ChapterDetail: a chapter without a map image never sends map_image', async
   await store.chapters.flush('c1', 'ch1')
   assert.ok(puts.length >= 1)
   assert.equal('map_image' in puts.at(-1), false)
+})
+
+test('mapSaveFields: a positions-only save still carries the current image, in its write shape', () => {
+  const img = { key: 'k', url: 'https://e.test/x.png', width: 800, height: 600, rotation: 90, scale: 0.5 }
+  assert.deepEqual(mapSaveFields({ a: { x: 1, y: 2 } }, img), {
+    map_positions: { a: { x: 1, y: 2 } },
+    map_image: { key: 'k', width: 800, height: 600, rotation: 90, scale: 0.5 },
+  })
+  assert.deepEqual(mapSaveFields({ a: { x: 1, y: 2 } }, null), { map_positions: { a: { x: 1, y: 2 } } })
+})
+
+test('ChapterDetail: opening a different chapter re-seeds the map image', async () => {
+  setAnon(false)
+  globalThis.fetch = async (url) => (String(url).endsWith('/settings') ? res({ party_level: 3, party_size: 4 }) : res([]))
+  const img = (u) => ({ key: u, url: `https://e.test/${u}`, width: 10, height: 10 })
+  const props = { campaignId: 'c1', onClose: () => {}, onOpenEncounter: () => {} }
+  const { rerender } = render(<ChapterDetail {...props} chapter={{ ...chapter, map_image: img('a.png') }} />)
+  await screen.findByRole('tablist')
+  fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
+  assert.equal(screen.getByAltText('Chapter map').getAttribute('src'), 'https://e.test/a.png')
+  rerender(<ChapterDetail {...props} chapter={{ ...chapter, id: 'ch2', map_image: img('b.png') }} />)
+  assert.equal((await screen.findByAltText('Chapter map')).getAttribute('src'), 'https://e.test/b.png')
 })

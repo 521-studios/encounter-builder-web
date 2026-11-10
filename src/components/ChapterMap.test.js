@@ -97,3 +97,11 @@ test('ChapterMap: no onMapImageChange → toggle only, no rotate/scale controls'
   assert.ok(screen.getByRole('button', { name: 'Hide map image' }))
   assert.equal(screen.queryByRole('button', { name: /Rotate/ }), null)
 })
+
+test('ChapterMap: scale resizes the image and rotation spins it', () => {
+  render(<ChapterMap encounters={chapter} onOpenEncounter={() => {}} mapImage={{ ...mapImage, rotation: 90, scale: 0.5 }} />)
+  const img = screen.getByAltText('Chapter map')
+  assert.equal(img.getAttribute('width'), '400')
+  assert.equal(img.getAttribute('height'), '300')
+  assert.equal(img.style.transform, 'rotate(90deg)')
+})

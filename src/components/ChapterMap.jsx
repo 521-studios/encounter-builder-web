@@ -89,6 +89,31 @@ function MapImageNode({ data }) {
 }
 const nodeTypes = { room: RoomNode, exit: ExitNode, mapImage: MapImageNode }
 
+// Rotate a quarter-turn and scale; each change sends the whole map_image back.
+function MapImageControls({ mapImage, onChange }) {
+  const { rotation, scale } = imageTransform(mapImage)
+  return (
+    <>
+      <button type="button" className="link" onClick={() => onChange({ ...mapImage, rotation: (rotation + 90) % 360, scale })}>
+        Rotate 90° ({rotation}°)
+      </button>
+      <label>
+        Scale{' '}
+        <input
+          type="range"
+          aria-label="map image scale"
+          min={SCALE_MIN * 100}
+          max={SCALE_MAX * 100}
+          step={5}
+          value={Math.round(scale * 100)}
+          onChange={(e) => onChange({ ...mapImage, rotation, scale: Number(e.target.value) / 100 })}
+        />{' '}
+        {Math.round(scale * 100)}%
+      </label>
+    </>
+  )
+}
+
 // The centre + half-extents of an internal React Flow node (measured, with fallbacks).
 function boxOf(n) {
   const w = n.measured?.width || (n.type === 'exit' ? 36 : 132)
@@ -238,29 +263,7 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
                 <button type="button" className="link" onClick={() => setShowImage((v) => !v)}>
                   {showImage ? 'Hide map image' : 'Show map image'}
                 </button>
-                {showImage && onMapImageChange && (() => {
-                  const { rotation, scale } = imageTransform(mapImage)
-                  return (
-                    <>
-                      <button type="button" className="link" onClick={() => onMapImageChange({ ...mapImage, rotation: (rotation + 90) % 360, scale })}>
-                        Rotate 90° ({rotation}°)
-                      </button>
-                      <label>
-                        Scale{' '}
-                        <input
-                          type="range"
-                          aria-label="map image scale"
-                          min={SCALE_MIN * 100}
-                          max={SCALE_MAX * 100}
-                          step={5}
-                          value={Math.round(scale * 100)}
-                          onChange={(e) => onMapImageChange({ ...mapImage, rotation, scale: Number(e.target.value) / 100 })}
-                        />{' '}
-                        {Math.round(scale * 100)}%
-                      </label>
-                    </>
-                  )
-                })()}
+                {showImage && onMapImageChange && <MapImageControls mapImage={mapImage} onChange={onMapImageChange} />}
               </div>
             )}
             <p className="map-legend muted">
