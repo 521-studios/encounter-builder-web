@@ -1,0 +1,113 @@
+import { test, afterEach } from 'node:test'
+import assert from 'node:assert/strict'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import RoomView from './RoomView.jsx'
+import { setAnon } from '../api/anon.js'
+
+afterEach(() => {
+  cleanup()
+  setAnon(false)
+})
+
+const chapterImg = { key: 'maps/c/ch/a.png', url: '/maps/c/ch/a.png', width: 1000, height: 800, rotation: 0, scale: 1 }
+const chapter = { id: 'ch', map_image: chapterImg, map_positions: { e1: { x: 100, y: 200 } } }
+const region = { x: 100, y: 100, w: 400, h: 200 }
+
+test('RoomView: crops the chapter map to the padded region', () => {
+  render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={chapter} onChange={() => {}} />)
+  const svg = screen.getByRole('img', { name: 'Room on the chapter map' })
+  assert.equal(svg.getAttribute('viewBox'), '0 0 600 400') // padded by 100 (a quarter of 400) each side
+  assert.equal(svg.querySelector('image').getAttribute('href'), '/maps/c/ch/a.png')
+  assert.ok(screen.getByRole('button', { name: 'Change area on chapter map' }))
+})
+
+test("RoomView: the encounter's own image wins over the crop, and hides the area controls", () => {
+  render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region, map_image: { key: 'k', url: '/k.png', width: 1, height: 1 } }} chapter={chapter} onChange={() => {}} />)
+  assert.equal(screen.getByRole('img', { name: 'Room map' }).getAttribute('src'), '/k.png')
+  assert.equal(screen.queryByRole('button', { name: /area on chapter map/ }), null)
+  assert.ok(screen.getByRole('button', { name: 'Remove room image' }))
+})
+
+test('RoomView: hints when there is nothing to show', () => {
+  const { rerender } = render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={null} onChange={() => {}} />)
+  assert.ok(screen.getByText(/Put this encounter in a chapter/))
+  rerender(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={{ id: 'ch' }} onChange={() => {}} />)
+  assert.ok(screen.getByText(/Upload a map image on the chapter/))
+  rerender(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={() => {}} />)
+  assert.ok(screen.getByText(/No area set yet/))
+})
+
+test("RoomView: the picker shows the whole map with this room's card outlined; cancel returns", () => {
+  render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={() => {}} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Mark area on chapter map' }))
+  const picker = screen.getByTestId('room-picker')
+  assert.equal(picker.getAttribute('viewBox'), '0 0 1000 800')
+  const card = picker.querySelector('.room-card-outline')
+  assert.deepEqual([card.getAttribute('x'), card.getAttribute('y')], ['100', '200'])
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  assert.equal(screen.queryByTestId('room-picker'), null)
+})
+
+test('RoomView: clear area sends null; released is read-only', () => {
+  const calls = []
+  const { rerender } = render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={chapter} onChange={(p) => calls.push(p)} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Clear area' }))
+  assert.deepEqual(calls, [{ map_region: null }])
+  rerender(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={chapter} released onChange={() => {}} />)
+  assert.equal(screen.queryByRole('button'), null)
+})
+
+test("RoomView: the crop draws the image at the chapter's rotation and scale", () => {
+  const turned = { ...chapter, map_image: { ...chapterImg, rotation: 90, scale: 0.5 } }
+  render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={turned} onChange={() => {}} />)
+  const image = screen.getByRole('img', { name: 'Room on the chapter map' }).querySelector('image')
+  assert.deepEqual([image.getAttribute('width'), image.getAttribute('height')], ['500', '400'])
+  assert.equal(image.getAttribute('transform'), 'rotate(90 250 200)')
+})
+
+test('RoomView: no room image upload in anonymous mode', () => {
+  render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={() => {}} />)
+  assert.ok(screen.getByLabelText(/Upload room image/))
+  cleanup()
+  setAnon(true)
+  render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={() => {}} />)
+  assert.equal(screen.queryByLabelText(/Upload room image/), null)
+  assert.ok(screen.getByRole('button', { name: 'Mark area on chapter map' })) // the area itself still works locally
+})
+
+// jsdom has no SVG screen matrix: map client coordinates 1:1 so the drag can be driven.
+function identityScreen(svg) {
+  svg.getScreenCTM = () => ({ inverse: () => ({}) })
+  svg.setPointerCapture = () => {}
+}
+
+test('RoomView: dragging a box on the picker saves it as map_region; a bare click saves nothing', () => {
+  const realPoint = globalThis.DOMPoint
+  globalThis.DOMPoint = class {
+    constructor(x, y) {
+      this.x = x
+      this.y = y
+    }
+    matrixTransform() {
+      return { x: this.x, y: this.y }
+    }
+  }
+  try {
+    const calls = []
+    render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={(p) => calls.push(p)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mark area on chapter map' }))
+    let svg = screen.getByTestId('room-picker')
+    identityScreen(svg)
+    fireEvent.pointerDown(svg, { clientX: 300, clientY: 300, pointerId: 1 })
+    fireEvent.pointerUp(svg, { clientX: 301, clientY: 300, pointerId: 1 })
+    assert.deepEqual(calls, []) // too small to be a box; the picker stays open
+    svg = screen.getByTestId('room-picker')
+    fireEvent.pointerDown(svg, { clientX: 600.4, clientY: 300, pointerId: 1 })
+    fireEvent.pointerMove(svg, { clientX: 400, clientY: 200, pointerId: 1 })
+    fireEvent.pointerUp(svg, { clientX: 200, clientY: 100, pointerId: 1 })
+    assert.deepEqual(calls, [{ map_region: { x: 200, y: 100, w: 400, h: 200 } }])
+    assert.equal(screen.queryByTestId('room-picker'), null) // a pick closes the picker
+  } finally {
+    globalThis.DOMPoint = realPoint
+  }
+})

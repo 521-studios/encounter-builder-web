@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { uploadMapImage, imageSize, MAP_IMAGE_MAX_BYTES } from './mapUpload.js'
+import { uploadMapImage, uploadEncounterImage, imageSize, MAP_IMAGE_MAX_BYTES } from './mapUpload.js'
 
 const file = (type = 'image/png', size = 10) => new File([new Uint8Array(size)], 'map.png', { type })
 
@@ -29,6 +29,12 @@ test('uploadMapImage: presigns, POSTs fields then file to S3, returns the write 
   assert.equal(calls.posts[0].url, 'https://bucket.test')
   assert.deepEqual(calls.posts[0].form.map(([k]) => k), ['key', 'policy', 'file']) // the file must be last
   assert.deepEqual(img, { key: 'maps/c1/ch1/abc.png', url: '/maps/c1/ch1/abc.png', width: 800, height: 600, rotation: 0, scale: 1 })
+})
+
+test('uploadEncounterImage: presigns against the encounter route', async () => {
+  const { calls, opts } = fakes()
+  await uploadEncounterImage('c1', 'e/1', file(), opts)
+  assert.equal(calls.requests[0].path, '/api/app/campaigns/c1/encounters/e%2F1/map-image/upload-url')
 })
 
 test('uploadMapImage: rejects wrong types and oversize files before any request', async () => {

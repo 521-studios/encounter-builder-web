@@ -16,13 +16,21 @@ export async function imageSize(file) {
   return size
 }
 
-export async function uploadMapImage(campaignId, chapterId, file, { requestImpl = request, fetchImpl = fetch, measure = imageSize } = {}) {
+export function uploadMapImage(campaignId, chapterId, file, opts) {
+  return uploadTo(`/api/app/campaigns/${encodeURIComponent(campaignId)}/chapters/${encodeURIComponent(chapterId)}/map-image/upload-url`, file, opts)
+}
+
+// muz0.7: an encounter's own room image, overriding its crop of the chapter map.
+export function uploadEncounterImage(campaignId, encounterId, file, opts) {
+  return uploadTo(`/api/app/campaigns/${encodeURIComponent(campaignId)}/encounters/${encodeURIComponent(encounterId)}/map-image/upload-url`, file, opts)
+}
+
+async function uploadTo(path, file, { requestImpl = request, fetchImpl = fetch, measure = imageSize } = {}) {
   if (!MAP_IMAGE_TYPES.includes(file.type)) throw new Error('Map image must be a PNG, JPEG or WebP file.')
   if (file.size > MAP_IMAGE_MAX_BYTES) throw new Error('Map image must be 15 MB or smaller.')
   const { width, height } = await measure(file).catch(() => {
     throw new Error('Could not read that image file.')
   })
-  const path = `/api/app/campaigns/${encodeURIComponent(campaignId)}/chapters/${encodeURIComponent(chapterId)}/map-image/upload-url`
   const { key, url, fields } = await requestImpl('POST', path, { body: { content_type: file.type } })
   const form = new FormData()
   for (const [k, v] of Object.entries(fields)) form.append(k, v)
