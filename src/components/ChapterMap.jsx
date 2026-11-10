@@ -57,8 +57,35 @@ function ExitNode() {
 // (natural pixel size) underneath the rooms, so it pans/zooms with the graph and the
 // GM can drag rooms onto their real spots. Not draggable/selectable; never saved.
 const MAP_IMAGE_ID = '__map-image'
+
+// muz0.3: the GM's rotate/scale of the image, persisted on map_image. Rotation is a
+// quarter-turn (0/90/180/270); scale is clamped to 10%..400%. Missing → 0 / 1.
+export const SCALE_MIN = 0.1
+export const SCALE_MAX = 4
+export function imageTransform(img) {
+  const r = Math.round(Number(img?.rotation) / 90) * 90
+  const s = Number(img?.scale)
+  return {
+    rotation: Number.isFinite(r) ? ((r % 360) + 360) % 360 : 0,
+    scale: Number.isFinite(s) && s > 0 ? Math.min(SCALE_MAX, Math.max(SCALE_MIN, s)) : 1,
+  }
+}
+
+// Scale resizes the node (so fitView and the minimap see the real footprint);
+// rotation spins the picture about its centre.
 function MapImageNode({ data }) {
-  return <img className="map-image" src={data.url} alt="Chapter map" width={data.width} height={data.height} draggable={false} />
+  const { rotation, scale } = imageTransform(data)
+  return (
+    <img
+      className="map-image"
+      src={data.url}
+      alt="Chapter map"
+      width={Math.round(data.width * scale)}
+      height={Math.round(data.height * scale)}
+      style={rotation ? { transform: `rotate(${rotation}deg)` } : undefined}
+      draggable={false}
+    />
+  )
 }
 const nodeTypes = { room: RoomNode, exit: ExitNode, mapImage: MapImageNode }
 
@@ -116,7 +143,7 @@ function PassageEdge({ source, target, data }) {
 }
 const edgeTypes = { passage: PassageEdge }
 
-export default function ChapterMap({ encounters, onOpenEncounter, positions, onPositionsChange, mapImage }) {
+export default function ChapterMap({ encounters, onOpenEncounter, positions, onPositionsChange, mapImage, onMapImageChange }) {
   const [collapsed, setCollapsed] = useState(false)
   const [showImage, setShowImage] = useState(true)
   const { nodes: rooms, exitPorts, passages, exitEdges, layout, deadEnds, stats } = useMemo(() => buildChapterGraph(encounters), [encounters])
@@ -207,9 +234,34 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
               </ReactFlow>
             </div>
             {imageNode && (
-              <button type="button" className="link" onClick={() => setShowImage((v) => !v)}>
-                {showImage ? 'Hide map image' : 'Show map image'}
-              </button>
+              <div className="map-image-controls">
+                <button type="button" className="link" onClick={() => setShowImage((v) => !v)}>
+                  {showImage ? 'Hide map image' : 'Show map image'}
+                </button>
+                {showImage && onMapImageChange && (() => {
+                  const { rotation, scale } = imageTransform(mapImage)
+                  return (
+                    <>
+                      <button type="button" className="link" onClick={() => onMapImageChange({ ...mapImage, rotation: (rotation + 90) % 360, scale })}>
+                        Rotate 90° ({rotation}°)
+                      </button>
+                      <label>
+                        Scale{' '}
+                        <input
+                          type="range"
+                          aria-label="map image scale"
+                          min={SCALE_MIN * 100}
+                          max={SCALE_MAX * 100}
+                          step={5}
+                          value={Math.round(scale * 100)}
+                          onChange={(e) => onMapImageChange({ ...mapImage, rotation, scale: Number(e.target.value) / 100 })}
+                        />{' '}
+                        {Math.round(scale * 100)}%
+                      </label>
+                    </>
+                  )
+                })()}
+              </div>
             )}
             <p className="map-legend muted">
               <strong>→</strong> one-way exit · <strong>—</strong> two-way · <span className="map-legend-dash">– –</span> secret door (🔒 = the side it's hidden from) ·{' '}

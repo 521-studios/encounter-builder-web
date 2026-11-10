@@ -2,7 +2,7 @@ import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import ChapterDetail from './ChapterDetail.jsx'
-import { resetStore } from '../store/store.js'
+import { resetStore, store } from '../store/store.js'
 import { setAnon } from '../api/anon.js'
 
 // ChapterDetail routes settings/encounters through the store's api backend → client.js
@@ -63,4 +63,44 @@ test('ChapterDetail: the Map tab renders the chapter map_image', async () => {
   await screen.findByRole('tablist')
   fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
   assert.equal(screen.getByAltText('Chapter map').getAttribute('src'), 'https://e.test/x.png')
+})
+
+// muz0.3: rotating the map image saves map_image (with the transform) AND the current
+// map_positions in one PUT, so a later positions save can't drop a pending image edit.
+test('ChapterDetail: rotating the map image PUTs map_image + current map_positions', async () => {
+  setAnon(false)
+  const puts = []
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url)
+    if (init.method === 'PUT') { puts.push(JSON.parse(init.body)); return res({ ...chapter, ...JSON.parse(init.body) }) }
+    if (u.endsWith('/settings')) return res({ party_level: 3, party_size: 4 })
+    if (u.endsWith('/encounters')) return res([])
+    return res({})
+  }
+  const withImage = { ...chapter, map_positions: { a: { x: 1, y: 2 } }, map_image: { key: 'maps/c1/ch1/x.png', url: 'https://e.test/x.png', width: 800, height: 600 } }
+  render(<ChapterDetail campaignId="c1" chapter={withImage} onClose={() => {}} onOpenEncounter={() => {}} />)
+  await screen.findByRole('tablist')
+  fireEvent.click(screen.getByRole('tab', { name: 'Map' }))
+  fireEvent.click(screen.getByRole('button', { name: /Rotate 90°/ }))
+  await store.chapters.flush('c1', 'ch1')
+  assert.equal(puts.length, 1)
+  assert.deepEqual(puts[0].map_positions, { a: { x: 1, y: 2 } })
+  assert.equal(puts[0].map_image.rotation, 90)
+  assert.equal(puts[0].map_image.scale, 1)
+  assert.equal(puts[0].map_image.key, 'maps/c1/ch1/x.png')
+})
+
+test('ChapterDetail: a chapter without a map image never sends map_image', async () => {
+  setAnon(false)
+  const puts = []
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method === 'PUT') { puts.push(JSON.parse(init.body)); return res({}) }
+    return String(url).endsWith('/settings') ? res({ party_level: 3, party_size: 4 }) : res([])
+  }
+  render(<ChapterDetail campaignId="c1" chapter={chapter} onClose={() => {}} onOpenEncounter={() => {}} />)
+  await screen.findByRole('tablist')
+  fireEvent.change(screen.getByLabelText('party level'), { target: { value: '6' } })
+  await store.chapters.flush('c1', 'ch1')
+  assert.ok(puts.length >= 1)
+  assert.equal('map_image' in puts.at(-1), false)
 })
