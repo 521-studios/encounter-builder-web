@@ -112,6 +112,47 @@ export function seedPositions(nodes, stored, layout) {
   return out
 }
 
+// muz0.4: a passage's GM-placed bend points live in map_positions under the EDGE id
+// (p:<a|b> / xe:<room>:<idx>, which never collide with a node id) as [{x, y}, ...] in
+// flow coordinates. Pick the live edges' bends; malformed points are dropped, and
+// bends of edges that no longer exist are ignored (pruned on the next save).
+export function storedWaypoints(stored, edgeIds) {
+  const out = {}
+  for (const id of edgeIds) {
+    const v = stored?.[id]
+    const pts = Array.isArray(v) ? v.filter((p) => Number.isFinite(p?.x) && Number.isFinite(p?.y)) : []
+    if (pts.length) out[id] = pts
+  }
+  return out
+}
+
+// Insert a bend at `pt` on the segment of from → ...wps → to that it adds the least
+// length to (i.e. the segment the GM double-clicked), keeping the route's order.
+export function insertWaypoint(from, wps, to, pt) {
+  const pts = [from, ...wps, to]
+  const d = (a, b) => Math.hypot(b.x - a.x, b.y - a.y)
+  let best = 0
+  let bestCost = Infinity
+  for (let i = 0; i < pts.length - 1; i++) {
+    const cost = d(pts[i], pt) + d(pt, pts[i + 1]) - d(pts[i], pts[i + 1])
+    if (cost < bestCost) {
+      bestCost = cost
+      best = i
+    }
+  }
+  return [...wps.slice(0, best), pt, ...wps.slice(best)]
+}
+
+// The layout blob saved back as map_positions: every live node's {x, y} plus every
+// bent edge's waypoints, rounded to whole pixels.
+export function layoutSnapshot(nodes, waypoints) {
+  const r = (p) => ({ x: Math.round(p.x), y: Math.round(p.y) })
+  const out = {}
+  for (const n of nodes) out[n.id] = r(n.position)
+  for (const [id, pts] of Object.entries(waypoints)) if (pts.length) out[id] = pts.map(r)
+  return out
+}
+
 // One side's edge caption for the map: a 🔒 (secret from this side), the label, and
 // any skill check (Skill DC N), joined with " · " — e.g. "🔒 hidden panel · Perception
 // DC 18". A DC with no skill shows "DC N"; secret with nothing else is just "🔒";

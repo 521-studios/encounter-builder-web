@@ -1,6 +1,38 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText, seedPositions } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, layoutSnapshot } from './chapterGraph.js'
+
+test('storedWaypoints: picks live edges, drops malformed points + empty/gone entries', () => {
+  const stored = {
+    1: { x: 5, y: 5 }, // a node position, not an edge
+    'p:1|2': [{ x: 1, y: 2 }, { x: 'bad' }, null, { x: 3, y: 4 }],
+    'p:2|3': [{ x: 'bad' }],
+    'xe:1:0': { x: 1, y: 1 }, // not an array
+    'p:gone|9': [{ x: 1, y: 1 }],
+  }
+  assert.deepEqual(storedWaypoints(stored, ['p:1|2', 'p:2|3', 'xe:1:0']), { 'p:1|2': [{ x: 1, y: 2 }, { x: 3, y: 4 }] })
+  assert.deepEqual(storedWaypoints(undefined, ['p:1|2']), {})
+})
+
+test('insertWaypoint: lands on the segment it sits on, in route order', () => {
+  const from = { x: 0, y: 0 }
+  const to = { x: 100, y: 0 }
+  assert.deepEqual(insertWaypoint(from, [], to, { x: 50, y: 10 }), [{ x: 50, y: 10 }])
+  // Route 0 → (30,40) → (70,40) → 100: a point near the middle segment goes between them.
+  const wps = [{ x: 30, y: 40 }, { x: 70, y: 40 }]
+  assert.deepEqual(insertWaypoint(from, wps, to, { x: 50, y: 42 }), [wps[0], { x: 50, y: 42 }, wps[1]])
+  assert.deepEqual(insertWaypoint(from, wps, to, { x: 10, y: 15 }), [{ x: 10, y: 15 }, ...wps])
+  assert.deepEqual(insertWaypoint(from, wps, to, { x: 90, y: 15 }), [...wps, { x: 90, y: 15 }])
+})
+
+test('layoutSnapshot: node positions + bends, rounded; empty bend lists omitted', () => {
+  const nodes = [{ id: '1', position: { x: 1.4, y: 2.6 } }, { id: 'exit:1:0', position: { x: 0, y: 0 } }]
+  assert.deepEqual(layoutSnapshot(nodes, { 'p:1|2': [{ x: 9.5, y: 0.2 }], 'p:2|3': [] }), {
+    1: { x: 1, y: 3 },
+    'exit:1:0': { x: 0, y: 0 },
+    'p:1|2': [{ x: 10, y: 0 }],
+  })
+})
 
 // A1→A2→A3→A1→A4 (all one-directional). One exit is external (no target) and one is
 // dangling (target not in the chapter) — both become boundary exit ports, not passages.
