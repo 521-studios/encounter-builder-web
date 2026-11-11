@@ -12,7 +12,7 @@
     "e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
-    "@521studios/pfsrd2-display": "git+https://github.com/521-studios/pfsrd2-display.git#ae9ba1ea5109bd2d2864aab499ce0afade0c7c7b",
+    "@521studios/pfsrd2-display": "git+https://github.com/521-studios/pfsrd2-display.git#34ba3e4ca7757466e48a8ff4d07faf82f0c9acf5",
     "@xyflow/react": "^12.11.3",
     "oidc-client-ts": "^3.1.0",
     "react": "^18.3.1",
