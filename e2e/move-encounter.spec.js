@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter, openTab } from './helpers/login.js'
 
 // HTML5 drag-and-drop: fire the drag events with a shared DataTransfer. (Playwright's
 // mouse-based dragTo can't reliably re-initiate a second consecutive native drag;
@@ -75,6 +75,7 @@ test('move an encounter via the editor Chapter select (no mouse needed)', async 
 
   // Create an Unsorted encounter (opens the editor).
   await createEncounter(page, enc)
+  await openTab(page, 'Config')
 
   // Change its Chapter in the editor; autosave persists it.
   await page.locator('select[aria-label="chapter"]').selectOption({ label: ch })

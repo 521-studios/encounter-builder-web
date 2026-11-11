@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, addContent, openEncounter, removeRow } from './helpers/login.js'
 
 // vz1j: structured skill-check / discovery entries (skill + DC + effect). Persist
-// across reload; incomplete rows (no skill or no DC) are dropped on save.
-test('skill checks: add a structured DC entry, it persists; incomplete rows are dropped', async ({ page, baseURL }) => {
+// across reload. An incomplete row (no DC) persists too (rvd4: completeness gates
+// release, not save), so in-progress work is never lost.
+test('skill checks: add a structured DC entry, it persists; an incomplete row persists too', async ({ page, baseURL }) => {
   const apiErrors = trackApiErrors(page)
   await login(page, baseURL)
   await openFirstCampaign(page)
@@ -11,29 +12,32 @@ test('skill checks: add a structured DC entry, it persists; incomplete rows are 
   const name = `Checks ${Date.now()}`
   await createEncounter(page, name)
 
-  await page.getByRole('button', { name: '+ skill check' }).click()
+  await addContent(page, 'Skill check')
   const check = page.getByTestId('skill-check')
   await expect(check).toHaveCount(1)
   await check.getByLabel('check skill').fill('Perception')
   await check.getByLabel('check DC').fill('12')
   await check.getByLabel('check effect').fill('# spot the loose planks')
 
-  // A second, incomplete row (skill but no DC) must be dropped on save.
-  await page.getByRole('button', { name: '+ skill check' }).click()
+  // A second, incomplete row (skill but no DC) still saves.
+  await addContent(page, 'Skill check')
   await page.getByTestId('skill-check').nth(1).getByLabel('check skill').fill('Nature')
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
-  // Persist across reload: the complete check survives, the incomplete one is gone.
+  // Persist across reload: both rows survive, the incomplete one as entered.
   await page.reload()
   await expect(page.getByTestId('chapter-tree')).toBeVisible()
-  await page.locator('button.encounter', { hasText: name }).click()
+  await openEncounter(page, name)
   const checks2 = page.getByTestId('skill-check')
-  await expect(checks2).toHaveCount(1)
-  await expect(checks2.getByLabel('check skill')).toHaveValue('Perception')
-  await expect(checks2.getByLabel('check DC')).toHaveValue('12')
+  await expect(checks2).toHaveCount(2)
+  await expect(checks2.first().getByLabel('check skill')).toHaveValue('Perception')
+  await expect(checks2.first().getByLabel('check DC')).toHaveValue('12')
+  await expect(checks2.nth(1).getByLabel('check skill')).toHaveValue('Nature')
 
-  // Removing it clears the entry.
-  await checks2.getByRole('button', { name: 'remove' }).click()
+  // Removing them clears the entries.
+  await removeRow(page, checks2.first())
+  await expect(checks2).toHaveCount(1)
+  await removeRow(page, checks2.first())
   await expect(page.getByTestId('skill-check')).toHaveCount(0)
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
 

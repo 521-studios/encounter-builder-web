@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openTab, openBudget } from './helpers/login.js'
 
 // 529w: for a table that isn't the 4-PC book standard, the budget panel shows the
 // same roster's CANONICAL band at 4 PCs (directly comparable to a module's printed
@@ -14,18 +14,21 @@ test('budget shows the canonical 4-PC band + normalized XP for a larger table', 
   await createEncounter(page, name)
 
   // Pin a 6-PC table at level 1 via the encounter's own override.
+  await openTab(page, 'Config')
   await page.locator('.editor').getByLabel('party level').fill('1')
   await page.locator('.editor').getByLabel('party size').fill('6')
+  await openTab(page, 'Encounter')
 
   // Level-14 dragon vs level 1 is capped at PL+4 = 160 XP: Moderate for 6 PCs, but
   // Extreme at the 4-PC book standard.
-  await page.getByRole('button', { name: '+ monster' }).click()
+  await addContent(page, 'Monster')
   await page.locator('.monster-search [data-testid="creature-search"]').first().fill('adult cinder dragon')
   const dragon = page.locator('.monster-search [data-testid="search-result"][data-name="Adult Cinder Dragon"]')
   await expect(dragon).toBeVisible()
   await dragon.click()
-  await expect(page.locator('.picked')).toBeVisible()
+  await expect(page.getByTestId('monster-header')).toBeVisible()
 
+  await openBudget(page)
   await expect(page.getByTestId('encounter-threat')).toHaveText('Moderate') // as-configured (6 PCs)
   const canon = page.getByTestId('budget-canonical')
   await expect(canon).toBeVisible()
@@ -36,7 +39,9 @@ test('budget shows the canonical 4-PC band + normalized XP for a larger table', 
   await expect(page.getByTestId('difficulty-badge')).toHaveAttribute('title', /Extreme at 4 PCs \(book standard\)/)
 
   // At the 4-PC standard the lens is redundant and hidden.
+  await openTab(page, 'Config')
   await page.locator('.editor').getByLabel('party size').fill('4')
+  await openTab(page, 'Encounter')
   await expect(page.getByTestId('budget-canonical')).toHaveCount(0)
 
   await page.getByRole('button', { name: /^Close/ }).click()

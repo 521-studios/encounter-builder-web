@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openEncounter } from './helpers/login.js'
 
 // Placing a hazard in an encounter (bd_521Studios-cid5): a SEPARATE "+ hazard"
 // search over hazards + weather hazards (not the monster search), its own slot with
@@ -15,24 +15,24 @@ test('add a hazard: separate search, HAZARD header + stat block, persists', asyn
   await createEncounter(page, name)
 
   // The "+ hazard" affordance is separate from "+ monster".
-  await page.getByRole('button', { name: '+ hazard' }).click()
+  await addContent(page, 'Hazard')
   await page.locator('.hazard-search [data-testid="creature-search"]').first().fill('spike launcher')
   const result = page.locator('.hazard-search [data-testid="search-result"]', { hasText: 'Spike Launcher' }).first()
   await expect(result).toBeVisible()
   await result.click()
 
-  const line = page.locator('.hazard-line-wrap')
+  const line = page.locator('.creature-card', { has: page.getByTestId('hazard-header') })
   await expect(line.getByTestId('hazard-header-level')).toContainText('HAZARD')
   // Open the hazard stat block (rendered via the library HazardStatBlock).
-  await line.getByRole('button', { name: 'stat block' }).click()
+  await line.getByRole('button', { name: /^show stat block for/ }).click()
   await expect(line.locator('[data-testid="hazard-stat-block"]')).toBeVisible()
 
   // Autosave persists the hazard; reload and confirm it re-derives.
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
   await page.reload()
   await expect(page.getByTestId('chapter-tree')).toBeVisible()
-  await page.locator('button.encounter', { hasText: name }).click()
-  await expect(page.locator('.hazard-line-wrap').getByTestId('hazard-header-level')).toContainText('HAZARD')
+  await openEncounter(page, name)
+  await expect(page.locator('.creature-card', { has: page.getByTestId('hazard-header') }).getByTestId('hazard-header-level')).toContainText('HAZARD')
 
   // Cleanup.
   await page.getByRole('button', { name: /^Close/ }).click()

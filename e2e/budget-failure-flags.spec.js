@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, openFirstCampaign, createEncounter, deleteEncounter, addContent, openBudget } from './helpers/login.js'
 
 // f4fc: when an encounter's referenced entries can't load, the treasure/difficulty
 // budget must say so — a failure alert + Retry — not silently show a wrong/zero
@@ -18,14 +18,15 @@ test('the treasure budget surfaces an entry load failure with a Retry', async ({
   )
 
   // Add a monster (search hits a different endpoint, so the picker still works).
-  await page.getByRole('button', { name: '+ monster' }).click()
+  await addContent(page, 'Monster')
   await page.locator('.monster-search [data-testid="creature-search"]').first().fill('adult cinder dragon')
   const dragon = page.locator('.monster-search [data-testid="search-result"][data-name="Adult Cinder Dragon"]')
   await expect(dragon).toBeVisible()
   await dragon.click()
-  await expect(page.locator('.picked')).toBeVisible()
+  await expect(page.getByTestId('monster-header')).toBeVisible()
 
   // The budget panel shows the failure alert + Retry rather than a bogus budget.
+  await openBudget(page)
   const budget = page.getByTestId('treasure-budget')
   const err = budget.getByTestId('budget-error')
   await expect(err).toBeVisible()

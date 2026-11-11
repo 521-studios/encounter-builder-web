@@ -52,6 +52,16 @@ export async function createEncounter(page, name, group) {
   await page.getByLabel('encounter name').fill(name)
   await put
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
+  // The editor opens on Config; most specs build content next, so land on Encounter.
+  await openTab(page, 'Encounter')
+}
+
+// Switch the open encounter editor to a tab (Config / Encounter / Exits / Room).
+// The editor always opens on Config, including after a re-open or reload.
+export async function openTab(page, label) {
+  const tab = page.getByRole('tab', { name: label, exact: true })
+  await tab.click()
+  await expect(tab).toHaveAttribute('aria-selected', 'true')
 }
 
 // Create-and-open a chapter, name it, wait for the rename to persist, and close
@@ -65,6 +75,38 @@ export async function createChapter(page, name) {
   await put
   await expect(detail.getByTestId('chapter-saved')).toHaveText('Saved')
   await detail.getByRole('button', { name: 'Close' }).click()
+}
+
+// Add a content row via the Encounter tab's "+ Add" dialog, by its type label
+// (Markdown section, Box text, Monster, Hazard, Affliction, Skill check,
+// Treasure pool, Treasure, Coin, XP award, Reward).
+export async function addContent(page, label) {
+  await page.getByTestId('add-content').click()
+  const dialog = page.getByRole('dialog', { name: 'Add to the encounter' })
+  await dialog.getByRole('button', { name: label, exact: true }).click()
+  await expect(dialog).toBeHidden()
+}
+
+// Show the encounter's treasure/XP budget table (Encounter tab; the header's
+// treasure chip toggles it, and it starts hidden on every open/reload).
+export async function openBudget(page) {
+  const chip = page.getByTestId('treasure-chip')
+  if ((await chip.getAttribute('aria-expanded')) !== 'true') await chip.click()
+  await expect(page.getByTestId('treasure-budget')).toBeVisible()
+}
+
+// Click a row's × and accept its "Remove this …?" confirm (Playwright dismisses
+// dialogs by default, which would cancel the removal).
+export async function removeRow(page, row) {
+  page.once('dialog', (d) => d.accept())
+  await row.getByRole('button', { name: /^Remove / }).click()
+}
+
+// Re-open an encounter from the sidebar and land on a tab (default Encounter).
+export async function openEncounter(page, name, tab = 'Encounter') {
+  await page.locator('button.encounter', { hasText: name }).first().click()
+  await expect(page.locator('.editor')).toBeVisible()
+  await openTab(page, tab)
 }
 
 // Open an encounter from the sidebar and delete it from inside the editor.

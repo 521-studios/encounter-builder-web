@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent } from './helpers/login.js'
 
 // The library search filters wired into the app's monster + treasure pickers:
 // CreatureSearch by trait, ItemSearch by category/subcategory (+ trait). The
@@ -13,7 +13,7 @@ test('monster + treasure pickers filter by tag / category', async ({ page, baseU
   await createEncounter(page, name)
 
   // --- Monster picker: trait filter present + narrows the results ---
-  await page.getByRole('button', { name: '+ monster' }).click()
+  await addContent(page, 'Monster')
   const cinder = page.locator(
     '.monster-search [data-testid="search-result"][data-name="Adult Cinder Dragon"]',
   )
@@ -37,9 +37,12 @@ test('monster + treasure pickers filter by tag / category', async ({ page, baseU
   await undead.click()
   // Adult Cinder Dragon isn't Undead → filtered out.
   await expect(cinder).toHaveCount(0)
+  // Click away to close the trait dropdown (it overlays "+ Add"; Escape doesn't close it).
+  await page.getByLabel('encounter name').click()
+  await expect(undead).toBeHidden()
 
   // --- Treasure picker: category dropdown + trait filter present, category narrows ---
-  await page.getByRole('button', { name: '+ treasure' }).click()
+  await addContent(page, 'Treasure')
   const category = page.locator('.item-search [data-testid="ItemSearch-category"]')
   await expect(category.locator('option', { hasText: 'Runes' })).toBeAttached()
   await expect(page.locator('.item-search [data-testid="ItemSearch-trait-input"]')).toBeVisible()

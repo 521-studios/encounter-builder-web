@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, trackApiErrors, createEncounter, deleteEncounter, addContent, openEncounter } from './helpers/login.js'
 
 // The end-to-end acceptance loop: sign in → pick a campaign → build an encounter
 // (monster search + stat block) → autosave → persist across reload → release.
@@ -20,18 +20,20 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   await createEncounter(page, name)
 
   // Add a monster via the library CreatureSearch and confirm the stat block renders.
-  await page.getByRole('button', { name: '+ monster' }).click()
+  await addContent(page, 'Monster')
   await page.locator('.monster-search [data-testid="creature-search"]').first().fill('goblin')
   await expect(page.locator('.monster-search [data-testid="search-result"]').first()).toBeVisible()
   await page.locator('.monster-search [data-testid="search-result"]').first().click()
-  await expect(page.locator('.picked')).toBeVisible()
-  await page.getByRole('button', { name: 'stat block' }).first().click()
+  await expect(page.getByTestId('monster-header')).toBeVisible()
+  await page.getByRole('button', { name: /^show stat block for/ }).first().click()
   await expect(page.locator('.statblock')).toBeVisible()
 
-  // Give it a markdown description (v2) and confirm the library Markdown renders it.
+  // Give it a markdown section and confirm the library Markdown renders it.
+  await addContent(page, 'Markdown section')
   await page.locator('.description-input').fill('# The Vault\n\nA **giant** guards the door.')
-  await expect(page.getByTestId('description-preview').locator('h1')).toHaveText('The Vault')
-  await expect(page.getByTestId('description-preview').locator('strong')).toHaveText('giant')
+  await page.locator('.text-block').getByRole('button', { name: 'Done' }).click()
+  await expect(page.locator('.description-preview h1')).toHaveText('The Vault')
+  await expect(page.locator('.description-preview strong')).toHaveText('giant')
 
   // Autosave — wait for the status indicator to reach "Saved" before reloading.
   // It flips to "Saved" only after the debounced PUT resolves with no pending
@@ -46,13 +48,11 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
   const encounterBtn = page.locator('button.encounter', { hasText: name })
   await expect(encounterBtn).toBeVisible()
-  await encounterBtn.click()
-  await expect(page.locator('.editor')).toBeVisible()
-  // The markdown description persisted (raw in the textarea, rendered in preview).
-  await expect(page.locator('.description-input')).toHaveValue(/The Vault/)
-  await expect(page.getByTestId('description-preview').locator('h1')).toHaveText('The Vault')
-  await expect(page.locator('.picked')).toBeVisible()
-  await page.getByRole('button', { name: 'stat block' }).first().click()
+  await openEncounter(page, name)
+  // The markdown section persisted (rendered in preview).
+  await expect(page.locator('.description-preview h1')).toHaveText('The Vault')
+  await expect(page.getByTestId('monster-header')).toBeVisible()
+  await page.getByRole('button', { name: /^show stat block for/ }).first().click()
   await expect(page.locator('.statblock')).toBeVisible()
 
   // Release → read-only.
