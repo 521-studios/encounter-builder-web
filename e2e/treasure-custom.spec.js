@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openEncounter, openBudget } from './helpers/login.js'
 
 // 1nej: a freeform/custom treasure item (name + gp) for loot not in the pfsrd2
 // catalog — gems, art, trophies, quest items (e.g. AV's "peridot bead, 2 gp"). It
@@ -13,12 +13,13 @@ test('custom treasure item: add name + gp, counts toward the total, persists', a
   await createEncounter(page, name)
 
   // Add a treasure line, then choose the custom-item path instead of the catalog.
-  await page.getByRole('button', { name: '+ treasure' }).click()
+  await addContent(page, 'Treasure')
   await page.getByRole('button', { name: '+ custom item' }).click()
   const custom = page.getByTestId('custom-treasure')
   await expect(custom).toBeVisible()
   await custom.getByLabel('custom item name').fill('peridot bead')
   await custom.getByLabel('value (gp)').fill('2')
+  await openBudget(page)
 
   // It counts toward the treasure total (2 gp).
   await expect(page.getByTestId('treasure-value')).toHaveText('2 gp')
@@ -27,10 +28,11 @@ test('custom treasure item: add name + gp, counts toward the total, persists', a
   // Persists across reload (rides in the ContentRef's opaque json — no API change).
   await page.reload()
   await expect(page.getByTestId('chapter-tree')).toBeVisible()
-  await page.locator('button.encounter', { hasText: name }).click()
+  await openEncounter(page, name)
   const custom2 = page.getByTestId('custom-treasure')
   await expect(custom2.getByLabel('custom item name')).toHaveValue('peridot bead')
   await expect(custom2.getByLabel('value (gp)')).toHaveValue('2')
+  await openBudget(page)
   await expect(page.getByTestId('treasure-value')).toHaveText('2 gp')
 
   // Cleanup.

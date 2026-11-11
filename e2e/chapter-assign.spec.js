@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter, openTab } from './helpers/login.js'
 
 // Regression guard for the buildInput chapter_id echo: a chapter-assigned
 // encounter must NOT jump to Unsorted when saved. Without the echo, the PUT
@@ -21,11 +21,12 @@ test('a chapter-assigned encounter stays in its chapter after save+reload', asyn
   })
   await expect(group).toBeVisible()
   await createEncounter(page, encName, group)
+  await openTab(page, 'Config') // Notes is a plain autosaved field
 
   // Trigger another autosave with a harmless edit. The autosave PUT echoes
   // chapter_id via buildInput, which is the exact regression under test. Wait for
   // the indicator to settle before reload.
-  await page.locator('.description-input').fill(`assigned ${stamp}`)
+  await page.getByLabel('Notes').fill(`assigned ${stamp}`)
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
 
   // Reload — the encounter must still be inside its chapter group, not Unsorted.

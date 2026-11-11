@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter, addContent, openTab } from './helpers/login.js'
 
 // Chapter + campaign treasure rollups (always visible, collapse-by-title). Build a
 // chapter with two coin encounters and confirm the chapter detail sums the loot per
@@ -21,7 +21,8 @@ test('chapter treasure + campaign-by-chapter summary sum the encounters loot', a
 
   for (const [name, gp] of [[encA, '30'], [encB, '20']]) {
     await createEncounter(page, name, group)
-    await page.locator('.editor .coins').getByLabel('gp', { exact: true }).fill(gp)
+    await addContent(page, 'Coin')
+    await page.locator('.content-coin').getByLabel('gp', { exact: true }).fill(gp)
     await expect(page.getByTestId('save-state')).toHaveText('Saved')
     await page.getByRole('button', { name: /^Close/ }).click()
     await expect(group.locator('button.encounter', { hasText: name })).toBeVisible()
@@ -30,6 +31,7 @@ test('chapter treasure + campaign-by-chapter summary sum the encounters loot', a
   // Chapter rollup: 30 + 20 = 50 gp total across the two encounters, one row each.
   // It's always visible now (no Show toggle).
   await page.getByRole('button', { name: `Open chapter ${chapterName}` }).click()
+  await openTab(page, 'Summary') // chapter detail opens on Config
   const chapterRollup = page.getByTestId('chapter-detail').getByTestId('treasure-rollup')
   await expect(chapterRollup).toBeVisible()
   await expect(chapterRollup.getByTestId('rollup-total')).toHaveText('50 gp')

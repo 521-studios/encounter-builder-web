@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openEncounter } from './helpers/login.js'
 
 // Applying a pfsrd2 template to a monster via the library TemplatePicker:
 // highlights the changed values, stores the derived ref, and — crucially —
@@ -14,10 +14,10 @@ test('apply a template to a monster: highlights, persists, and re-derives on rel
   await createEncounter(page, name)
 
   // Add a monster and open its stat block (which hosts the TemplatePicker).
-  await page.getByRole('button', { name: '+ monster' }).click()
+  await addContent(page, 'Monster')
   await page.locator('.monster-search [data-testid="creature-search"]').first().fill('goblin')
   await page.locator('.monster-search [data-testid="search-result"]').first().click()
-  await page.getByRole('button', { name: 'stat block' }).first().click()
+  await page.getByRole('button', { name: /^show stat block for/ }).first().click()
   const block = page.locator('.monster-view .statblock')
   await expect(block.locator('.Monster')).toBeVisible()
   await expect(block.locator('.Monster__changed')).toHaveCount(0) // nothing applied yet
@@ -56,8 +56,8 @@ test('apply a template to a monster: highlights, persists, and re-derives on rel
 
   await page.reload()
   await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
-  await page.locator('button.encounter', { hasText: name }).click()
-  await page.getByRole('button', { name: 'stat block' }).first().click()
+  await openEncounter(page, name)
+  await page.getByRole('button', { name: /^show stat block for/ }).first().click()
   const block2 = page.locator('.monster-view .statblock')
   await expect(block2.locator('.Monster__changed').first()).toBeVisible() // re-derived highlighting
   await expect(block2.locator('.Monster__template-title').first()).toBeVisible() // section re-derives too

@@ -18,6 +18,9 @@ test('a chapter detail warns when inherited party values fail to load, and stays
       : route.continue(),
   )
 
+  // The store caches settings from the first load, so reload to make the next read hit the failing route.
+  await page.reload()
+  await expect(page.getByTestId('chapter-tree')).toBeVisible()
   await page.getByRole('button', { name: `Open chapter ${chapterName}` }).click()
   const detail = page.getByTestId('chapter-detail')
   await expect(detail).toBeVisible()

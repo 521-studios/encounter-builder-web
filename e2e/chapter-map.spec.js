@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteChapter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteChapter, openTab } from './helpers/login.js'
 
 // 8hda: the chapter connectivity map. Two rooms in a chapter linked by a 3qq7 exit
 // render as a node-link graph; clicking a node opens that encounter.
@@ -18,6 +18,7 @@ test('chapter map: linked rooms render as a graph; clicking a node opens the enc
 
   await createEncounter(page, roomB, group) // target first
   await createEncounter(page, roomA, group) // opens A's editor
+  await openTab(page, 'Exits')
 
   // Link A → B.
   await page.getByRole('button', { name: '+ exit' }).click()
@@ -28,17 +29,20 @@ test('chapter map: linked rooms render as a graph; clicking a node opens the enc
   await page.locator('.chapter-name', { hasText: chName }).click()
   const detail = page.getByTestId('chapter-detail')
   await expect(detail).toBeVisible()
+  await openTab(page, 'Map') // chapter detail opens on Config
 
   // The map: two nodes, at least one edge, and the title stats.
-  await expect(detail.getByTestId('map-svg')).toBeVisible()
-  await expect(detail.getByTestId('map-node')).toHaveCount(2)
-  // The A→B edge renders as one <g> — assert by count (a horizontal edge has a
+  // (React Flow canvas: room nodes + passage edges.)
+  await expect(detail.getByTestId('map-canvas')).toBeVisible()
+  const rooms = detail.locator('.react-flow__node-room')
+  await expect(rooms).toHaveCount(2)
+  // The A→B passage is one edge — assert by count (a horizontal edge has a
   // zero-height bbox, which Playwright's visibility heuristic reports as hidden).
-  await expect(detail.getByTestId('map-edge')).toHaveCount(1)
+  await expect(detail.locator('.react-flow__edge')).toHaveCount(1)
   await expect(detail.getByText(/Map — 2 rooms/)).toBeVisible()
 
   // Clicking Room B's node opens Room B's editor.
-  await detail.getByLabel(`Open ${roomB}`).click()
+  await rooms.filter({ hasText: roomB }).click()
   await expect(page.locator('.editor')).toBeVisible()
   await expect(page.getByLabel('encounter name')).toHaveValue(roomB)
 

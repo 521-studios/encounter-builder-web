@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openEncounter } from './helpers/login.js'
 
 // Pick an item with versions (a Striking rune). It reads like the book — every
 // version stacked, nothing selected until the GM locks one in — and the chosen
@@ -13,7 +13,7 @@ test('treasure item version is locked in by selecting it and persists', async ({
   await createEncounter(page, name)
 
   // Add a treasure line and pick the Striking rune (has versions).
-  await page.getByRole('button', { name: '+ treasure' }).click()
+  await addContent(page, 'Treasure')
   await page.locator('.item-search [data-testid="item-search"]').first().fill('striking')
   const striking = page.locator('.item-search [data-testid="item-search-result"][data-name="Striking"]').first()
   await expect(striking).toBeVisible()
@@ -40,7 +40,7 @@ test('treasure item version is locked in by selecting it and persists', async ({
   // Reload, re-open — the Greater version is still locked in (collapsed), no prompt.
   await page.reload()
   await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
-  await page.locator('button.encounter', { hasText: name }).click()
+  await openEncounter(page, name)
   const wrap2 = page.locator('.treasure-line-wrap')
   const card2 = wrap2.locator('.itemcard')
   await expect(card2.locator('.Monster__name')).toHaveText('Striking (Greater)')

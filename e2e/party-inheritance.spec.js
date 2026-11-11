@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, deleteChapter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, deleteChapter, openTab } from './helpers/login.js'
 
 // Slice 3: expected-party inheritance across campaign -> chapter -> encounter.
 // Set a campaign default, override it on a chapter (seeing the inherited value),
@@ -39,6 +39,7 @@ test('party level/size inherits campaign -> chapter -> encounter with per-layer 
     has: page.locator('.chapter-name', { hasText: chapterName }),
   })
   await createEncounter(page, encName, group)
+  await openTab(page, 'Config') // party fields live on Config
   const editorLevel = page.locator('.editor').getByLabel('party level')
   // Inherits the chapter's 8 (placeholder) and campaign's 4 for size.
   await expect(editorLevel).toHaveAttribute('placeholder', '8')

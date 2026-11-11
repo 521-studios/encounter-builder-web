@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openEncounter } from './helpers/login.js'
 
 // Item templating (6wzv): a treasure item can be customized with a rune — "+1 rapier"
 // = base Rapier + Weapon Potency — named, highlighted, and re-derived after reload
@@ -14,7 +14,7 @@ test('treasure item templating: compose a rune onto a weapon, name it, persist +
   await createEncounter(page, name)
 
   // Add a treasure line and pick the BASE weapon.
-  await page.getByRole('button', { name: '+ treasure' }).click()
+  await addContent(page, 'Treasure')
   await page.locator('.item-search [data-testid="item-search"]').first().fill('rapier')
   const rapier = page.locator('.item-search [data-testid="item-search-result"]', { hasText: 'Rapier' }).first()
   await expect(rapier).toBeVisible()
@@ -48,7 +48,7 @@ test('treasure item templating: compose a rune onto a weapon, name it, persist +
 
   await page.reload()
   await expect(page.getByTestId('chapter-tree')).toBeVisible()
-  await page.locator('button.encounter', { hasText: name }).click()
+  await openEncounter(page, name)
   const line2 = page.locator('.treasure-line-wrap')
   // A composed line renders collapsed: the resolved card (custom name + highlighted
   // changes, both re-derived from the stored modifications), plus a Customize button.

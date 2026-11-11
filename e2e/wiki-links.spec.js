@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, addContent } from './helpers/login.js'
 
 // w08f: a [[wiki-link]] in an encounter's markdown description resolves to another
 // encounter and becomes a clickable link that opens it.
@@ -15,9 +15,11 @@ test('wiki-links: [[Name]] in a description links to and opens that encounter', 
   await createEncounter(page, roomA) // opens A's editor
 
   // Author a wiki-link to B in A's description; it renders as a clickable link.
+  await addContent(page, 'Markdown section')
   await page.locator('.description-input').fill(`Cross to [[${roomB}]] to continue.`)
+  await page.locator('.text-block').getByRole('button', { name: 'Done' }).click()
   await expect(page.getByTestId('save-state')).toHaveText('Saved')
-  const link = page.getByTestId('description-preview').getByRole('link', { name: roomB })
+  const link = page.locator('.description-preview').getByRole('link', { name: roomB })
   await expect(link).toBeVisible()
 
   // Clicking it opens Room B's editor.

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openEncounter } from './helpers/login.js'
 
 // Treasure via the library: pick an item with ItemSearch (no more raw game_ids)
 // and render it with ItemCard; confirm it persists across reload.
@@ -12,7 +12,7 @@ test('treasure: pick an item with ItemSearch, render ItemCard, persist', async (
   await createEncounter(page, name)
 
   // Add a treasure line and pick an item by name.
-  await page.getByRole('button', { name: '+ treasure' }).click()
+  await addContent(page, 'Treasure')
   await page.locator('.item-search [data-testid="item-search"]').first().fill('sword')
   const result = page.locator('.item-search [data-testid="item-search-result"]').first()
   await expect(result).toBeVisible()
@@ -28,7 +28,7 @@ test('treasure: pick an item with ItemSearch, render ItemCard, persist', async (
 
   await page.reload()
   await expect(page.getByTestId('chapter-tree')).toBeVisible() // reload restores the two-pane directly (no campaign picker)
-  await page.locator('button.encounter', { hasText: name }).click()
+  await openEncounter(page, name)
   await expect(page.locator('.treasure-line-wrap .itemcard .Monster__name')).toHaveText(itemName)
 
   // Cleanup.
