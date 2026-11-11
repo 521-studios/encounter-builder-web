@@ -258,8 +258,8 @@ test('a spell in a staff prices the line at the staff\'s chosen tier variant, no
     name: 'Staff of Fire',
     stat_block: {
       variants: [
-        { name: 'Staff of Fire', price: { value: 90, currency: 'gp' } },
-        { name: 'Greater Staff of Fire', price: { value: 900, currency: 'gp' } },
+        { name: 'Staff of Fire', price: { value: 60, currency: 'gp' } },
+        { name: 'Staff of Fire (Greater)', price: { value: 450, currency: 'gp' } }, // gm_core naming/prices
       ],
     },
   }
@@ -273,7 +273,7 @@ test('a spell in a staff prices the line at the staff\'s chosen tier variant, no
     SlotPicker: SpellPicker,
   })
   render(
-    <ItemComposeView treasure={{ ref: { game_id: 'equipment:staff' }, variant: 'Greater Staff of Fire' }} onChange={(t) => refs.push(t.ref)} deps={deps} />,
+    <ItemComposeView treasure={{ ref: { game_id: 'equipment:staff' }, variant: 'Staff of Fire (Greater)' }} onChange={(t) => refs.push(t.ref)} deps={deps} />,
   )
   await screen.findByTestId('card')
   fireEvent.click(screen.getByTestId('customize-item'))
@@ -281,7 +281,27 @@ test('a spell in a staff prices the line at the staff\'s chosen tier variant, no
   await waitFor(() => assert.equal(refs.length, 1))
   const ref = refs.at(-1)
   assert.deepEqual([ref.modifications[0].price_cp, ref.modifications[0].price_mode], [0, 'add'])
-  assert.equal(ref.price_cp, 90000) // the Greater tier's 900 gp, untouched by the spell
+  assert.equal(ref.price_cp, 45000) // the Greater tier's 450 gp, untouched by the spell
+})
+
+test('a spell in a staff with no tier variants prices the line at the base entry price (76bn)', async () => {
+  const refs = []
+  const STAFF = { name: 'Plain Staff', stat_block: { price: { value: 230, currency: 'gp' } } } // 26 staves look like this
+  function SpellPicker({ onApplySpell }) {
+    return <button onClick={() => onApplySpell({ game_id: 'spell:heal', name: 'Heal', level: 1 })}>applySpell</button>
+  }
+  const deps = makeDeps({
+    api: { entryFull: async () => STAFF, applyItemPost: async () => ({}), templatesGet: async () => ({}), suggestSpells: async () => [] },
+    fetchEligible: async () => ({ spells: { holder: 'staff' } }),
+    applyItemEffect: async () => ({ item: STAFF, patches: [], applied: 'Heal' }),
+    SlotPicker: SpellPicker,
+  })
+  render(<ItemComposeView treasure={{ ref: { game_id: 'equipment:plain-staff' } }} onChange={(t) => refs.push(t.ref)} deps={deps} />)
+  await screen.findByTestId('card')
+  fireEvent.click(screen.getByTestId('customize-item'))
+  fireEvent.click(await screen.findByText('applySpell'))
+  await waitFor(() => assert.equal(refs.length, 1))
+  assert.equal(refs.at(-1).price_cp, 23000) // base stat_block.price, not unpriced
 })
 
 test('ItemComposeView preserves per-modification price_cp across reload so the total stays composed (4den)', async () => {
