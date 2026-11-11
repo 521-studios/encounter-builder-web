@@ -32,7 +32,7 @@ test("a 'set' component (a scroll/wand spell) IS the whole price — base + othe
   assert.equal(ref.modifications[0].price_mode, 'set')
 })
 
-test("a 'set' component with no resolved price leaves the line unpriced (a staff: no rank variant)", () => {
+test("a 'set' component with no resolved price leaves the line unpriced (no matching rank variant)", () => {
   const stack = [{ effect: { game_id: 's:x', name: 'Spell' }, grade: null, price_cp: null, price_mode: 'set', item: {} }]
   assert.equal(buildItemRef('equipment:staff', stack, '', 5000).price_cp, undefined) // base priced, but the 'set' part isn't
 })

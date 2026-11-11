@@ -130,8 +130,8 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
   // carries a price variant per spell rank (Magic Scroll → {spell_rank:3, price:"30 gp"}),
   // so the composed item's price IS that rank's variant price (non-additive — the
   // generic holder has no standalone price). null for a holder with no matching rank
-  // variant (a staff: tier-priced, not per-rank — deferred to its own follow-up), which
-  // leaves the line unpriced rather than mis-valuing it. (qeai)
+  // variant (out of range), which leaves the line unpriced rather than mis-valuing it.
+  // Staves don't come here: they're tier-priced by their base variant (applyEffect). (qeai)
   function holderRankPriceCp(rank) {
     if (rank == null) return null
     const variants = base?.stat_block?.variants || []
@@ -180,14 +180,17 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
       })
       // A spell sets the whole price (a scroll/wand rank price); a rune adds to the base.
       const isSpell = spellRank != null
+      const isStaffSpell = isSpell && eligibility?.spells?.holder === 'staff'
       const next = [
         ...stack,
         {
           effect: { game_id: effectGameId, name: effectName },
           applied: res.applied || effectName, // the resolved label (e.g. "Weapon Potency (+1)")
           grade: grade ?? null,
-          price_cp: isSpell ? holderRankPriceCp(spellRank) : gradePriceCp(effectGameId, grade),
-          price_mode: isSpell ? 'set' : 'add', // component price for the treasure total (4den/qeai)
+          // A staff is tier-priced by its base variant (Greater/Major/True), so its spells
+          // add nothing: total = base variant + any runes (76bn).
+          price_cp: isStaffSpell ? 0 : isSpell ? holderRankPriceCp(spellRank) : gradePriceCp(effectGameId, grade),
+          price_mode: isSpell && !isStaffSpell ? 'set' : 'add', // component price for the treasure total (4den/qeai)
           item: res.item,
           patches: res.patches,
         },

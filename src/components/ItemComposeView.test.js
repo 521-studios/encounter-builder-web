@@ -229,7 +229,7 @@ test('a reloaded scroll keeps its set-mode rank price on a later edit — no rev
   assert.equal(refs.at(-1).price_cp, 3000) // set price still wins — not reverted to additive
 })
 
-test('a holder spell with no matching rank variant (a staff / out-of-range) leaves the line unpriced (qeai)', async () => {
+test('a holder spell with no matching rank variant (out-of-range) leaves the line unpriced (qeai)', async () => {
   const refs = []
   const SCROLL = { name: 'Magic Scroll', stat_block: { variants: [{ name: '3rd-rank Scroll', spell_rank: 3, price: { value: 30, currency: 'gp' } }] } }
   function SpellPicker({ onApplySpell }) {
@@ -250,6 +250,38 @@ test('a holder spell with no matching rank variant (a staff / out-of-range) leav
   assert.equal(ref.modifications[0].price_mode, 'set')
   assert.equal(ref.modifications[0].price_cp, null) // no rank-9 variant → no resolved price
   assert.equal(ref.price_cp, undefined) // set mode with no price → unpriced (a floor, not a mis-value)
+})
+
+test('a spell in a staff prices the line at the staff\'s chosen tier variant, not per rank (76bn)', async () => {
+  const refs = []
+  const STAFF = {
+    name: 'Staff of Fire',
+    stat_block: {
+      variants: [
+        { name: 'Staff of Fire', price: { value: 90, currency: 'gp' } },
+        { name: 'Greater Staff of Fire', price: { value: 900, currency: 'gp' } },
+      ],
+    },
+  }
+  function SpellPicker({ onApplySpell }) {
+    return <button onClick={() => onApplySpell({ game_id: 'spell:fireball', name: 'Fireball', level: 3 })}>applySpell</button>
+  }
+  const deps = makeDeps({
+    api: { entryFull: async () => STAFF, applyItemPost: async () => ({}), templatesGet: async () => ({}), suggestSpells: async () => [] },
+    fetchEligible: async () => ({ spells: { holder: 'staff' } }),
+    applyItemEffect: async () => ({ item: STAFF, patches: [], applied: 'Fireball' }),
+    SlotPicker: SpellPicker,
+  })
+  render(
+    <ItemComposeView treasure={{ ref: { game_id: 'equipment:staff' }, variant: 'Greater Staff of Fire' }} onChange={(t) => refs.push(t.ref)} deps={deps} />,
+  )
+  await screen.findByTestId('card')
+  fireEvent.click(screen.getByTestId('customize-item'))
+  fireEvent.click(await screen.findByText('applySpell'))
+  await waitFor(() => assert.equal(refs.length, 1))
+  const ref = refs.at(-1)
+  assert.deepEqual([ref.modifications[0].price_cp, ref.modifications[0].price_mode], [0, 'add'])
+  assert.equal(ref.price_cp, 90000) // the Greater tier's 900 gp, untouched by the spell
 })
 
 test('ItemComposeView preserves per-modification price_cp across reload so the total stays composed (4den)', async () => {
