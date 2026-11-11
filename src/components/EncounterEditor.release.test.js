@@ -20,12 +20,15 @@ afterEach(() => {
 const res = (obj, status = 200) => ({ ok: status < 400, status, text: async () => (obj == null ? '' : JSON.stringify(obj)) })
 const base = { id: 'e1', name: 'A1', status: 'draft', room_type: 'combat', content: [], exits: [] }
 
-function stub(enc, partyTreasure, calls = []) {
+function stub(enc, partyTreasure, calls = [], retryFails = false) {
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url)
     calls.push(`${init.method || 'GET'} ${u}`)
     if (u.endsWith('/api/app/me')) return res({ sub: 'gm', party_treasure: partyTreasure })
-    if (u.endsWith('/release/retry')) return res({ ...enc, release_push: { at: 'x', ledger_id: 'e1', item_count: 2 } })
+    if (u.endsWith('/release/retry')) {
+      if (retryFails) return res({ error: 'party-treasure is not configured' }, 503)
+      return res({ ...enc, release_push: { at: 'x', ledger_id: 'e1', item_count: 2 } })
+    }
     if (u.endsWith('/encounters/e1')) return res(enc)
     if (u.endsWith('/encounters')) return res([enc])
     if (u.endsWith('/chapters')) return res([])
@@ -60,4 +63,14 @@ test('EncounterEditor: a failed push shows the error and Retry replaces it with 
   await waitFor(() => assert.match(screen.getByTestId('release-receipt').textContent, /Sent to the party pool: 2 items \(ledger e1\)/))
   assert.ok(calls.includes('POST /api/app/campaigns/c1/encounters/e1/release/retry'))
   assert.equal(screen.queryByRole('button', { name: 'Retry' }), null)
+})
+
+test('EncounterEditor: a failed Retry shows the error and keeps Retry available', async () => {
+  const enc = { ...base, status: 'released', release_push: { at: 'x', item_count: 0, error: 'boom' } }
+  stub(enc, true, [], true)
+  render(<EncounterEditor campaignId="c1" encounterId="e1" onClose={() => {}} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry' }))
+  assert.match((await screen.findByRole('alert')).textContent, /not configured/)
+  assert.equal(screen.getByRole('button', { name: 'Retry' }).disabled, false)
+  assert.match(screen.getByTestId('release-receipt').textContent, /Not sent to the party pool: boom/)
 })

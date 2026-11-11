@@ -9,7 +9,8 @@ let cached = null // Promise<boolean>, shared by every editor in the session
 
 export function partyTreasureEnabled() {
   if (isAnon()) return Promise.resolve(false)
-  cached ??= api.me().then((me) => me?.party_treasure === true, () => {
+  cached ??= api.me().then((me) => me?.party_treasure === true, (e) => {
+    console.warn('party-treasure: /api/app/me failed; hiding Release until it succeeds', e)
     cached = null // a failed /me retries next time instead of hiding Release for good
     return false
   })
