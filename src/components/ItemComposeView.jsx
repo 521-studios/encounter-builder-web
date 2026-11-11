@@ -130,13 +130,23 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
   // carries a price variant per spell rank (Magic Scroll → {spell_rank:3, price:"30 gp"}),
   // so the composed item's price IS that rank's variant price (non-additive — the
   // generic holder has no standalone price). null for a holder with no matching rank
-  // variant (a staff: tier-priced, not per-rank — deferred to its own follow-up), which
-  // leaves the line unpriced rather than mis-valuing it. (qeai)
+  // variant (out of range), which leaves the line unpriced rather than mis-valuing it.
+  // Staves don't come here (componentPricing). (qeai)
   function holderRankPriceCp(rank) {
     if (rank == null) return null
     const variants = base?.stat_block?.variants || []
     const v = variants.find((x) => x.spell_rank === rank)
     return v ? itemPriceCp(base, v.name) : null
+  }
+
+  // How an applied component prices into the treasure total ({price_cp, price_mode}):
+  // a rune adds its grade price to the base; a scroll/wand spell sets the whole price
+  // to the holder's rank variant; a staff is tier-priced by its base variant
+  // (Greater/Major/True), so its spells add nothing (76bn).
+  function componentPricing(effectGameId, grade, spellRank) {
+    if (spellRank == null) return { price_cp: gradePriceCp(effectGameId, grade), price_mode: 'add' }
+    if (eligibility?.spells?.holder === 'staff') return { price_cp: 0, price_mode: 'add' }
+    return { price_cp: holderRankPriceCp(spellRank), price_mode: 'set' }
   }
 
   // The base item's price in copper, summed with the applied runes' prices to give the
@@ -178,16 +188,13 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
         effectGameId,
         grade,
       })
-      // A spell sets the whole price (a scroll/wand rank price); a rune adds to the base.
-      const isSpell = spellRank != null
       const next = [
         ...stack,
         {
           effect: { game_id: effectGameId, name: effectName },
           applied: res.applied || effectName, // the resolved label (e.g. "Weapon Potency (+1)")
           grade: grade ?? null,
-          price_cp: isSpell ? holderRankPriceCp(spellRank) : gradePriceCp(effectGameId, grade),
-          price_mode: isSpell ? 'set' : 'add', // component price for the treasure total (4den/qeai)
+          ...componentPricing(effectGameId, grade, spellRank), // price_cp + price_mode (4den/qeai/76bn)
           item: res.item,
           patches: res.patches,
         },
