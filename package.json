@@ -15,8 +15,8 @@
     "@521studios/pfsrd2-display": "git+https://github.com/521-studios/pfsrd2-display.git#ae9ba1ea5109bd2d2864aab499ce0afade0c7c7b",
     "@xyflow/react": "^12.11.3",
     "oidc-client-ts": "^3.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
