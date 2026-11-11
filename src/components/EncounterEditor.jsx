@@ -18,6 +18,7 @@ import {
   CONTENT_TYPE_LABELS,
 } from '../model.js'
 import { resolveParty } from '../party.js'
+import { usePartyTreasure, receipt } from '../partyTreasure.js'
 import { naturalSort } from '../sort.js'
 import { BAND_LABELS, BASE_PARTY, treasureBudget } from '../pf2eRules.js'
 import { treasureStanding } from '../budget.js'
@@ -48,6 +49,8 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [error, setError] = useState(null)
   const [releasing, setReleasing] = useState(false)
   const [releaseGaps, setReleaseGaps] = useState(null) // rvd4: unfinished items blocking release, or null
+  const [retrying, setRetrying] = useState(false)
+  const partyTreasure = usePartyTreasure() // 6m14: Release + receipt only when party-treasure is wired up
   const gapsRef = useRef(null) // the gaps panel — focused when it appears so keyboard/SR users land on it
   const [printing, setPrinting] = useState(false) // full-screen print/PDF sheet overlay
   // The save indicator now reflects the store's flush layer (rtd8b): edits are
@@ -248,6 +251,22 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     }
   }
 
+  // Retry re-pushes a released encounter's loot after a failed push (6m14). The
+  // API re-sends the same client_ulid, so a push that actually landed isn't doubled.
+  async function retryPush() {
+    setRetrying(true)
+    setError(null)
+    try {
+      const result = await encounters.retryRelease(campaignId, encounterId)
+      setEnc(keyed(result))
+      onSaved && onSaved(result)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setRetrying(false)
+    }
+  }
+
   // Jump the GM to an unfinished item: switch to the Encounter tab, scroll it into
   // view, and flash it. Switching tabs may need a render+paint before the row exists,
   // so wait two animation frames (after React commits + paints) rather than guess a
@@ -361,6 +380,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         </div>
 
         {released && <p className="muted">Released — read-only.</p>}
+        {released && partyTreasure && <ReleaseReceipt push={enc.release_push} onRetry={retryPush} retrying={retrying} />}
         {error && <p className="error" role="alert">{error}</p>}
 
         {releaseGaps && (
@@ -425,9 +445,11 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               >
                 {saveLabel}
               </span>
-              <button onClick={() => release()} disabled={releasing || saveState === 'saving'}>
-                {releasing ? 'Releasing…' : 'Release to party'}
-              </button>
+              {partyTreasure && (
+                <button onClick={() => release()} disabled={releasing || saveState === 'saving'}>
+                  {releasing ? 'Releasing…' : 'Release to party'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -629,5 +651,21 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         />
       )}
     </section>
+  )
+}
+
+// The party-treasure receipt on a released encounter, with Retry when the push
+// failed or was never recorded (6m14).
+function ReleaseReceipt({ push, onRetry, retrying }) {
+  const { sent, text } = receipt(push)
+  return (
+    <p className={sent ? 'muted' : 'error'} data-testid="release-receipt">
+      {text}{' '}
+      {!sent && (
+        <button type="button" onClick={onRetry} disabled={retrying}>
+          {retrying ? 'Retrying…' : 'Retry'}
+        </button>
+      )}
+    </p>
   )
 }
