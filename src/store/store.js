@@ -37,6 +37,10 @@ const apiBackend = {
       const { force, ...rest } = opts
       return request('POST', `${encBase(cid)}/${enc(id)}/release${force ? '?force=true' : ''}`, rest)
     },
+    // Re-push a released encounter's loot to party-treasure (same client_ulid, so
+    // a push that did land is replayed, not duplicated). API-only: anon has no
+    // party-treasure, and the editor hides the control there.
+    retryRelease: (cid, id, opts = {}) => request('POST', `${encBase(cid)}/${enc(id)}/release/retry`, opts),
   },
   chapters: {
     list: (cid, opts = {}) => request('GET', chBase(cid), opts),
@@ -269,6 +273,11 @@ export const store = {
     },
     async release(cid, id, opts) {
       const rec = await backend().encounters.release(cid, id, opts)
+      slice(cid).encounters.set(String(id), rec)
+      return rec
+    },
+    async retryRelease(cid, id, opts) {
+      const rec = await apiBackend.encounters.retryRelease(cid, id, opts)
       slice(cid).encounters.set(String(id), rec)
       return rec
     },
