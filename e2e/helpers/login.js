@@ -1,9 +1,12 @@
 import { expect } from '@playwright/test'
 
-// Staging test GM. NON-SECRET per Devon ("the staging creds aren't a secret") —
-// staging-only, throwaway test data. Override via env for other accounts.
-const EMAIL = process.env.EB_EMAIL || 'gm@example.com'
-const PASSWORD = process.env.EB_PASSWORD || '***REMOVED***'
+// Staging test GM credentials: env only (EB_EMAIL / EB_PASSWORD), never in source.
+export function creds() {
+  const email = process.env.EB_EMAIL
+  const password = process.env.EB_PASSWORD
+  if (!email || !password) throw new Error('set EB_EMAIL and EB_PASSWORD (staging GM login) to run e2e')
+  return { email, password }
+}
 
 // Drive the full OIDC Authorization-Code+PKCE login: SPA "Sign in" → lets-roll
 // Devise form → back to the SPA authed, campaigns loaded. Reusable across specs.
@@ -14,9 +17,10 @@ export async function login(page, baseURL) {
   await signIn.waitFor({ timeout: 15_000 }) // wait for React to render the button
   await signIn.click()
 
+  const { email, password } = creds()
   await page.locator('#user_email').waitFor({ timeout: 20_000 })
-  await page.locator('#user_email').fill(EMAIL)
-  await page.locator('#user_password').fill(PASSWORD)
+  await page.locator('#user_email').fill(email)
+  await page.locator('#user_password').fill(password)
   await page.locator('input[type="submit"], button[type="submit"]').first().click()
 
   await page.waitForURL((u) => u.toString().startsWith(baseURL), { timeout: 20_000 })

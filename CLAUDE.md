@@ -7,10 +7,15 @@ encounter-builder-api at `/api/app/*`. Architecture:
 
 ## Status
 
-Vite + React SPA. Slice 1 (auth shell) done: OIDC Authorization Code + PKCE login
-against lets-roll, and an API client that sends the bearer in `X-Access-Token`.
-Next slices: campaign list, encounter CRUD UI, pfsrd2-display `CreatureStatBlock`,
-release.
+Vite + React SPA, live on staging and prod. Built: OIDC login, campaign/chapter/
+encounter authoring (Config/Encounter/Exits tabs, one ordered content list of every
+item type), pfsrd2-display stat blocks, treasure budget + pools, skill checks, XP,
+chapter map (React Flow), release to party-treasure, print sheet, and an anon
+no-sign-in builder. All reads/writes go through one store (`src/store/store.js`)
+with an optimistic autosave flush layer. Open work lives in beads (bd_521Studios).
+
+E2E (`npm run e2e`) runs against deployed staging and needs `EB_EMAIL` /
+`EB_PASSWORD` (the staging GM login) in env; CI reads them from repo secrets.
 
 ## Auth
 
