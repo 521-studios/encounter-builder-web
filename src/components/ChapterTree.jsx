@@ -143,6 +143,7 @@ export default function ChapterTree({ campaignId, onEdit, onEditChapter, reloadK
                 className="chapter-caret-btn"
                 aria-expanded={isOpen}
                 aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${g.chapter ? g.chapter.name : 'Unsorted'}`}
+                aria-describedby={g.encounters.length > 0 ? `rollup-${key}` : undefined}
                 onClick={() => toggle(key)}
               >
                 <span className="chapter-caret" aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
@@ -160,7 +161,7 @@ export default function ChapterTree({ campaignId, onEdit, onEditChapter, reloadK
               )}
               {/* Progress rollup (we5k.2.1): always visible, even collapsed. */}
               {g.encounters.length > 0 && (
-                <span className="chapter-rollup" data-testid="chapter-rollup">
+                <span className="chapter-rollup" id={`rollup-${key}`} data-testid="chapter-rollup">
                   {statusRollup(g.encounters)
                     .map(([s, n]) => `${n} ${s}`)
                     .join(' · ')}

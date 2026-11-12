@@ -392,6 +392,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               <option value="prepared">Prepared</option>
               {(combat || status === 'executing') && <option value="executing">Executing</option>}
               <option value="complete">Complete</option>
+              {!['prepared', 'executing', 'complete'].includes(status) && <option value={status}>{status}</option>}
             </select>
           )}
           <button type="button" className="link" onClick={() => setPrinting(true)}>Print / PDF</button>

@@ -32,7 +32,7 @@ export function canonicalStatus(status) {
 }
 // A chapter's progress: [status, count] in lifecycle order, zero counts dropped.
 export function statusRollup(encounters) {
-  const counts = {}
+  const counts = Object.create(null) // statuses are server strings; no prototype keys
   for (const e of encounters) {
     const s = canonicalStatus(e.status)
     counts[s] = (counts[s] || 0) + 1
