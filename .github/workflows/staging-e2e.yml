@@ -43,7 +43,7 @@ jobs:
           EB_EMAIL: ${{ secrets.EB_EMAIL }}
           EB_PASSWORD: ${{ secrets.EB_PASSWORD }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
