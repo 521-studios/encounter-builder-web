@@ -31,9 +31,12 @@ run() {
 }
 # A failing baseline (broken tests, or systemd-run itself failing) would read as KILLED.
 run "$@" || { echo "BROKEN (exit $?): the unmutated tests fail, so no mutant can be judged"; exit 2; }
-# Zero tests, or all skipped, also pass and would read as SURVIVED. An empty file
-# shows as one passing "test" named after its path, so require a real one.
-grep -E '^ *✔ ' "$tmp/out" | grep -qvE '^ *✔ [^ ]+\.test\.js \(' ||
+# Zero tests, or all skipped/todo, also pass and would read as SURVIVED. 'ℹ pass'
+# counts tests only (not suites, skips or todos), but an empty file shows as one
+# passing "test" named after its path, so subtract those and require a real one.
+pass=$(sed -n 's/^ℹ pass //p' "$tmp/out")
+files=$(grep -cE '^ *✔ [^ ]+\.test\.js \(' "$tmp/out" || true)
+[ "$(( ${pass:-0} - files ))" -gt 0 ] ||
   { echo "BROKEN: the unmutated tests pass no real test, so no mutant can be judged"; exit 2; }
 cp "$f" "$tmp/orig"
 sed --sandbox -i "$expr" "$f"
