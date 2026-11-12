@@ -126,3 +126,21 @@ test("a 'replace-base' material replaces the base price and runes still add on t
   stack[0].price_cp = null
   assert.equal(buildItemRef('w:ls', stack, '', 100).price_cp, undefined) // unpriceable material → unpriced line
 })
+
+test('materialPriceCp: armor by item_category alone, and a text-only numeric Bulk', () => {
+  assert.equal(materialPriceCp({ price_cp: 14000, cp_per_bulk: 1400 }, { stat_block: { item_category: 'Armor', bulk: { value: 2 } } }), 18200)
+  assert.equal(materialPriceCp(COLD_LOW, weapon({ text: '2' })), 4800)
+  assert.equal(materialPriceCp(COLD_LOW, weapon({ text: '' })), 4400) // blank = light end → 1
+})
+
+test("replace-base combinations: alone, under 'set', with an unpriced rune, two materials", () => {
+  const mat = (cp) => ({ effect: { game_id: 'm', name: 'M' }, price_cp: cp, price_mode: 'replace-base', item: {} })
+  const rune = (cp) => ({ effect: { game_id: 'r', name: 'R' }, price_cp: cp, price_mode: 'add', item: {} })
+  const ref = buildItemRef('w', [mat(4400)], '', 100)
+  assert.equal(ref.price_cp, 4400)
+  assert.equal(ref.modifications[0].price_mode, 'replace-base') // round-trips in the ref
+  const set = { effect: { game_id: 's', name: 'S' }, price_cp: 3000, price_mode: 'set', item: {} }
+  assert.equal(buildItemRef('w', [mat(4400), set], '', 100).price_cp, 3000) // 'set' still wins
+  assert.equal(buildItemRef('w', [mat(4400), rune(null)], '', 100).price_cp, undefined) // unpriced rune → unpriced
+  assert.equal(buildItemRef('w', [mat(4400), mat(9680)], '', 100).price_cp, undefined) // two materials → unpriced, not summed
+})

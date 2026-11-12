@@ -54,7 +54,9 @@ export function buildItemRef(baseGameId, stack, name, basePriceCp = null) {
 function composedPriceCp(modifications, basePriceCp) {
   const setMod = modifications.find((m) => m.price_mode === 'set')
   if (setMod) return typeof setMod.price_cp === 'number' ? setMod.price_cp : null
-  const replaceMod = modifications.find((m) => m.price_mode === 'replace-base')
+  const replaceMods = modifications.filter((m) => m.price_mode === 'replace-base')
+  if (replaceMods.length > 1) return null // two materials: no honest single price
+  const replaceMod = replaceMods[0]
   const start = replaceMod ? replaceMod.price_cp : basePriceCp
   const adds = modifications.filter((m) => m !== replaceMod)
   const allPriced = typeof start === 'number' && adds.every((m) => typeof m.price_cp === 'number')
@@ -86,6 +88,8 @@ export function materialPriceCp(row, item) {
   return row.price_cp + row.cp_per_bulk * bulk
 }
 
+// Bulk and armor-ness come from the BASE entry: variants share them in the data, and
+// the stored price is a snapshot (a later variant change doesn't re-derive it).
 // numericBulk reads a stat_block bulk section as a number: its value when numeric,
 // else its text ("L"/"–"/"-"/"" → 0, the light/negligible end; "2" → 2). null when
 // unreadable.
