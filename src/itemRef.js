@@ -18,6 +18,9 @@
 //   'set' — the component IS the whole price; base + others are ignored (a spell on a
 //           scroll/wand: a Scroll of Fireball costs the rank-3 scroll price, and its
 //           generic "Magic Scroll" base carries no standalone price to add to).
+//   'replace-base' — the component replaces the BASE price; runes still add on top (a
+//           precious material: a cold iron longsword's price is the material grade's,
+//           not 1 gp + it — see materialPriceCp).
 // Stored inside each opaque modification (the API treats modifications as raw JSON),
 // so it round-trips without an API change; absent → 'add' (pre-qeai composed refs).
 export function buildItemRef(baseGameId, stack, name, basePriceCp = null) {
@@ -51,6 +54,46 @@ export function buildItemRef(baseGameId, stack, name, basePriceCp = null) {
 function composedPriceCp(modifications, basePriceCp) {
   const setMod = modifications.find((m) => m.price_mode === 'set')
   if (setMod) return typeof setMod.price_cp === 'number' ? setMod.price_cp : null
-  const allPriced = typeof basePriceCp === 'number' && modifications.every((m) => typeof m.price_cp === 'number')
-  return allPriced ? modifications.reduce((sum, m) => sum + m.price_cp, basePriceCp) : null
+  const replaceMod = modifications.find((m) => m.price_mode === 'replace-base')
+  const start = replaceMod ? replaceMod.price_cp : basePriceCp
+  const adds = modifications.filter((m) => m !== replaceMod)
+  const allPriced = typeof start === 'number' && adds.every((m) => typeof m.price_cp === 'number')
+  return allPriced ? adds.reduce((sum, m) => sum + m.price_cp, start) : null
+}
+
+// THE precious-material price rule (76bn; pfsrd2's ruling, Devon confirmed "count from
+// 1st Bulk"). `row` is the chosen /eligible grade_prices row, `item` the base entry.
+// Returns the copper price that REPLACES the base item's, or null when it can't be
+// priced honestly (the line then stays unpriced rather than mis-valued):
+//   shield (row.form)  → the row's flat price for that form
+//   ammunition         → the bare listed price (it's per 10; no Bulk add)
+//   no per-Bulk add    → the flat listed price (e.g. Elven Chain)
+//   weapon / armor     → price_cp + cp_per_bulk × max(B, 1), where B is the integer
+//                        Bulk (L and – count as 1); for armor B is CARRIED Bulk
+//                        (worn + 1; L armor = 1).
+// e.g. low-grade cold iron (40 gp + 4 gp/Bulk): 1-Bulk or L weapon 44 gp, 2-Bulk 48 gp;
+// worn-2 armor (140 gp + 14 gp/Bulk) = 140 + 14×3 = 182 gp.
+export function materialPriceCp(row, item) {
+  if (!row || typeof row.price_cp !== 'number') return null
+  if (row.form) return row.price_cp
+  const sb = (item && item.stat_block) || item || {}
+  if (sb.statistics?.category === 'Ammunition') return row.price_cp
+  if (typeof row.cp_per_bulk !== 'number') return row.per_bulk_text ? null : row.price_cp // unparsed add → unpriced
+  const worn = numericBulk(sb.bulk)
+  if (worn == null) return null
+  const isArmor = item?.type === 'armor' || sb.item_category === 'Armor'
+  const bulk = isArmor ? (worn < 1 ? 1 : worn + 1) : Math.max(worn, 1)
+  return row.price_cp + row.cp_per_bulk * bulk
+}
+
+// numericBulk reads a stat_block bulk section as a number: its value when numeric,
+// else its text ("L"/"–"/"-"/"" → 0, the light/negligible end; "2" → 2). null when
+// unreadable.
+function numericBulk(bulk) {
+  if (!bulk) return null
+  if (typeof bulk.value === 'number') return bulk.value
+  const t = String(bulk.text ?? '').trim()
+  if (t === '' || t === 'L' || t === '-' || t === '–' || t === '—') return 0
+  const n = Number(t)
+  return Number.isFinite(n) ? n : null
 }

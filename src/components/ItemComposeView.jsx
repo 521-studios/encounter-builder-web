@@ -10,7 +10,7 @@ import {
 } from '@521studios/pfsrd2-display'
 import { pfsrd2 } from '../api/pfsrd2.js'
 import { errorMessage } from '../api/errors.js'
-import { buildItemRef } from '../itemRef.js'
+import { buildItemRef, materialPriceCp } from '../itemRef.js'
 import { variantIndex } from '../variants.js'
 
 // Injectable dependencies — the async client/library calls and the two library
@@ -140,10 +140,12 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
   }
 
   // How an applied component prices into the treasure total ({price_cp, price_mode}):
-  // a rune adds its grade price to the base; a scroll/wand spell sets the whole price
-  // to the holder's rank variant; a staff is tier-priced by its base variant
+  // a graded precious material replaces the base price (materialPriceCp); a rune adds
+  // its grade price to the base; a scroll/wand spell sets the whole price to the
+  // holder's rank variant; a staff is tier-priced by its base variant
   // (Greater/Major/True), so its spells add nothing (76bn).
-  function componentPricing(effectGameId, grade, spellRank) {
+  function componentPricing(effectGameId, grade, spellRank, gradePrice) {
+    if (gradePrice) return { price_cp: materialPriceCp(gradePrice, base), price_mode: 'replace-base' }
     if (spellRank == null) return { price_cp: gradePriceCp(effectGameId, grade), price_mode: 'add' }
     if (eligibility?.spells?.holder === 'staff') return { price_cp: 0, price_mode: 'add' }
     return { price_cp: holderRankPriceCp(spellRank), price_mode: 'set' }
@@ -176,7 +178,8 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
 
   // spellRank is set only when applying a spell to a holder (scroll/wand/staff); it
   // switches pricing from additive rune grades to the holder's per-rank variant price.
-  async function applyEffect(effectGameId, effectName, grade, spellRank = null) {
+  // gradePrice is the chosen /eligible grade_prices row for a graded material (76bn).
+  async function applyEffect(effectGameId, effectName, grade, spellRank = null, gradePrice = null) {
     const currentItem = stack.length ? stack[stack.length - 1].item : base
     setBusy(true)
     setApplyError(null)
@@ -194,7 +197,7 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
           effect: { game_id: effectGameId, name: effectName },
           applied: res.applied || effectName, // the resolved label (e.g. "Weapon Potency (+1)")
           grade: grade ?? null,
-          ...componentPricing(effectGameId, grade, spellRank), // price_cp + price_mode (4den/qeai/76bn)
+          ...componentPricing(effectGameId, grade, spellRank, gradePrice), // price_cp + price_mode (4den/qeai/76bn)
           item: res.item,
           patches: res.patches,
         },
@@ -252,7 +255,7 @@ export default function ItemComposeView({ treasure, onChange, disabled, deps = d
           onNameChange={onNameChange}
           stack={stack}
           loading={busy}
-          onApply={(candidate, { grade }) => applyEffect(candidate.game_id, candidate.name, grade)}
+          onApply={(candidate, { grade, gradePrice }) => applyEffect(candidate.game_id, candidate.name, grade, null, gradePrice)}
           // The spell search row carries `level` = the spell's rank, which prices the
           // scroll/wand by its matching rank variant (qeai).
           onApplySpell={(spell) => applyEffect(spell.game_id, spell.name, undefined, spell.level ?? null)}

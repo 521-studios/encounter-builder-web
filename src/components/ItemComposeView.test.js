@@ -2,6 +2,7 @@ import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import ItemComposeView from './ItemComposeView.jsx'
+import { ItemSlotPicker } from '@521studios/pfsrd2-display'
 
 afterEach(() => cleanup())
 
@@ -302,6 +303,44 @@ test('a spell in a staff with no tier variants prices the line at the base entry
   fireEvent.click(await screen.findByText('applySpell'))
   await waitFor(() => assert.equal(refs.length, 1))
   assert.equal(refs.at(-1).price_cp, 23000) // base stat_block.price, not unpriced
+})
+
+test('a graded precious material, picked in the REAL ItemSlotPicker, replaces the base price (76bn)', async () => {
+  const refs = []
+  const applied = []
+  const LONGSWORD = { name: 'Longsword', type: 'weapon', stat_block: { item_category: 'Weapons', bulk: { value: 1, text: '1' }, price: { value: 1, currency: 'gp' } } }
+  const COLD_IRON = {
+    game_id: 'm:cold',
+    name: 'Cold Iron Weapon',
+    precious: false,
+    grade_prices: [
+      { grade: 'standard', name: 'Cold Iron Weapon (Standard-Grade)', level: 7, price_cp: 88000, cp_per_bulk: 8800, per_bulk_text: '+88 gp per Bulk' },
+      { grade: 'low', name: 'Cold Iron Weapon (Low-Grade)', level: 2, price_cp: 4000, cp_per_bulk: 400, per_bulk_text: '+4 gp per Bulk' },
+    ],
+  }
+  const deps = makeDeps({
+    api: { entryFull: async () => LONGSWORD, applyItemPost: async () => ({}), templatesGet: async () => ({}), suggestSpells: async () => [] },
+    fetchEligible: async () => ({ item: { name: 'Longsword' }, materials: [COLD_IRON] }),
+    applyItemEffect: async (args) => {
+      applied.push(args)
+      return { item: LONGSWORD, patches: [], applied: 'Cold Iron Weapon' }
+    },
+    SlotPicker: ItemSlotPicker, // the real picker: exercises its grade step click path
+  })
+  render(<ItemComposeView treasure={{ ref: { game_id: 'w:longsword' } }} onChange={(t) => refs.push(t.ref)} deps={deps} />)
+  await screen.findByTestId('card')
+  fireEvent.click(screen.getByTestId('customize-item'))
+  const toggle = await screen.findByTestId('grade-open')
+  fireEvent.click(toggle)
+  assert.equal(screen.getByRole('radio', { name: /Low/ }).checked, true) // defaults to the lowest level
+  fireEvent.click(screen.getByRole('radio', { name: /Standard/ }))
+  fireEvent.click(screen.getByTestId('apply-grade'))
+  await waitFor(() => assert.equal(refs.length, 1))
+  assert.equal(applied[0].grade, 'standard') // /apply ignores ?grade for a material
+  const ref = refs.at(-1)
+  assert.deepEqual([ref.modifications[0].grade, ref.modifications[0].price_mode], ['standard', 'replace-base'])
+  assert.equal(ref.price_cp, 96800) // 880 + 88×max(1,1) = 968 gp, replacing the 1 gp base
+  assert.equal(document.activeElement, screen.getByTestId('grade-open')) // focus back on the toggle
 })
 
 test('ItemComposeView preserves per-modification price_cp across reload so the total stays composed (4den)', async () => {
