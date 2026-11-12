@@ -11,10 +11,10 @@ afterEach(() => {
   setAnon(false)
 })
 
-test('create mints an id, defaults status draft + empty line arrays, and echoes a full record', () => {
+test('create mints an id, defaults status prepared + empty line arrays, and echoes a full record', () => {
   const rec = localStore.encounters.create({ name: 'Ambush', currency: {} })
   assert.ok(rec.id, 'minted an id')
-  assert.equal(rec.status, 'draft')
+  assert.equal(rec.status, 'prepared')
   assert.equal(rec.name, 'Ambush')
   for (const k of ['content', 'exits']) {
     assert.deepEqual(rec[k], [], `${k} defaults to []`)
@@ -28,7 +28,7 @@ test('update is a full replace that preserves id + server-owned status', () => {
   const updated = localStore.encounters.update(a.id, { name: 'A2', monsters: [{ ref: { game_id: 'M:1' } }] })
   assert.equal(updated.id, a.id)
   assert.equal(updated.name, 'A2')
-  assert.equal(updated.status, 'draft') // status is not carried in the PUT body; store preserves it
+  assert.equal(updated.status, 'prepared') // no status in the body: store preserves it
   assert.equal(updated.monsters.length, 1)
   assert.equal(localStore.encounters.get(a.id).name, 'A2')
 })
@@ -92,4 +92,12 @@ test('the encounters API client delegates to the store when anon (await-compatib
   assert.deepEqual(list.map((e) => e.name), ['ViaClient'])
   const got = await encounters.get('local', created.id)
   assert.equal(got.name, 'ViaClient')
+})
+
+test('update moves status among prepared/executing/complete but never into or out of released', () => {
+  const a = localStore.encounters.create({ name: 'A' })
+  assert.equal(localStore.encounters.update(a.id, { name: 'A', status: 'complete' }).status, 'complete')
+  assert.equal(localStore.encounters.update(a.id, { name: 'A', status: 'released' }).status, 'complete')
+  localStore.encounters.release(a.id)
+  assert.equal(localStore.encounters.update(a.id, { name: 'A', status: 'prepared' }).status, 'released')
 })

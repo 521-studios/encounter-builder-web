@@ -16,6 +16,7 @@ import {
   roomNeighbours,
   keyed,
   CONTENT_TYPE_LABELS,
+  canonicalStatus,
 } from '../model.js'
 import { resolveParty } from '../party.js'
 import { usePartyTreasure, receipt } from '../partyTreasure.js'
@@ -195,6 +196,8 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   // A room with no monster/hazard/affliction item has no combat difficulty to show —
   // suppress the "Trivial 1" band and fall back to the room-type label.
   const hasChallenges = content.some((c) => c.type === 'monster' || c.type === 'hazard' || c.type === 'affliction')
+  const combat = isCombatRoom(budget.roomType) && hasChallenges
+  const status = canonicalStatus(enc.status)
 
   // The single ordered "Encounter" content list (every item type). Adding takes a
   // ready-built item so EncounterContent owns its id; all edits persist via patch.
@@ -373,13 +376,42 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               </>
             )}
           </button>
-          <span className="status">{enc.status}</span>
+          {released ? (
+            <span className="status">released</span>
+          ) : (
+            // we5k.2.1 lifecycle; persists on change like every other field.
+            // Non-combat rooms go prepared → complete, so executing is only
+            // offered for a combat room (or kept if it's already there).
+            <select
+              className="status-select"
+              aria-label="encounter status"
+              data-testid="encounter-status"
+              value={status}
+              onChange={(e) => patch({ status: e.target.value })}
+            >
+              <option value="prepared">Prepared</option>
+              {(combat || status === 'executing') && <option value="executing">Executing</option>}
+              <option value="complete">Complete</option>
+            </select>
+          )}
           <button type="button" className="link" onClick={() => setPrinting(true)}>Print / PDF</button>
           <button type="button" className="link danger" aria-label={`Delete ${enc.name || 'Untitled encounter'}`} onClick={del}>Delete</button>
           <button type="button" className="link" onClick={onClose}>Close</button>
         </div>
 
         {released && <p className="muted">Released — read-only.</p>}
+        {(status === 'complete' || (released && enc.closeout_notes)) && (
+          <label className="field closeout-notes">
+            <span>Close-out notes</span>
+            <textarea
+              aria-label="close-out notes"
+              placeholder="Optional: how it went, what the party skipped or took…"
+              value={enc.closeout_notes || ''}
+              disabled={released}
+              onChange={(e) => patch({ closeout_notes: e.target.value })}
+            />
+          </label>
+        )}
         {released && partyTreasure && <ReleaseReceipt push={enc.release_push} onRetry={retryPush} retrying={retrying} />}
         {error && <p className="error" role="alert">{error}</p>}
 

@@ -25,7 +25,7 @@ const uuid = () => crypto.randomUUID()
 // A fresh encounter's server-supplied defaults, so list/get records are
 // well-formed even before the editor has touched every field.
 const encounterDefaults = () => ({
-  status: 'draft',
+  status: 'prepared',
   currency: {},
   content: [], // the single ordered Encounter authoring list
   exits: [],
@@ -81,18 +81,20 @@ export const localStore = {
       return e
     },
     create: (input = {}) => {
-      // Defensive: a create is always a draft — force it, so any status a caller
+      // Defensive: a create is always prepared — force it, so any status a caller
       // happened to pass in the input can't override the server-owned field.
-      const rec = { ...encounterDefaults(), ...input, id: uuid(), status: 'draft' }
+      const rec = { ...encounterDefaults(), ...input, id: uuid(), status: 'prepared' }
       state.encounters[rec.id] = rec
       persist()
       return rec
     },
     update: (id, input = {}) => {
-      // Full replace (PUT semantics), but preserve id and the server-owned
-      // status (release is the only thing that flips it).
+      // Full replace (PUT semantics), but preserve id; like the API, a save may
+      // move status among prepared/executing/complete but never into or out of
+      // released (that's release()).
       const prev = state.encounters[id]
-      const rec = { ...input, id, status: prev?.status || 'draft' }
+      const keep = prev?.status === 'released' || !input.status || input.status === 'released'
+      const rec = { ...input, id, status: keep ? prev?.status || 'prepared' : input.status }
       state.encounters[id] = rec
       persist()
       return rec
