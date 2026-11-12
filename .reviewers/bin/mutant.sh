@@ -11,6 +11,8 @@ for p in "$f" "$@"; do
 done
 for t in "$@"; do
   case $t in *.test.js) ;; *) echo "refusing $t: not a *.test.js file, so no test would run"; exit 2 ;; esac
+  # the empty-file count below matches paths without spaces only
+  case $t in *' '*) echo "refusing $t: a space in the path breaks the baseline check"; exit 2 ;; esac
 done
 repo=$(git rev-parse --show-toplevel)
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/mutant.XXXXXX")
