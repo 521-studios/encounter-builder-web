@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { ReactFlow, Background, Controls, MiniMap, Handle, Position, useNodesState, useInternalNode, useReactFlow, EdgeLabelRenderer } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { buildChapterGraph, boundaryPoint, sideText, seedPositions, reseedBends, insertWaypoint, withBends, layoutSnapshot } from '../chapterGraph.js'
+import { buildChapterGraph, boundaryPoint, sideText, seedPositions, reseedBends, reseedNodes, insertWaypoint, withBends, layoutSnapshot } from '../chapterGraph.js'
 import { ROOM_TYPE_LABELS } from '../model.js'
 
 // 8hda: an INTERACTIVE node-link map of a chapter — pan (drag canvas), zoom (scroll),
@@ -212,11 +212,15 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
   const positionsRef = useRef(positions)
   positionsRef.current = positions
 
+  // Drag state (see the save-on-unmount effect below); declared first so the seed
+  // effects can read it.
+  const dirtyRef = useRef(false)
+  const latestRef = useRef({ nodes: [], waypoints: {} })
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   useEffect(() => {
     // Seed rooms AND exit ports: a saved position wins, else the force layout (new
     // nodes auto-place). Port ids (exit:<room>:<idx>) are stable while the exit list is.
-    const seeded = seedPositions([...rooms, ...exitPorts], positionsRef.current, layout)
+    const seeded = seedPositions([...rooms, ...exitPorts], reseedNodes(dirtyRef.current, latestRef.current.nodes, positionsRef.current), layout)
     setNodes([
       ...rooms.map((n) => ({ id: n.id, type: 'room', position: seeded[n.id], data: { name: n.name, roomType: n.roomType, dead: deadEnds.has(n.id) } })),
       ...exitPorts.map((p) => ({ id: p.id, type: 'exit', position: seeded[p.id], data: {}, draggable: true })),
@@ -236,8 +240,6 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
   // Drags (rooms, ports, bends) only mutate local state; mark the layout dirty and flush
   // ONE save of the full layout (live nodes + bends, gone ones pruned) on unmount —
   // leaving the Map tab or closing the chapter — instead of a PUT per drag.
-  const dirtyRef = useRef(false)
-  const latestRef = useRef({ nodes: [], waypoints: {} })
 
   // muz0.4: each edge's bend points, re-seeded when the graph structure changes.
   const [waypoints, setWaypoints] = useState({})

@@ -150,6 +150,16 @@ export function reseedBends(dirty, local, saved, edgeIds) {
   return storedWaypoints(dirty ? local : saved, edgeIds)
 }
 
+// 0otq: the same rule for node positions. Once the GM has dragged, the live nodes'
+// positions win over the saved layout (so a structure change doesn't snap a room
+// back); nodes new since then still fall back to the saved layout.
+export function reseedNodes(dirty, localNodes, saved) {
+  if (!dirty) return saved
+  const out = { ...saved }
+  for (const n of localNodes) out[n.id] = n.position
+  return out
+}
+
 // One edge's bends replaced (an empty list drops the edge's entry).
 export function withBends(waypoints, id, pts) {
   const next = { ...waypoints }

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, withBends, reseedBends, layoutSnapshot } from './chapterGraph.js'
+import { buildChapterGraph, layerLayout, connectedComponents, shelfPack, pairKey, boundaryPoint, sideText, seedPositions, storedWaypoints, insertWaypoint, withBends, reseedBends, reseedNodes, layoutSnapshot } from './chapterGraph.js'
 
 test('reseedBends: saved layout until edited; after an edit a removed bend stays removed', () => {
   const saved = { 'p:1|2': [{ x: 1, y: 1 }], 'p:2|3': [{ x: 2, y: 2 }] }
@@ -302,4 +302,11 @@ test('buildChapterGraph tolerates empty / missing input', () => {
   assert.deepEqual(g.exitPorts, [])
   assert.equal(g.stats.connections, 0)
   assert.deepEqual(layerLayout([], []), {})
+})
+
+test('reseedNodes: saved layout until dragged; after a drag live positions win, new nodes use saved', () => {
+  const saved = { 1: { x: 1, y: 1 }, 2: { x: 2, y: 2 }, 3: { x: 3, y: 3 } }
+  const local = [{ id: '1', position: { x: 9, y: 9 } }, { id: '2', position: { x: 2, y: 2 } }]
+  assert.equal(reseedNodes(false, local, saved), saved)
+  assert.deepEqual(reseedNodes(true, local, saved), { 1: { x: 9, y: 9 }, 2: { x: 2, y: 2 }, 3: { x: 3, y: 3 } })
 })
