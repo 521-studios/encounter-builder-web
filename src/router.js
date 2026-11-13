@@ -6,9 +6,13 @@
 // builds the bare query string for a nav state; urlFor wraps it into the path+query
 // the App pushes to the History API.
 
+const CHAPTER_URL_TABS = ['summary', 'map'] // config is the default, never in the URL
+
 // parseLocation(search) → { campaignId, view } where view is one of:
 //   { kind: 'empty' } | { kind: 'campaign' }
-//   | { kind: 'encounter', encounterId } | { kind: 'chapter', chapterId }
+//   | { kind: 'encounter', encounterId } | { kind: 'chapter', chapterId[, tab] }
+// A chapter's non-default tab (summary/map) rides along as &tab= (irmr), so reload
+// and back/forward keep it; config is the default and stays out of the URL.
 // `search` is a location.search string (with or without the leading '?').
 export function parseLocation(search) {
   const p = new URLSearchParams(search || '')
@@ -19,7 +23,10 @@ export function parseLocation(search) {
   if (encounterId) return { campaignId, view: { kind: 'encounter', encounterId } }
 
   const chapterId = p.get('chapter')
-  if (chapterId) return { campaignId, view: { kind: 'chapter', chapterId } }
+  if (chapterId) {
+    const tab = p.get('tab')
+    return { campaignId, view: CHAPTER_URL_TABS.includes(tab) ? { kind: 'chapter', chapterId, tab } : { kind: 'chapter', chapterId } }
+  }
 
   if (p.get('view') === 'settings') return { campaignId, view: { kind: 'campaign' } }
 
@@ -33,7 +40,10 @@ export function locationFor(campaignId, view = { kind: 'empty' }) {
   if (!campaignId) return ''
   const p = new URLSearchParams({ campaign: campaignId })
   if (view.kind === 'encounter' && view.enc?.id) p.set('encounter', view.enc.id)
-  else if (view.kind === 'chapter' && view.chapter?.id) p.set('chapter', view.chapter.id)
+  else if (view.kind === 'chapter' && view.chapter?.id) {
+    p.set('chapter', view.chapter.id)
+    if (CHAPTER_URL_TABS.includes(view.tab)) p.set('tab', view.tab)
+  }
   else if (view.kind === 'campaign') p.set('view', 'settings')
   return p.toString()
 }

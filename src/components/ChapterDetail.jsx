@@ -50,8 +50,11 @@ const CHAPTER_TABS = [
 // fields, so every save round-trips them via the shared clear-encoding. The body is
 // tabbed (Config / Summary / Map); the rollup hook runs unconditionally so its tab
 // shows fresh numbers regardless of which tab is active.
-export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted, onSaveError, onOpenEncounter, initialTab = 'config' }) {
+export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, onDeleted, onSaveError, onOpenEncounter, initialTab = 'config', onTabChange }) {
+  // irmr: App keeps the tab in its view (and so the URL). Follow it when it changes
+  // (back/forward between tabs of the same chapter) and report clicks up.
   const [tab, setTab] = useState(initialTab)
+  useEffect(() => setTab(initialTab), [initialTab])
   const [value, setValue] = useState({
     name: chapter.name || '',
     party_level: chapter.party_level ?? null,
@@ -207,7 +210,10 @@ export default function ChapterDetail({ campaignId, chapter, onClose, onSaved, o
               aria-controls={`chpanel-${t.id}`}
               aria-selected={tab === t.id}
               className={`tab${tab === t.id ? ' tab--active' : ''}`}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                setTab(t.id)
+                onTabChange?.(t.id)
+              }}
             >
               {t.label}
             </button>

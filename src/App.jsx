@@ -87,7 +87,7 @@ export default function App() {
         try {
           const all = await chaptersApi.list(c.id)
           const ch = all.find((x) => String(x.id) === target.chapterId)
-          nextView = ch ? { kind: 'chapter', chapter: ch } : { kind: 'empty' }
+          nextView = ch ? { kind: 'chapter', chapter: ch, tab: target.tab } : { kind: 'empty' }
         } catch (e) {
           // A chapter-fetch failure degrades to the loaded campaign's empty pane —
           // not all the way back to the campaign list, which would drop the campaign.
@@ -287,7 +287,8 @@ export default function App() {
                 key={view.chapter.id}
                 campaignId={campaign.id}
                 chapter={view.chapter}
-                initialTab={view.tab}
+                initialTab={view.tab || 'config'}
+                onTabChange={(tab) => setView((v) => ({ ...v, tab }))}
                 onClose={() => {
                   backToEmpty()
                   setReloadKey((k) => k + 1)
