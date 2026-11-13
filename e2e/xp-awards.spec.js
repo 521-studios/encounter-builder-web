@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, addContent, openEncounter, openBudget, removeRow } from './helpers/login.js'
 
 // izuh: non-combat XP awards (story/exploration/ally) add to the party's XP total

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openTab, openBudget } from './helpers/login.js'
 
 // 529w: for a table that isn't the 4-PC book standard, the budget panel shows the

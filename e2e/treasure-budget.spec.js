@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openTab, openBudget } from './helpers/login.js'
 
 // Slice 4: the encounter's treasure-vs-budget panel — difficulty band from

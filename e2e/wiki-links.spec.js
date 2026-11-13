@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent } from './helpers/login.js'
 
 // w08f: a [[wiki-link]] in an encounter's markdown description resolves to another

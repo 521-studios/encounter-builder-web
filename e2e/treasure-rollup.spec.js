@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter, addContent, openTab } from './helpers/login.js'
 
 // Chapter + campaign treasure rollups (always visible, collapse-by-title). Build a

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, openTab, openEncounter, removeRow } from './helpers/login.js'
 
 // 3qq7: room exits / connectivity graph. An exit links to another encounter (soft

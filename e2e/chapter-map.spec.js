@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteChapter, openTab } from './helpers/login.js'
 
 // 8hda: the chapter connectivity map. Two rooms in a chapter linked by a 3qq7 exit

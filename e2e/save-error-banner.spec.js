@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, openFirstCampaign, createEncounter, deleteEncounter, openTab } from './helpers/login.js'
 
 // e9aj: a background autosave that fails AFTER the editor closes (the flush-on-leave

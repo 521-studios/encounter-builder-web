@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, createEncounter, deleteEncounter, addContent, openEncounter } from './helpers/login.js'
 
 // The end-to-end acceptance loop: sign in → pick a campaign → build an encounter

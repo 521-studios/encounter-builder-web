@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, addContent, openEncounter, openTab, openBudget, removeRow } from './helpers/login.js'
 
 // ablm: room/area types. A non-combat room (knowledge/social/…) drops the meaningless
