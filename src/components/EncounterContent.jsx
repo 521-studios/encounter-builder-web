@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { CONTENT_SECTIONS, CONTENT_TYPE_LABELS, emptyContentItem } from '../model.js'
+import { CONTENT_SECTIONS, CONTENT_TYPE_LABELS, emptyContentItem, creatures as listCreatures, creatureName } from '../model.js'
 import MonsterLine from './MonsterLine.jsx'
 import HazardLine from './HazardLine.jsx'
 import AfflictionLine from './AfflictionLine.jsx'
@@ -39,6 +39,8 @@ export default function EncounterContent({
       return n
     })
 
+  const creatures = listCreatures(content, (c) => creatureName(c, entryOf)) // 77l2 gear sources
+
   const add = (type) => {
     const item = emptyContentItem(type)
     onAdd(item)
@@ -76,7 +78,7 @@ export default function EncounterContent({
       case 'pool':
         return <PoolHeaderEditor pool={c.pool} disabled={released} onChange={(p) => onSetItem(c.id, { pool: p })} onRemove={() => onRemove(c.id)} />
       case 'treasure':
-        return <TreasureLine treasure={c.treasure} disabled={released} onChange={(t) => onSetItem(c.id, { treasure: t })} onRemove={() => onRemove(c.id)} />
+        return <TreasureLine treasure={c.treasure} creatures={creatures} disabled={released} onChange={(t) => onSetItem(c.id, { treasure: t })} onRemove={() => onRemove(c.id)} />
       case 'coin':
         return <CoinEditor coin={c.coin} disabled={released} onChange={(coin) => onSetItem(c.id, { coin })} onRemove={() => onRemove(c.id)} />
       case 'xp_award':

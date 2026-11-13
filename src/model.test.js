@@ -858,3 +858,23 @@ test('isDone: complete, skipped and released are closed out; the rest are not', 
   for (const s of ['complete', 'skipped', 'released']) assert.equal(isDone(s), true, s)
   for (const s of ['prepared', 'executing', 'draft', 'run', undefined]) assert.equal(isDone(s), false, String(s))
 })
+
+test('creatures lists each creature by kill key; gearLeftBehind mirrors the API (77l2)', async () => {
+  const { creatures, gearLeftBehind } = await import('./model.js')
+  const content = [
+    { id: 'm1', type: 'monster', monster: { ref: { game_id: 'g' }, count: 2 } },
+    { id: 'h1', type: 'hazard', monster: { ref: { game_id: 'trap' }, count: 1 } },
+    { id: 'b', type: 'monster', monster: { ref: { game_id: 'boss' }, count: 0 } },
+  ]
+  assert.deepEqual(
+    creatures(content, (c) => c.id),
+    [{ key: 'm1:1', label: 'm1 #1' }, { key: 'm1:2', label: 'm1 #2' }, { key: 'b:1', label: 'b' }],
+  )
+  const kills = { 'm1:1': { killed: true } }
+  assert.equal(gearLeftBehind({ qty: 1, from_creature: 'm1:1' }, content, kills), false)
+  assert.equal(gearLeftBehind({ qty: 1, from_creature: 'm1:2' }, content, kills), true)
+  assert.equal(gearLeftBehind({ qty: 1, from_creature: 'm1:2', qty_moving: 1 }, content, kills), false)
+  assert.equal(gearLeftBehind({ qty: 1, from_creature: 'h1:1' }, content, kills), false) // hazards aren't sources
+  assert.equal(gearLeftBehind({ qty: 1, from_creature: 'm1:3' }, content, kills), false) // dangling
+  assert.equal(gearLeftBehind({ qty: 1 }, content, kills), false)
+})

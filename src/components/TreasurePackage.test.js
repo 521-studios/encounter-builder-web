@@ -86,3 +86,37 @@ test('the found toggle and coin exclusion write not_found / coin state, and cont
   assert.deepEqual(sent.find((c) => c.id === 'c1').coin, { gp: 5, state: 'consumed' })
   assert.equal(sent.find((c) => c.id === 'p1').pool.not_found, true)
 })
+
+// 77l2: each creature is a treasure source.
+const mitflits = [
+  { id: 'm1', type: 'monster', monster: { ref: { game_id: 'Monsters:1' }, count: 2, nickname: 'Mitflit' } },
+  { id: 's1', type: 'treasure', treasure: { ref: { game_id: 'Items:1' }, qty: 1, from_creature: 'm1:1' } },
+  { id: 's2', type: 'treasure', treasure: { ref: { game_id: 'Items:2' }, qty: 1, from_creature: 'm1:2' } },
+  { id: 'gone', type: 'treasure', treasure: { ref: { game_id: 'Items:1' }, qty: 4, from_creature: 'm1:9' } },
+]
+
+test('gear of a creature not killed stays behind without a note; a killed one moves', () => {
+  let last = mitflits
+  render(
+    <TreasurePackage content={mitflits} entryOf={entryOf} kills={{ 'm1:1': { killed: true } }} onChange={(n) => (last = n)} onRelease={() => {}} />,
+  )
+  const items = screen.getAllByTestId('package-item')
+  assert.equal(items[0].querySelector('input').value, '1') // Mitflit #1 killed
+  assert.equal(items[1].querySelector('input').value, '0') // Mitflit #2 alive
+  assert.match(screen.getByTestId('package-not-killed').textContent, /Mitflit #2 not killed/)
+  assert.equal(items[2].querySelector('input').value, '4') // dangling source: ordinary treasure
+  assert.equal(screen.queryByTestId('package-todo'), null) // the default needs no note
+  assert.equal(screen.getByRole('button', { name: 'Release to party' }).disabled, false)
+
+  // The GM can still send it: an explicit qty_moving overrides the default.
+  fireEvent.change(items[1].querySelector('input'), { target: { value: '1' } })
+  assert.equal(last.find((c) => c.id === 's2').treasure.qty_moving, 1)
+})
+
+test('setting not-killed gear back to 0 returns it to the live default', () => {
+  let last
+  const c = mitflits.map((x) => (x.id === 's2' ? { ...x, treasure: { ...x.treasure, qty_moving: 1 } } : x))
+  render(<TreasurePackage content={c} entryOf={entryOf} kills={{}} onChange={(n) => (last = n)} onRelease={() => {}} />)
+  fireEvent.change(screen.getAllByTestId('package-item')[1].querySelector('input'), { target: { value: '0' } })
+  assert.equal(last.find((x) => x.id === 's2').treasure.qty_moving, undefined)
+})

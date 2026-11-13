@@ -491,6 +491,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           <TreasurePackage
             content={content}
             entryOf={budget.entryOf}
+            kills={enc.kills}
             onChange={(next) => patch({ content: next })}
             onRelease={() => release()}
             releasing={releasing}

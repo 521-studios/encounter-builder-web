@@ -8,11 +8,14 @@ import RemoveButton from './RemoveButton.jsx'
 // name (no more typing raw game_ids). Once chosen: the ItemCard preview (masked-
 // aware) plus qty, a mask (label players see + identify DC), sale class, and
 // post-encounter state.
-export default function TreasureLine({ treasure, disabled, onChange, onRemove }) {
+// creatures (77l2): the encounter's individual creatures; a gear line names the
+// one carrying it (from_creature), so it moves only if that creature is killed.
+export default function TreasureLine({ treasure, creatures, disabled, onChange, onRemove }) {
   const set = (fields) => onChange({ ...treasure, ...fields })
   const gameId = gameIdOf(treasure) // pristine game_id, or a templated ref's base.game_id
   const custom = isCustomTreasure(treasure) // freeform item (name + gp), not in the catalog
   const setCustom = (fields) => set({ ref: { json: { ...treasure.ref.json, ...fields } } })
+  const dangling = Boolean(treasure.from_creature) && !(creatures || []).some((c) => c.key === treasure.from_creature)
 
   const controls = (
     <div className="line treasure-controls">
@@ -103,6 +106,23 @@ export default function TreasureLine({ treasure, disabled, onChange, onRemove })
             </label>
           ))}
         </span>
+      )}
+      {creatures && (creatures.length > 0 || treasure.from_creature) && (
+        <select
+          aria-label="from"
+          value={treasure.from_creature || ''}
+          disabled={disabled}
+          onChange={(e) => set({ from_creature: e.target.value || undefined })}
+        >
+          <option value="">from: —</option>
+          {creatures.map((c) => (
+            <option key={c.key} value={c.key}>from: {c.label}</option>
+          ))}
+          {dangling && <option value={treasure.from_creature}>from: (removed creature)</option>}
+        </select>
+      )}
+      {dangling && (
+        <span className="error" data-testid="from-dangling">source creature removed: moves as ordinary treasure</span>
       )}
       {!disabled && (
         <RemoveButton label="treasure" onRemove={onRemove} />
