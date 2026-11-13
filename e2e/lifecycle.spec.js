@@ -27,6 +27,7 @@ test('lifecycle: prepared → complete with close-out notes; executing only for 
     await expect(row.locator('.status')).toHaveText('complete')
     const unsorted = page.locator('[data-testid="chapter-group"][data-chapter-id=""]')
     await expect(unsorted.getByTestId('chapter-rollup')).toContainText('complete')
+    await expect(unsorted.getByTestId('chapter-rollup')).toContainText(/\d+\/\d+ done/)
 
     // Survives a reload.
     await page.reload()
@@ -34,6 +35,12 @@ test('lifecycle: prepared → complete with close-out notes; executing only for 
     await openEncounter(page, name)
     await expect(page.getByTestId('encounter-status')).toHaveValue('complete')
     await expect(page.getByLabel('close-out notes')).toHaveValue('Party talked their way past.')
+
+    // Skipped also closes it out: the notes stay visible.
+    await page.getByTestId('encounter-status').selectOption('skipped')
+    await expect(page.getByLabel('close-out notes')).toBeVisible()
+    await expect(page.getByTestId('save-state')).toHaveText('Saved')
+    await expect(row.locator('.status')).toHaveText('skipped')
 
     // A combat room (a monster added) offers executing.
     await page.getByTestId('encounter-status').selectOption('prepared')

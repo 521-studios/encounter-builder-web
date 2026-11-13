@@ -392,7 +392,8 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               <option value="prepared">Prepared</option>
               {(combat || status === 'executing') && <option value="executing">Executing</option>}
               <option value="complete">Complete</option>
-              {!['prepared', 'executing', 'complete'].includes(status) && <option value={status}>{status}</option>}
+              <option value="skipped">Skipped</option>
+              {!['prepared', 'executing', 'complete', 'skipped'].includes(status) && <option value={status}>{status}</option>}
             </select>
           )}
           <button type="button" className="link" onClick={() => setPrinting(true)}>Print / PDF</button>
@@ -401,7 +402,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         </div>
 
         {released && <p className="muted">Released — read-only.</p>}
-        {(status === 'complete' || (released && enc.closeout_notes)) && (
+        {(status === 'complete' || status === 'skipped' || (released && enc.closeout_notes)) && (
           <label className="field closeout-notes">
             <span>Close-out notes</span>
             <textarea

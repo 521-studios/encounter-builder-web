@@ -3,7 +3,7 @@ import { errorMessage } from '../api/errors.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { groupEncountersByChapter, nextChapterOrder, ensureUnsortedGroup, UNSORTED } from '../chapters.js'
-import { toEncounterInput, canonicalStatus, statusRollup } from '../model.js'
+import { toEncounterInput, canonicalStatus, statusRollup, isDone } from '../model.js'
 
 // The sidebar chapter tree: chapters (in order) each expand to their encounters
 // (natural-sorted). Direct manipulation — click a chapter's NAME to open its
@@ -162,9 +162,10 @@ export default function ChapterTree({ campaignId, onEdit, onEditChapter, reloadK
               {/* Progress rollup (we5k.2.1): always visible, even collapsed. */}
               {g.encounters.length > 0 && (
                 <span className="chapter-rollup" id={`rollup-${key}`} data-testid="chapter-rollup">
-                  {statusRollup(g.encounters)
-                    .map(([s, n]) => `${n} ${s}`)
-                    .join(' · ')}
+                  {[
+                    `${g.encounters.filter((e) => isDone(e.status)).length}/${g.encounters.length} done`,
+                    ...statusRollup(g.encounters).map(([s, n]) => `${n} ${s}`),
+                  ].join(' · ')}
                 </span>
               )}
             </div>

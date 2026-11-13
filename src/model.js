@@ -22,9 +22,15 @@ export const ROOM_TYPE_LABELS = {
 // A room shows its combat difficulty band + treasure target only when it's combat
 // (empty/unset defaults to combat, matching the API).
 // Encounter lifecycle (we5k.2.1): prepared → executing → complete → released.
-// Non-combat encounters skip executing. Rows saved before the lifecycle say
-// draft/run; read those as prepared/executing.
-export const STATUSES = ['prepared', 'executing', 'complete', 'released']
+// Non-combat encounters skip executing; skipped closes out one the party never
+// ran. Rows saved before the lifecycle say draft/run; read those as
+// prepared/executing.
+export const STATUSES = ['prepared', 'executing', 'complete', 'skipped', 'released']
+// Closed out: complete, skipped, or past that (released). What rollups count as done.
+export function isDone(status) {
+  const s = canonicalStatus(status)
+  return s === 'complete' || s === 'skipped' || s === 'released'
+}
 export function canonicalStatus(status) {
   if (!status || status === 'draft') return 'prepared'
   if (status === 'run') return 'executing'
