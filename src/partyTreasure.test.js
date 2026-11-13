@@ -58,3 +58,7 @@ test('receipt: no push, an error, one item, many items', () => {
   assert.equal(receipt({ ledger_id: 'L', item_count: 1 }).text, 'Sent to the party pool: 1 item (ledger L).')
   assert.equal(receipt({ ledger_id: 'L', item_count: 3 }).text, 'Sent to the party pool: 3 items (ledger L).')
 })
+
+test('receipt: an empty package (tdqh) reads as nothing sent, with no Retry', () => {
+  assert.deepEqual(receipt({ at: 'x', item_count: 0, empty: true }), { sent: true, text: 'Nothing to send to the party pool.' })
+})

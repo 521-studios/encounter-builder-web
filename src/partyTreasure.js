@@ -51,6 +51,7 @@ export const useCombatPush = () => useFlag(combatPushEnabled)
 export function receipt(push) {
   if (!push) return { sent: false, text: 'Not sent to the party pool.' }
   if (push.error) return { sent: false, text: `Not sent to the party pool: ${push.error}` }
+  if (push.empty) return { sent: true, text: 'Nothing to send to the party pool.' } // tdqh: nothing moved
   const n = push.item_count
   return { sent: true, text: `Sent to the party pool: ${n} ${n === 1 ? 'item' : 'items'} (ledger ${push.ledger_id}).` }
 }
