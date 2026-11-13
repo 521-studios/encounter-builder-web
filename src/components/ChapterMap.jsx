@@ -166,6 +166,7 @@ function PassageEdge({ id, source, target, data }) {
   const t = useInternalNode(target)
   const { screenToFlowPosition } = useReactFlow()
   const pressRef = useRef(null)
+  useEffect(() => () => clearTimeout(pressRef.current?.timer), []) // no press fires after unmount
   if (!s || !t) return null
   const sc = boxOf(s)
   const tc = boxOf(t)
@@ -210,8 +211,15 @@ function PassageEdge({ id, source, target, data }) {
               cy={p.y}
               r={5}
               onPointerDown={(e) => {
-                e.currentTarget.setPointerCapture(e.pointerId)
-                lp.onPointerDown(e)
+                const el = e.currentTarget
+                const pid = e.pointerId
+                el.setPointerCapture(pid)
+                // Release the capture before removing: React reuses this circle (key=i)
+                // for the next bend, which a still-down finger would otherwise drag.
+                longPress(pressRef, () => {
+                  if (el.hasPointerCapture(pid)) el.releasePointerCapture(pid)
+                  remove()
+                }).onPointerDown(e)
               }}
               onPointerMove={(e) => {
                 lp.onPointerMove(e)
