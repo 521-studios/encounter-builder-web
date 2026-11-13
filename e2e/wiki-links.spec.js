@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { login, trackApiErrors, openFirstCampaign, createEncounter, addContent } from './helpers/login.js'
+import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent } from './helpers/login.js'
 
 // w08f: a [[wiki-link]] in an encounter's markdown description resolves to another
 // encounter and becomes a clickable link that opens it.
@@ -12,20 +12,27 @@ test('wiki-links: [[Name]] in a description links to and opens that encounter', 
   const roomB = `Walkway ${ts}`
   const roomA = `Start ${ts}`
   await createEncounter(page, roomB) // link target
-  await createEncounter(page, roomA) // opens A's editor
+  try {
+    await createEncounter(page, roomA) // opens A's editor
 
-  // Author a wiki-link to B in A's description; it renders as a clickable link.
-  await addContent(page, 'Markdown section')
-  await page.locator('.description-input').fill(`Cross to [[${roomB}]] to continue.`)
-  await page.locator('.text-block').getByRole('button', { name: 'Done' }).click()
-  await expect(page.getByTestId('save-state')).toHaveText('Saved')
-  const link = page.locator('.description-preview').getByRole('link', { name: roomB })
-  await expect(link).toBeVisible()
+    // Author a wiki-link to B in A's description; it renders as a clickable link.
+    await addContent(page, 'Markdown section')
+    await page.locator('.description-input').fill(`Cross to [[${roomB}]] to continue.`)
+    await page.locator('.text-block').getByRole('button', { name: 'Done' }).click()
+    await expect(page.getByTestId('save-state')).toHaveText('Saved')
+    const link = page.locator('.description-preview').getByRole('link', { name: roomB })
+    await expect(link).toBeVisible()
 
-  // Clicking it opens Room B's editor.
-  await link.click()
-  await expect(page.locator('.editor')).toBeVisible()
-  await expect(page.getByLabel('encounter name')).toHaveValue(roomB)
+    // Clicking it opens Room B's editor.
+    await link.click()
+    await expect(page.locator('.editor')).toBeVisible()
+    await expect(page.getByLabel('encounter name')).toHaveValue(roomB)
+  } finally {
+    // Tear down both rooms even when an assertion fails (they used to pile up on
+    // the staging GM account as "Walkway <ts>" / "Start <ts>").
+    await page.getByRole('button', { name: /^Close/ }).click().catch(() => {})
+    for (const n of [roomA, roomB]) await deleteEncounter(page, n).catch(() => {})
+  }
 
   expect(apiErrors).toEqual([])
 })
