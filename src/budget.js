@@ -4,7 +4,7 @@
 // without fetching; the TreasureBudget component wires the real fetched entries.
 import { itemPriceCp, creatureLevel, coinsToCp } from '@521studios/pfsrd2-display'
 import { creatureXp, encounterThreat, treasureBudget } from './pf2eRules.js'
-import { isCustomTreasure, isCombatRoom, contentMonsters, contentHazards, contentAfflictions, contentTreasure, contentCurrency, contentXPAwards } from './model.js'
+import { treasureMoving, isCustomTreasure, isCombatRoom, contentMonsters, contentHazards, contentAfflictions, contentTreasure, contentCurrency, contentXPAwards } from './model.js'
 
 // refGameId: the game_id a monster/treasure ref resolves to — a pristine ref, or
 // a derived (templated/runed) ref's base.game_id.
@@ -18,6 +18,10 @@ function isDerived(ref) {
   return !!(ref && (ref.base || (Array.isArray(ref.modifications) && ref.modifications.length)))
 }
 
+// The quantity a line is valued at: its close-out moving qty once the GM has set
+// one (we5k.2.5), else the full qty.
+const valuedQty = (line) => (line.qty_moving != null ? treasureMoving(line) : line.qty || 1)
+
 // treasureValueCp sums an encounter's treasure to copper: coin reward + each
 // line's item price (variant-aware) × qty. Skips DESTROYED loot (not awarded).
 // Lines whose value can't be resolved — a derived/runed item, a "Varies" price,
@@ -27,14 +31,14 @@ export function treasureValueCp(treasure, currency, entryOf) {
   let cp = coinsToCp(currency)
   const unpriced = []
   for (const line of treasure || []) {
-    if (line.state === 'destroyed') continue
+    if (line.state === 'destroyed' && line.qty_moving == null) continue
     // A degree-of-success line overrides the item price; the builder budgets the
     // Success tier — the reliable outcome, not the higher crit-success — falling
     // back to another set tier.
     if (line.value_tiers) {
       const v = line.value_tiers
       const best = [v.success, v.crit_success, v.failure, v.crit_failure].find((n) => typeof n === 'number')
-      if (typeof best === 'number' && Number.isFinite(best)) cp += best * (line.qty || 1)
+      if (typeof best === 'number' && Number.isFinite(best)) cp += best * valuedQty(line)
       else unpriced.push(line)
       continue
     }
@@ -42,7 +46,7 @@ export function treasureValueCp(treasure, currency, entryOf) {
       // A freeform item carries its own gp value (in copper); a line left unvalued
       // (null) floors the total like any unpriced item.
       const v = line.ref.json.value_cp
-      if (typeof v === 'number' && Number.isFinite(v)) cp += v * (line.qty || 1)
+      if (typeof v === 'number' && Number.isFinite(v)) cp += v * valuedQty(line)
       else unpriced.push(line)
       continue
     }
@@ -52,7 +56,7 @@ export function treasureValueCp(treasure, currency, entryOf) {
       // unpriced component, or an item composed before pricing shipped) still floors
       // the budget via unpriced. (4den)
       const v = line.ref.price_cp
-      if (typeof v === 'number' && Number.isFinite(v)) cp += v * (line.qty || 1)
+      if (typeof v === 'number' && Number.isFinite(v)) cp += v * valuedQty(line)
       else unpriced.push(line)
       continue
     }
@@ -63,7 +67,7 @@ export function treasureValueCp(treasure, currency, entryOf) {
       unpriced.push(line)
       continue
     }
-    cp += per * (line.qty || 1)
+    cp += per * valuedQty(line)
   }
   return { cp, unpriced }
 }
@@ -266,8 +270,11 @@ export function gameIdsInEncounter(enc) {
     const g = refGameId(a.ref)
     if (g) ids.add(g)
   }
-  for (const t of contentTreasure(enc)) { // content-era loot too, not just legacy treasure[] (tjaa)
-    if (t.state === 'destroyed' || isDerived(t.ref)) continue
+  // Content-era loot too, not just legacy treasure[] (tjaa). Destroyed lines are
+  // fetched as well: the close-out package names them, and a partly-destroyed
+  // line (qty_moving, we5k.2.5) still prices its moving part.
+  for (const t of contentTreasure(enc)) {
+    if (isDerived(t.ref)) continue
     const g = refGameId(t.ref)
     if (g) ids.add(g)
   }

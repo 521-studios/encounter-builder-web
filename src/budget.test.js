@@ -257,7 +257,7 @@ test('encounterXp flags monsters whose level cannot be read', () => {
   assert.equal(unknown.length, 1)
 })
 
-test('gameIdsInEncounter dedupes and skips derived + destroyed', () => {
+test('gameIdsInEncounter dedupes, skips derived, keeps destroyed (the close-out package names it)', () => {
   const ids = gameIdsInEncounter({
     monsters: [
       { ref: { game_id: 'Monsters:goblin' } },
@@ -266,10 +266,10 @@ test('gameIdsInEncounter dedupes and skips derived + destroyed', () => {
     ],
     treasure: [
       { ref: { game_id: 'Weapons:1' } },
-      { ref: { game_id: 'Weapons:2' }, state: 'destroyed' }, // skip
+      { ref: { game_id: 'Weapons:2' }, state: 'destroyed' }, // fetched: named in the package (we5k.2.5)
     ],
   })
-  assert.deepEqual(ids.sort(), ['Monsters:goblin', 'Weapons:1'])
+  assert.deepEqual(ids.sort(), ['Monsters:goblin', 'Weapons:1', 'Weapons:2'])
 })
 
 import { rollupEncounters, rollupByChapter } from './budget.js'
@@ -512,5 +512,20 @@ test('gameIdsInEncounter includes content treasure refs', () => {
       { id: 'c1', type: 'coin', coin: { gp: 7 } },
     ],
   })
-  assert.deepEqual(ids, ['Items:rune'])
+  assert.deepEqual(ids, ['Items:rune', 'Items:gone'])
+})
+
+// we5k.2.5: a partly-destroyed line (qty_moving set) is fetched and valued at its
+// moving qty; a wholly destroyed one still isn't valued.
+test('partly-destroyed treasure is fetched and valued at its moving qty', () => {
+  const enc = {
+    content: [
+      { id: 't1', type: 'treasure', treasure: { ref: { game_id: 'W:dagger' }, qty: 3, state: 'destroyed', qty_moving: 2 } },
+      { id: 't2', type: 'treasure', treasure: { ref: { game_id: 'W:gone' }, qty: 1, state: 'destroyed' } },
+    ],
+  }
+  assert.deepEqual(gameIdsInEncounter(enc).sort(), ['W:dagger', 'W:gone'])
+  const entryOf = () => ({ stat_block: { price: { value: 2, currency: 'sp' } } })
+  const { cp } = treasureValueCp(enc.content.map((c) => c.treasure), {}, entryOf)
+  assert.equal(cp, 40) // 2 × 2 sp; the wholly destroyed line adds nothing
 })
