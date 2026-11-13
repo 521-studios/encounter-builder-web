@@ -65,6 +65,8 @@ test('round-trip: locationFor → parseLocation preserves the nav target', () =>
     ['C1', { kind: 'campaign' }, { kind: 'campaign' }],
     ['C1', { kind: 'encounter', enc: { id: 'E9' } }, { kind: 'encounter', encounterId: 'E9' }],
     ['C1', { kind: 'chapter', chapter: { id: 'H3' } }, { kind: 'chapter', chapterId: 'H3' }],
+    ['C1', { kind: 'chapter', chapter: { id: 'H3' }, tab: 'map' }, { kind: 'chapter', chapterId: 'H3', tab: 'map' }],
+    ['C1', { kind: 'chapter', chapter: { id: 'H3' }, tab: 'config' }, { kind: 'chapter', chapterId: 'H3' }],
   ]
   for (const [cid, view, expectedView] of cases) {
     const parsed = parseLocation('?' + locationFor(cid, view))
@@ -77,4 +79,10 @@ test('ids are URL-encoded/decoded (uuids with reserved chars survive)', () => {
   const id = 'a b/c?d'
   const q = locationFor(id, { kind: 'empty' })
   assert.equal(parseLocation('?' + q).campaignId, id)
+})
+
+test('chapter tab: only summary/map go in the URL; unknown tab values are dropped', () => {
+  assert.equal(locationFor('C1', { kind: 'chapter', chapter: { id: 'H3' }, tab: 'summary' }), 'campaign=C1&chapter=H3&tab=summary')
+  assert.deepEqual(parseLocation('?campaign=C1&chapter=H3&tab=bogus').view, { kind: 'chapter', chapterId: 'H3' })
+  assert.deepEqual(parseLocation('?campaign=C1&encounter=E9&tab=map').view, { kind: 'encounter', encounterId: 'E9' })
 })
