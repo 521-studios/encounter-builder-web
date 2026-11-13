@@ -43,7 +43,7 @@ const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 // item lives in ref.json. Mirrors budget.js's private isDerived.
 const isDerivedRef = (t) => Boolean(t.ref?.base || t.ref?.modifications)
 
-function treasureName(t, entryOf) {
+export function treasureName(t, entryOf) {
   if (isCustomTreasure(t)) return t.ref?.json?.name || 'Custom item'
   if (isDerivedRef(t)) {
     const j = t.ref?.json

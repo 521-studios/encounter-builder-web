@@ -39,17 +39,29 @@ function stub(enc, partyTreasure, calls = [], retryFails = false) {
 
 test('EncounterEditor: Release is hidden when party-treasure is not configured', async () => {
   const calls = []
-  stub(base, false, calls)
+  stub({ ...base, status: 'complete' }, false, calls)
   render(<EncounterEditor campaignId="c1" encounterId="e1" onClose={() => {}} />)
   await screen.findByLabelText('encounter name')
   await waitFor(() => assert.ok(calls.some((c) => c.endsWith('/api/app/me'))))
   assert.equal(screen.queryByRole('button', { name: 'Release to party' }), null)
 })
 
-test('EncounterEditor: Release shows when party-treasure is configured', async () => {
-  stub(base, true)
+// we5k.2.5: Release lives in the close-out Treasure package, so it shows only
+// once the encounter is complete or skipped.
+test('EncounterEditor: Release shows in the treasure package once closed out', async () => {
+  stub({ ...base, status: 'complete' }, true)
   render(<EncounterEditor campaignId="c1" encounterId="e1" onClose={() => {}} />)
+  await screen.findByTestId('treasure-package')
   await screen.findByRole('button', { name: 'Release to party' })
+})
+
+test('EncounterEditor: Release is hidden before close-out', async () => {
+  const calls = []
+  stub(base, true, calls)
+  render(<EncounterEditor campaignId="c1" encounterId="e1" onClose={() => {}} />)
+  await screen.findByLabelText('encounter name')
+  await waitFor(() => assert.ok(calls.some((c) => c.endsWith('/api/app/me'))))
+  assert.equal(screen.queryByRole('button', { name: 'Release to party' }), null)
 })
 
 test('EncounterEditor: a failed push shows the error and Retry replaces it with the receipt', async () => {
