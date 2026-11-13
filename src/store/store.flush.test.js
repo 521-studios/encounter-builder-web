@@ -193,3 +193,24 @@ test('subscribeFlush notifies on state transitions', async () => {
   un()
   assert.ok(ticks >= 2, `expected multiple notifications, got ${ticks}`)
 })
+
+test('flush() while a save is in flight waits for it to land (we5k.2.4 markKill)', async () => {
+  let release
+  const gate = new Promise((r) => (release = r))
+  let puts = 0
+  stubFetch(async (url, o) => {
+    await gate
+    puts++
+    return res({ ...JSON.parse(o.body), id: 'e1', status: 'draft' })
+  })
+  store.encounters.edit('c1', 'e1', rec())
+  const first = store.encounters.flush('c1', 'e1') // starts the PUT
+  let waited = false
+  const second = store.encounters.flush('c1', 'e1').then(() => (waited = true))
+  await new Promise((r) => setTimeout(r, 0))
+  assert.equal(waited, false, 'a second flush resolved before the in-flight PUT landed')
+  release()
+  await Promise.all([first, second])
+  assert.equal(puts, 1)
+  assert.equal(waited, true)
+})

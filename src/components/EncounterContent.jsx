@@ -25,6 +25,8 @@ export default function EncounterContent({
   onRemove,
   onReorder,
   onAddLoadoutToTreasure,
+  kills,
+  onKill,
 }) {
   const dialogRef = useRef(null)
   const [dragId, setDragId] = useState(null)
@@ -47,7 +49,7 @@ export default function EncounterContent({
   const editorFor = (c) => {
     switch (c.type) {
       case 'monster':
-        return <MonsterLine monster={c.monster} entryOf={entryOf} disabled={released} onChange={(m) => onSetItem(c.id, { monster: m })} onRemove={() => onRemove(c.id)} onAddToTreasure={onAddLoadoutToTreasure} />
+        return <MonsterLine monster={c.monster} itemId={c.id} kills={kills} onKill={onKill} entryOf={entryOf} disabled={released} onChange={(m) => onSetItem(c.id, { monster: m })} onRemove={() => onRemove(c.id)} onAddToTreasure={onAddLoadoutToTreasure} />
       case 'hazard':
         return <HazardLine hazard={c.monster} entryOf={entryOf} disabled={released} onChange={(h) => onSetItem(c.id, { monster: h })} onRemove={() => onRemove(c.id)} />
       case 'affliction':
