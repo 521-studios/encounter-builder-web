@@ -4,6 +4,9 @@ import {
   EXCLUSION_REASONS,
   EXCLUSION_REASON_LABELS,
   coinCp,
+  creatureName,
+  creatures as listCreatures,
+  gearLeftBehind,
   hasTreasureContent,
   treasureMoving,
 } from '../model.js'
@@ -21,7 +24,10 @@ function missingWhy(state, note) {
 // move (any shortfall needs a reason + note), excludes coin drops the same way,
 // and marks a gated pool not found (its loot + coin stay behind). Release lives
 // here — it's the last step of close-out.
-export default function TreasurePackage({ content, entryOf, onChange, onRelease, releasing, saving }) {
+// Gear from a creature that wasn't killed (77l2) stays behind by default and needs
+// no note; the GM can still type a different moving qty, which then needs one.
+export default function TreasurePackage({ content, entryOf, kills, onChange, onRelease, releasing, saving }) {
+  const creatureLabel = Object.fromEntries(listCreatures(content, (c) => creatureName(c, entryOf)).map((c) => [c.key, c.label]))
   const setItem = (id, fields) =>
     onChange(content.map((c) => (c.id === id ? { ...c, ...fields } : c)))
 
@@ -56,13 +62,18 @@ export default function TreasurePackage({ content, entryOf, onChange, onRelease,
       const t = c.treasure || {}
       if (!hasTreasureContent(t)) continue
       const qty = Number(t.qty) || 0
-      const moving = unfound ? 0 : treasureMoving(t)
-      const short = !unfound && moving < qty
+      const behind = !unfound && gearLeftBehind(t, content, kills)
+      const moving = unfound || behind ? 0 : treasureMoving(t)
+      const short = !unfound && !behind && moving < qty
       if (short && missingWhy(t.state, t.state_note)) todo++
       const set = (fields) => setItem(c.id, { treasure: { ...t, ...fields } })
+      // The live default: 0 for gear of a creature not killed, else the whole line.
+      const byDefault = gearLeftBehind({ ...t, qty_moving: undefined }, content, kills) ? 0 : qty
       const setMoving = (n) => {
         n = Math.max(0, Math.min(Math.round(Number(n) || 0), qty))
-        if (n >= qty) set({ qty_moving: undefined, state: 'intact', state_note: '' })
+        if (n === byDefault && n >= qty) set({ qty_moving: undefined, state: 'intact', state_note: '' })
+        else if (n === byDefault) set({ qty_moving: undefined })
+        else if (n >= qty) set({ qty_moving: qty, state: 'intact', state_note: '' })
         else set({ qty_moving: n, state: t.state && t.state !== 'intact' ? t.state : '' })
       }
       const name = treasureName(t, entryOf)
@@ -81,6 +92,11 @@ export default function TreasurePackage({ content, entryOf, onChange, onRelease,
             {' '}of {qty} × {name}
           </label>
           {unfound && <span className="muted"> — {EXCLUSION_REASON_LABELS.left_behind}: {POOL_NOT_FOUND_NOTE}</span>}
+          {behind && (
+            <span className="muted" data-testid="package-not-killed">
+              {' '}— {EXCLUSION_REASON_LABELS.left_behind}: {creatureLabel[t.from_creature]} not killed
+            </span>
+          )}
           {short && <Why value={t} label={name} onChange={set} />}
         </li>,
       )

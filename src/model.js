@@ -18,6 +18,34 @@ export function treasureMoving(t) {
   return !t?.state || t.state === 'intact' ? qty : 0
 }
 
+// 77l2: every creature on the encounter's monster lines, keyed like kills and the
+// lets-roll push ("<item id>:<n>"), labelled "Mitflit #2" (or just the name for a
+// lone creature). nameOf(item) names a monster content item.
+export function creatures(content, nameOf = () => 'monster') {
+  const out = []
+  for (const c of content || []) {
+    if (c.type !== 'monster' || !c.monster) continue
+    const n = Math.max(1, Math.floor(Number(c.monster.count)) || 1)
+    const name = nameOf(c)
+    for (let i = 1; i <= n; i++) out.push({ key: `${c.id}:${i}`, label: n > 1 ? `${name} #${i}` : name })
+  }
+  return out
+}
+
+// A monster content item's display name: the GM's nickname, else the book name.
+export function creatureName(item, entryOf) {
+  const m = item?.monster || {}
+  return m.nickname || entryOf?.(gameIdOf(m))?.name || m.ref?.json?.name || gameIdOf(m) || 'monster'
+}
+
+// Mirrors the API's Encounter.Moving (77l2): unless the GM set qty_moving, gear
+// from a creature that wasn't killed stays behind. A from_creature that no longer
+// names a creature is ignored (the line moves as ordinary treasure).
+export function gearLeftBehind(t, content, kills) {
+  if (t?.qty_moving != null || !t?.from_creature) return false
+  return creatures(content).some((c) => c.key === t.from_creature) && !kills?.[t.from_creature]?.killed
+}
+
 // A coin drop's value in copper.
 export function coinCp(coin) {
   const n = (k) => Number(coin?.[k]) || 0
