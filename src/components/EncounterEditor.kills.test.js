@@ -67,10 +67,12 @@ test('EncounterEditor: a slow first toggle never overrides a newer one', async (
   let openFirst
   const firstGate = new Promise((r) => (openFirst = r))
   let n = 0
+  const sent = []
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url)
     if (u.endsWith('/kills')) {
       const body = JSON.parse(init.body)
+      sent.push(body.killed)
       if (++n === 1) {
         await firstGate // the first (killed:true) answers last, with an error
         return res({ error: 'boom' }, 500)
@@ -87,10 +89,14 @@ test('EncounterEditor: a slow first toggle never overrides a newer one', async (
   fireEvent.click(await screen.findByRole('tab', { name: 'Encounter' }))
   const box = await screen.findByLabelText('gob killed')
   fireEvent.click(box) // killed
+  // Wait for the optimistic check to render, so the second click reads it (under
+  // load it could otherwise read the stale unchecked box and send killed:true again).
+  await waitFor(() => assert.equal(screen.getByLabelText('gob killed').checked, true))
   fireEvent.click(screen.getByLabelText('gob killed')) // alive again, answers first
   await waitFor(() => assert.equal(n, 2))
+  assert.deepEqual(sent, [true, false])
   openFirst()
   await new Promise((r) => setTimeout(r, 20))
-  assert.equal(screen.getByLabelText('gob killed').checked, false)
+  await waitFor(() => assert.equal(screen.getByLabelText('gob killed').checked, false))
   assert.equal(screen.queryByRole('alert'), null)
 })
