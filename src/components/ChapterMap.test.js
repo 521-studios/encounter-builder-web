@@ -1,7 +1,7 @@
-import { test, afterEach } from 'node:test'
+import { test, afterEach, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import ChapterMap, { imageTransform } from './ChapterMap.jsx'
+import ChapterMap, { imageTransform, longPress, LONG_PRESS_MS } from './ChapterMap.jsx'
 
 afterEach(() => cleanup())
 
@@ -104,4 +104,40 @@ test('ChapterMap: scale resizes the image and rotation spins it', () => {
   assert.equal(img.getAttribute('width'), '400')
   assert.equal(img.getAttribute('height'), '300')
   assert.equal(img.style.transform, 'rotate(90deg)')
+})
+
+test('longPress: a held touch fires once with its point; mouse, early lift, or a drag do not (xc9v)', () => {
+  mock.timers.enable({ apis: ['setTimeout'] })
+  try {
+    const ref = { current: null }
+    const fired = []
+    const lp = longPress(ref, (pt) => fired.push(pt))
+    const touch = (x, y) => ({ pointerType: 'touch', clientX: x, clientY: y })
+
+    lp.onPointerDown(touch(10, 20))
+    lp.onPointerMove(touch(13, 22)) // finger jitter stays a press
+    mock.timers.tick(LONG_PRESS_MS)
+    assert.deepEqual(fired, [{ clientX: 10, clientY: 20 }])
+    lp.onPointerUp()
+    mock.timers.tick(LONG_PRESS_MS)
+    assert.equal(fired.length, 1) // once per press
+
+    lp.onPointerDown({ ...touch(0, 0), pointerType: 'mouse' }) // mouse keeps double-click
+    mock.timers.tick(LONG_PRESS_MS)
+    lp.onPointerDown(touch(0, 0))
+    lp.onPointerUp() // a tap
+    mock.timers.tick(LONG_PRESS_MS)
+    lp.onPointerDown(touch(0, 0))
+    lp.onPointerMove(touch(30, 0)) // a drag
+    mock.timers.tick(LONG_PRESS_MS)
+    assert.equal(fired.length, 1)
+
+    // A re-render mid-press makes new handlers on the same ref; lifting still cancels.
+    longPress(ref, (pt) => fired.push(pt)).onPointerDown(touch(0, 0))
+    longPress(ref, (pt) => fired.push(pt)).onPointerUp()
+    mock.timers.tick(LONG_PRESS_MS)
+    assert.equal(fired.length, 1)
+  } finally {
+    mock.timers.reset()
+  }
 })

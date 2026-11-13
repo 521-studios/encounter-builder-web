@@ -129,15 +129,43 @@ function unit(a, b) {
   return len ? { x: (b.x - a.x) / len, y: (b.y - a.y) / len } : { x: 1, y: 0 }
 }
 
+// xc9v: touch has no double-click, so a long press (touch only) stands in for it on
+// passages and bends. `ref` holds the one pending press per edge, so a re-render
+// mid-press (a bend drag re-renders) can't orphan the timer. Moving a finger more
+// than a few px cancels it (that's a drag/pan, not a press). `fire` gets the press
+// point as {clientX, clientY}.
+export const LONG_PRESS_MS = 500
+export function longPress(ref, fire, ms = LONG_PRESS_MS) {
+  const stop = () => {
+    clearTimeout(ref.current?.timer)
+    ref.current = null
+  }
+  return {
+    onPointerDown: (e) => {
+      if (e.pointerType !== 'touch') return
+      stop()
+      const pt = { clientX: e.clientX, clientY: e.clientY }
+      ref.current = { ...pt, timer: setTimeout(() => ((ref.current = null), fire(pt)), ms) }
+    },
+    onPointerMove: (e) => {
+      const p = ref.current
+      if (p && Math.hypot(e.clientX - p.clientX, e.clientY - p.clientY) > 8) stop()
+    },
+    onPointerUp: stop,
+    onPointerCancel: stop,
+  }
+}
+
 // A passage between two rooms (or a room and an exit port). Line runs centre-to-centre
 // through the GM's bend points (muz0.4); a one-way passage adds an arrowhead at the
 // target's card edge; each side's label sits at its own card edge; a secret side is
-// dashed with a lock. Double-click the line to add a bend; drag a bend to move it;
-// double-click a bend to remove it.
+// dashed with a lock. Double-click (touch: long-press) the line to add a bend; drag a
+// bend to move it; double-click (touch: long-press) a bend to remove it.
 function PassageEdge({ id, source, target, data }) {
   const s = useInternalNode(source)
   const t = useInternalNode(target)
   const { screenToFlowPosition } = useReactFlow()
+  const pressRef = useRef(null)
   if (!s || !t) return null
   const sc = boxOf(s)
   const tc = boxOf(t)
@@ -160,30 +188,43 @@ function PassageEdge({ id, source, target, data }) {
   const tText = sideText(data.targetSecret, data.targetLabel, data.targetSkill, data.targetDC)
   const onChange = data.onWaypointsChange
   const at = (e) => screenToFlowPosition({ x: e.clientX, y: e.clientY })
+  const addBend = (e) => onChange(id, insertWaypoint(sc, wps, tc, at(e)))
   return (
     <>
       <path className="react-flow__edge-path" d={path} fill="none" stroke={EDGE_COLOR} strokeWidth={1.6} strokeDasharray={secret ? '6 4' : undefined} />
       {onChange && (
         // A wide invisible stroke so the thin line is easy to double-click.
-        <path className="map-edge-hit nodrag nopan" d={path} fill="none" stroke="transparent" strokeWidth={14} onDoubleClick={(e) => onChange(id, insertWaypoint(sc, wps, tc, at(e)))}>
-          <title>Double-click to add a bend</title>
+        <path className="map-edge-hit nodrag nopan" d={path} fill="none" stroke="transparent" strokeWidth={14} onDoubleClick={addBend} {...longPress(pressRef, addBend)}>
+          <title>Double-click (or long-press) to add a bend</title>
         </path>
       )}
       {onChange &&
-        wps.map((p, i) => (
-          <circle
-            key={i}
-            className="map-bend nodrag nopan"
-            cx={p.x}
-            cy={p.y}
-            r={5}
-            onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
-            onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && onChange(id, wps.map((q, j) => (j === i ? at(e) : q)))}
-            onDoubleClick={() => onChange(id, wps.filter((_, j) => j !== i))}
-          >
-            <title>Drag to move · double-click to remove</title>
-          </circle>
-        ))}
+        wps.map((p, i) => {
+          const remove = () => onChange(id, wps.filter((_, j) => j !== i))
+          const lp = longPress(pressRef, remove)
+          return (
+            <circle
+              key={i}
+              className="map-bend nodrag nopan"
+              cx={p.x}
+              cy={p.y}
+              r={5}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId)
+                lp.onPointerDown(e)
+              }}
+              onPointerMove={(e) => {
+                lp.onPointerMove(e)
+                if (e.currentTarget.hasPointerCapture(e.pointerId)) onChange(id, wps.map((q, j) => (j === i ? at(e) : q)))
+              }}
+              onPointerUp={lp.onPointerUp}
+              onPointerCancel={lp.onPointerCancel}
+              onDoubleClick={remove}
+            >
+              <title>Drag to move · double-click (or long-press) to remove</title>
+            </circle>
+          )
+        })}
       {!data.twoWay && (
         <g transform={`translate(${tb.x} ${tb.y}) rotate(${ang})`}>
           <polygon points="0,0 -10,-4.5 -10,4.5" fill={EDGE_COLOR} />
@@ -316,8 +357,8 @@ export default function ChapterMap({ encounters, onOpenEncounter, positions, onP
             )}
             <p className="map-legend muted">
               <strong>→</strong> one-way exit · <strong>—</strong> two-way · <span className="map-legend-dash">– –</span> secret door (🔒 = the side it's hidden from) ·{' '}
-              ○ exit leaving the chapter · red outline = dead-end. Drag to pan, scroll to zoom, drag a room to rearrange, click a room to open it. Double-click a passage to bend it;
-              drag a bend to move it, double-click it to remove.
+              ○ exit leaving the chapter · red outline = dead-end. Drag to pan, scroll to zoom, drag a room to rearrange, click a room to open it. Double-click (touch: long-press) a passage to bend it;
+              drag a bend to move it, double-click or long-press it to remove.
             </p>
           </>
         ))}

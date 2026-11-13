@@ -242,8 +242,8 @@ button.encounter { flex: 1; text-align: left; }
 /* Passage labels, positioned at each side's card edge via EdgeLabelRenderer. */
 .map-edge-label { position: absolute; pointer-events: none; background: rgba(27, 31, 34, 0.85); color: #cbd0d6; font-size: 10px; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
 /* muz0.4: passage bends. The hit stroke + handles take pointer events (React Flow edges don't by default). */
-.map-edge-hit { pointer-events: stroke; cursor: copy; }
-.map-bend { pointer-events: all; cursor: move; fill: #cbd0d6; stroke: #2a3033; stroke-width: 1.5; touch-action: none; }
+.map-edge-hit { pointer-events: stroke; cursor: copy; touch-action: none; -webkit-touch-callout: none; }
+.map-bend { pointer-events: all; cursor: move; fill: #cbd0d6; stroke: #2a3033; stroke-width: 1.5; touch-action: none; -webkit-touch-callout: none; }
 .map-legend { font-size: 12px; }
 .map-legend-dash { letter-spacing: -1px; }
 
