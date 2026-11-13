@@ -502,10 +502,10 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
         {enc.combat_push && (
           <p className="muted combat-push" data-testid="combat-push">
             In lets-roll as encounter #{enc.combat_push.lets_roll_encounter_id}
-            {config.authority && (
+            {config.letsRollUrl && (
               <>
                 {' · '}
-                <a href={`${config.authority.replace(/\/$/, '')}/games/${campaignId}`} target="_blank" rel="noreferrer">
+                <a href={`${config.letsRollUrl.replace(/\/$/, '')}/games/${campaignId}`} target="_blank" rel="noreferrer">
                   open the game
                 </a>
               </>
