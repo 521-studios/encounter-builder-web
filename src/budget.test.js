@@ -501,3 +501,16 @@ test('rollupEncounters resolves party per-encounter, not once for all rows', () 
   assert.notEqual(rows[0].targetCp, rows[1].targetCp) // same band, different level ⇒ different budget
   assert.ok(rows[0].targetCp > 0 && rows[1].targetCp > 0)
 })
+
+// tjaa: content-era treasure (the unified `content` list) must be prefetched too,
+// or every item prices as unknown and the badge shows only coins "(floor)".
+test('gameIdsInEncounter includes content treasure refs', () => {
+  const ids = gameIdsInEncounter({
+    content: [
+      { id: 't1', type: 'treasure', treasure: { ref: { game_id: 'Items:rune' }, qty: 1, variant: 'Striking (Greater)' } },
+      { id: 't2', type: 'treasure', treasure: { ref: { game_id: 'Items:gone' }, qty: 1, state: 'destroyed' } },
+      { id: 'c1', type: 'coin', coin: { gp: 7 } },
+    ],
+  })
+  assert.deepEqual(ids, ['Items:rune'])
+})

@@ -266,7 +266,7 @@ export function gameIdsInEncounter(enc) {
     const g = refGameId(a.ref)
     if (g) ids.add(g)
   }
-  for (const t of enc?.treasure || []) {
+  for (const t of contentTreasure(enc)) { // content-era loot too, not just legacy treasure[] (tjaa)
     if (t.state === 'destroyed' || isDerived(t.ref)) continue
     const g = refGameId(t.ref)
     if (g) ids.add(g)
