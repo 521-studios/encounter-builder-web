@@ -282,10 +282,19 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     setPushing(true)
     setError(null)
     try {
-      await encounters.update(campaignId, encounterId, buildInput(encRef.current))
+      const sent = encRef.current
+      await encounters.update(campaignId, encounterId, buildInput(sent))
       const result = await encounters.pushCombat(campaignId, encounterId)
-      encRef.current = keyed(result)
-      setEnc(encRef.current)
+      syncedRef.current = { name: result.name, chapter_id: result.chapter_id || '', status: result.status }
+      if (encRef.current === sent) {
+        encRef.current = keyed(result)
+        setEnc(encRef.current)
+      } else {
+        // The GM kept editing during the push: keep those edits and take only the
+        // server-owned fields. patch re-arms the autosave with the new status, so the
+        // flush queued mid-push (still saying prepared) can't revert it.
+        patch({ status: result.status, combat_push: result.combat_push })
+      }
       onSaved && onSaved(result)
     } catch (e) {
       setError(e?.status === 422 && Array.isArray(e.body?.incomplete)
