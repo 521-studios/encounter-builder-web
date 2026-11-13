@@ -19,7 +19,8 @@ import {
   canonicalStatus,
 } from '../model.js'
 import { resolveParty } from '../party.js'
-import { usePartyTreasure, receipt } from '../partyTreasure.js'
+import { usePartyTreasure, useCombatPush, receipt } from '../partyTreasure.js'
+import { config } from '../config.js'
 import { naturalSort } from '../sort.js'
 import { BAND_LABELS, BASE_PARTY, treasureBudget } from '../pf2eRules.js'
 import { treasureStanding } from '../budget.js'
@@ -52,6 +53,8 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   const [releaseGaps, setReleaseGaps] = useState(null) // rvd4: unfinished items blocking release, or null
   const [retrying, setRetrying] = useState(false)
   const partyTreasure = usePartyTreasure() // 6m14: Release + receipt only when party-treasure is wired up
+  const combatPush = useCombatPush() // we5k.2.3: "Run in lets-roll" only when the API can push
+  const [pushing, setPushing] = useState(false)
   const gapsRef = useRef(null) // the gaps panel — focused when it appears so keyboard/SR users land on it
   const [printing, setPrinting] = useState(false) // full-screen print/PDF sheet overlay
   // The save indicator now reflects the store's flush layer (rtd8b): edits are
@@ -270,6 +273,29 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     }
   }
 
+  // we5k.2.3: push the monsters into the campaign's lets-roll game. Save current
+  // edits first (lets-roll gets what the GM sees), then push. The API moves the
+  // encounter to executing; adopt its result so a later autosave doesn't send the
+  // old status. Re-pushing syncs later edits (lets-roll upserts by encounter id).
+  async function pushCombat() {
+    encounters.cancel(campaignId, encounterId) // drop the pending flush; save explicitly
+    setPushing(true)
+    setError(null)
+    try {
+      await encounters.update(campaignId, encounterId, buildInput(encRef.current))
+      const result = await encounters.pushCombat(campaignId, encounterId)
+      encRef.current = keyed(result)
+      setEnc(encRef.current)
+      onSaved && onSaved(result)
+    } catch (e) {
+      setError(e?.status === 422 && Array.isArray(e.body?.incomplete)
+        ? 'Some monsters still use the old elite/weak setting. Re-apply elite/weak as a template, then push again.'
+        : errorMessage(e))
+    } finally {
+      setPushing(false)
+    }
+  }
+
   // Jump the GM to an unfinished item: switch to the Encounter tab, scroll it into
   // view, and flash it. Switching tabs may need a render+paint before the row exists,
   // so wait two animation frames (after React commits + paints) rather than guess a
@@ -415,6 +441,21 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
           </label>
         )}
         {released && partyTreasure && <ReleaseReceipt push={enc.release_push} onRetry={retryPush} retrying={retrying} />}
+        {enc.combat_push && (
+          <p className="muted combat-push" data-testid="combat-push">
+            In lets-roll as encounter #{enc.combat_push.lets_roll_encounter_id}
+            {config.authority && (
+              <>
+                {' · '}
+                <a href={`${config.authority.replace(/\/$/, '')}/games/${campaignId}`} target="_blank" rel="noreferrer">
+                  open the game
+                </a>
+              </>
+            )}
+            {enc.combat_push.kept?.length > 0 &&
+              ` · lets-roll kept ${enc.combat_push.kept.length} removed ${enc.combat_push.kept.length === 1 ? 'monster' : 'monsters'} that already took damage or were killed`}
+          </p>
+        )}
         {error && <p className="error" role="alert">{error}</p>}
 
         {releaseGaps && (
@@ -479,6 +520,11 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               >
                 {saveLabel}
               </span>
+              {combatPush && combat && (status === 'prepared' || status === 'executing') && (
+                <button data-testid="push-combat" onClick={pushCombat} disabled={pushing || saveState === 'saving'}>
+                  {pushing ? 'Sending…' : enc.combat_push ? 'Update lets-roll' : 'Run in lets-roll'}
+                </button>
+              )}
               {partyTreasure && (
                 <button onClick={() => release()} disabled={releasing || saveState === 'saving'}>
                   {releasing ? 'Releasing…' : 'Release to party'}

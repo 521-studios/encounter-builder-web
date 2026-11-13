@@ -1,6 +1,6 @@
 import { test, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { partyTreasureEnabled, resetPartyTreasure, receipt } from './partyTreasure.js'
+import { partyTreasureEnabled, combatPushEnabled, resetPartyTreasure, receipt } from './partyTreasure.js'
 import { setAnon } from './api/anon.js'
 
 const realFetch = globalThis.fetch
@@ -39,6 +39,17 @@ test('partyTreasureEnabled: a successful /me is cached', async () => {
   assert.equal(await partyTreasureEnabled(), true)
   assert.equal(await partyTreasureEnabled(), true)
   assert.equal(calls, 1)
+})
+
+test('combatPushEnabled reads combat_push from the same cached /me', async () => {
+  let calls = 0
+  globalThis.fetch = async () => (calls++, res({ party_treasure: false, combat_push: true }))
+  assert.equal(await combatPushEnabled(), true)
+  assert.equal(await partyTreasureEnabled(), false)
+  assert.equal(calls, 1)
+  resetPartyTreasure()
+  globalThis.fetch = async () => res({ party_treasure: true }) // older API: no combat_push
+  assert.equal(await combatPushEnabled(), false)
 })
 
 test('receipt: no push, an error, one item, many items', () => {

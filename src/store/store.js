@@ -41,6 +41,9 @@ const apiBackend = {
     // a push that did land is replayed, not duplicated). API-only: anon has no
     // party-treasure, and the editor hides the control there.
     retryRelease: (cid, id, opts = {}) => request('POST', `${encBase(cid)}/${enc(id)}/release/retry`, opts),
+    // we5k.2.3: push the encounter's monsters into the lets-roll game (an upsert,
+    // so a re-push syncs). API-only; the editor hides it when not wired up.
+    pushCombat: (cid, id, opts = {}) => request('POST', `${encBase(cid)}/${enc(id)}/push-combat`, opts),
   },
   chapters: {
     list: (cid, opts = {}) => request('GET', chBase(cid), opts),
@@ -278,6 +281,11 @@ export const store = {
     },
     async retryRelease(cid, id, opts) {
       const rec = await apiBackend.encounters.retryRelease(cid, id, opts)
+      slice(cid).encounters.set(String(id), rec)
+      return rec
+    },
+    async pushCombat(cid, id, opts) {
+      const rec = await apiBackend.encounters.pushCombat(cid, id, opts)
       slice(cid).encounters.set(String(id), rec)
       return rec
     },

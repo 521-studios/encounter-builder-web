@@ -53,6 +53,13 @@ test('release POSTs to the /release subpath', async () => {
   assert.equal(fetchImpl.calls[0].opts.method, 'POST')
 })
 
+test('pushCombat POSTs to the /push-combat subpath', async () => {
+  const fetchImpl = fakeFetch(ok({ status: 'executing' }))
+  await encounters.pushCombat('g1', 'e1', { tokenProvider: tok, fetchImpl })
+  assert.match(fetchImpl.calls[0].url, /\/encounters\/e1\/push-combat$/)
+  assert.equal(fetchImpl.calls[0].opts.method, 'POST')
+})
+
 test('path components are URL-encoded', async () => {
   const fetchImpl = fakeFetch(ok({}))
   await encounters.get('g 1', 'e/1', { tokenProvider: tok, fetchImpl })
