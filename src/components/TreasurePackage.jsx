@@ -76,7 +76,7 @@ export default function TreasurePackage({ content, entryOf, onChange, onRelease,
               aria-label={`${name} moving`}
               value={moving}
               disabled={unfound}
-              onChange={(e) => setMoving(e.target.value)}
+              onChange={(e) => e.target.value !== '' && setMoving(e.target.value)} // a cleared box isn't 0
             />
             {' '}of {qty} × {name}
           </label>
