@@ -74,6 +74,7 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   // about, so we only refresh the tree on real name/chapter/status changes, not
   // on every keystroke. Dirty/saving/debounce now live in the store's flush layer.
   const encRef = useRef(null)
+  const killSeq = useRef({}) // per creature key: only the latest toggle may adopt or revert (we5k.2.4)
   const syncedRef = useRef({ name: null, chapter_id: null, status: null })
   encRef.current = enc
 
@@ -278,17 +279,34 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   // autosaved PUT (the API keeps them apart so a save never clobbers a lets-roll
   // report), so save pending edits first (a just-added monster must exist on the
   // server), then adopt only the returned kills.
+  // The toggle flips at once (optimistic) and reverts if the save or the post fails.
   async function markKill(key, killed) {
     const id = encRef.current?.id
+    const setKill = (k) => {
+      if (!encRef.current || encRef.current.id !== id) return // the GM opened another encounter meanwhile
+      const kills = { ...encRef.current.kills }
+      if (k) kills[key] = k
+      else delete kills[key]
+      encRef.current = { ...encRef.current, kills }
+      setEnc(encRef.current)
+    }
+    const seq = (killSeq.current[key] || 0) + 1
+    killSeq.current[key] = seq
+    const latest = () => killSeq.current[key] === seq
+    const before = encRef.current?.kills?.[key]
     setError(null)
+    setKill({ ...before, killed })
     try {
       await encounters.flush(campaignId, encounterId)
-      if (flushState(encKey(campaignId, encounterId)) === 'error') return // "Save failed" is already showing
+      if (flushState(encKey(campaignId, encounterId)) === 'error') {
+        if (latest()) setKill(before) // "Save failed" is already showing
+        return
+      }
       const result = await encounters.markKill(campaignId, encounterId, key, killed)
-      if (!encRef.current || encRef.current.id !== id) return // the GM opened another encounter meanwhile
-      encRef.current = { ...encRef.current, kills: result.kills }
-      setEnc(encRef.current)
+      if (latest()) setKill(result.kills?.[key])
     } catch (e) {
+      if (!latest()) return // a newer toggle owns this creature now
+      setKill(before)
       if (encRef.current?.id === id) setError(errorMessage(e))
     }
   }

@@ -23,7 +23,9 @@ test('kills: mark a creature killed, edit, reload, still killed', async ({ page,
     await expect(page.getByTestId('monster-kills')).toHaveCount(0)
     await page.getByTestId('encounter-status').selectOption('executing')
     const killed = page.getByLabel('Goblin Warrior killed', { exact: true })
+    const posted = page.waitForResponse((r) => r.url().endsWith('/kills') && r.request().method() === 'POST')
     await killed.check()
+    expect((await posted).status(), 'POST /kills').toBe(200)
     await expect(killed).toBeChecked()
 
     // An autosaved edit after the kill must not clear it.
