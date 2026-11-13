@@ -5,33 +5,46 @@ import { useEffect, useState } from 'react'
 import { api } from './api/client.js'
 import { isAnon } from './api/anon.js'
 
-let cached = null // Promise<boolean>, shared by every editor in the session
+// The same /me also says whether the lets-roll combat push is wired up
+// (combat_push, we5k.2.3); "Run in lets-roll" hides when it isn't.
+let cached = null // Promise<me|null>, shared by every editor in the session
 
-export function partyTreasureEnabled() {
-  if (isAnon()) return Promise.resolve(false)
-  cached ??= api.me().then((me) => me?.party_treasure === true, (e) => {
-    console.warn('party-treasure: /api/app/me failed; hiding Release until it succeeds', e)
-    cached = null // a failed /me retries next time instead of hiding Release for good
-    return false
+function me() {
+  if (isAnon()) return Promise.resolve(null)
+  cached ??= api.me().catch((e) => {
+    console.warn('/api/app/me failed; hiding Release and Run in lets-roll until it succeeds', e)
+    cached = null // a failed /me retries next time instead of hiding them for good
+    return null
   })
   return cached
+}
+
+export function partyTreasureEnabled() {
+  return me().then((m) => m?.party_treasure === true)
+}
+
+export function combatPushEnabled() {
+  return me().then((m) => m?.combat_push === true)
 }
 
 export function resetPartyTreasure() {
   cached = null
 }
 
-export function usePartyTreasure() {
+function useFlag(read) {
   const [enabled, setEnabled] = useState(false)
   useEffect(() => {
     let live = true
-    partyTreasureEnabled().then((v) => live && setEnabled(v))
+    read().then((v) => live && setEnabled(v))
     return () => {
       live = false
     }
-  }, [])
+  }, [read])
   return enabled
 }
+
+export const usePartyTreasure = () => useFlag(partyTreasureEnabled)
+export const useCombatPush = () => useFlag(combatPushEnabled)
 
 // The receipt for a released encounter's push. No push yet (released before the
 // push existed, or never recorded) reads as not sent, so Retry can recover it.
