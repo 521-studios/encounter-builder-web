@@ -16,7 +16,7 @@ function MapSvg({ img, view, svgRef, children, ...rest }) {
   return (
     <>
       <svg ref={svgRef} className="room-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} {...rest}>
-        <image href={img.url} width={w} height={h} preserveAspectRatio="none" transform={t.rotation ? `rotate(${t.rotation} ${w / 2} ${h / 2})` : undefined} onError={() => setFailedUrl(img.url)} />
+        <image href={img.url} width={w} height={h} preserveAspectRatio="none" transform={t.rotation ? `rotate(${t.rotation} ${w / 2} ${h / 2})` : undefined} onError={() => setFailedUrl(img.url)} onLoad={() => setFailedUrl(null)} />
         {children}
       </svg>
       {failedUrl === img.url && <ImageError />}
@@ -161,7 +161,7 @@ export default function RoomView({ campaignId, enc, chapter, released, onChange,
     <div className="room-view">
       {enc.map_image ? (
         <>
-          <img className="room-image" src={enc.map_image.url} alt="Room map" onError={() => setBrokenUrl(enc.map_image.url)} />
+          <img className="room-image" src={enc.map_image.url} alt="Room map" onError={() => setBrokenUrl(enc.map_image.url)} onLoad={() => setBrokenUrl(null)} />
           {brokenUrl === enc.map_image.url && <ImageError />}
         </>
       ) : chapterImg && region ? (

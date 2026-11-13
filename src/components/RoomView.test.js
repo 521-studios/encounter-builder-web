@@ -194,6 +194,8 @@ test('RoomView: a broken room image or chapter map image says so (qcm5)', () => 
   assert.equal(screen.queryByRole('alert'), null)
   fireEvent.error(screen.getByRole('img', { name: 'Room map' }))
   assert.match(screen.getByRole('alert').textContent, /Couldn't load the map image/)
+  fireEvent.load(screen.getByRole('img', { name: 'Room map' })) // recovered (e.g. a retry)
+  assert.equal(screen.queryByRole('alert'), null)
   cleanup()
   render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={chapter} onChange={() => {}} />)
   fireEvent.error(screen.getByRole('img', { name: 'Room on the chapter map' }).querySelector('image'))
