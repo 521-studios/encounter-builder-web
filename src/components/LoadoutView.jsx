@@ -47,7 +47,7 @@ export default function LoadoutView({ loadout, disabled, onChange, onSendToTreas
                     suggestTraits={pfsrd2.suggestItemTraits}
                     loadFacets={pfsrd2.loadItemFacets}
                     levelFilter
-                    onSelect={(it) => setItem(i, { ...item, ref: { game_id: it.game_id }, variant: '' })}
+                    onSelect={(it) => setItem(i, { ...item, ref: { game_id: it.game_id }, variant: it.matched_variant || '' })}
                     placeholder="search a weapon / armor…"
                   />
                 </div>

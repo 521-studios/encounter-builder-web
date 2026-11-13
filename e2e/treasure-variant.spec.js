@@ -53,3 +53,31 @@ test('treasure item version is locked in by selecting it and persists', async ({
 
   expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
 })
+
+// Searching by a VARIANT's name preselects that variant: the suggest row carries
+// matched_variant (pfsrd2 data-api #86), so the GM doesn't have to pick it twice.
+test('treasure: searching a variant name preselects that variant', async ({ page, baseURL }) => {
+  const apiErrors = trackApiErrors(page)
+  await login(page, baseURL)
+  await openFirstCampaign(page)
+
+  const name = `TVarPick ${Date.now()}`
+  await createEncounter(page, name)
+  try {
+    await addContent(page, 'Treasure')
+    await page.locator('.item-search [data-testid="item-search"]').first().fill('healing potion (lesser)')
+    const potion = page.locator('.item-search [data-testid="item-search-result"][data-name="Healing Potion"]').first()
+    await expect(potion).toBeVisible()
+    await potion.click()
+
+    const wrap = page.locator('.treasure-line-wrap')
+    await expect(wrap.locator('.itemcard .Monster__name')).toHaveText('Healing Potion (Lesser)')
+    await expect(wrap.locator('.variant-hint')).toHaveCount(0) // already locked in
+    await expect(page.getByTestId('save-state')).toHaveText('Saved')
+  } finally {
+    await page.getByRole('button', { name: /^Close/ }).click().catch(() => {})
+    await deleteEncounter(page, name)
+  }
+
+  expect(apiErrors, 'no API request should return 4xx/5xx').toEqual([])
+})
