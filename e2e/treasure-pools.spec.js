@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openEncounter, openBudget } from './helpers/login.js'
 
 // iuha: treasure is grouped into pools (header rows in the content list), each with a

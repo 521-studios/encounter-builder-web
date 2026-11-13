@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, addContent, openEncounter } from './helpers/login.js'
 
 // Placing a hazard in an encounter (bd_521Studios-cid5): a SEPARATE "+ hazard"

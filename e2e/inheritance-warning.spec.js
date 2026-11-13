@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, openFirstCampaign, createChapter, deleteChapter } from './helpers/login.js'
 
 // fb4e: when the campaign settings fetch fails, a chapter's inherited party values

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, deleteChapter, openTab } from './helpers/login.js'
 
 // Slice 3: expected-party inheritance across campaign -> chapter -> encounter.

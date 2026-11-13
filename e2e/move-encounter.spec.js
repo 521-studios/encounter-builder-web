@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createChapter, createEncounter, deleteEncounter, deleteChapter, openTab } from './helpers/login.js'
 
 // HTML5 drag-and-drop: fire the drag events with a shared DataTransfer. (Playwright's

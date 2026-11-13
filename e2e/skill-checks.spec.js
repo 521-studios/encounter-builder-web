@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, addContent, openEncounter, removeRow } from './helpers/login.js'
 
 // vz1j: structured skill-check / discovery entries (skill + DC + effect). Persist

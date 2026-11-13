@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors, openFirstCampaign, createEncounter, deleteEncounter, openTab } from './helpers/login.js'
 
 // Autosave must persist an edit even when the GM navigates away WITHOUT waiting

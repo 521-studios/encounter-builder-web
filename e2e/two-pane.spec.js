@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, trackApiErrors } from './helpers/login.js'
 
 // Selecting a campaign enters the two-pane layout: sidebar (campaign switcher +

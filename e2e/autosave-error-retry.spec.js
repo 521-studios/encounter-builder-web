@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, openFirstCampaign, createEncounter, deleteEncounter, openTab } from './helpers/login.js'
 
 // 85qx: a MOUNTED autosave that fails shows the inline "Save failed" indicator +

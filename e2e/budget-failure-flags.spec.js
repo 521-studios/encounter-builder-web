@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './helpers/fixtures.js'
 import { login, openFirstCampaign, createEncounter, deleteEncounter, addContent, openBudget } from './helpers/login.js'
 
 // f4fc: when an encounter's referenced entries can't load, the treasure/difficulty
