@@ -62,3 +62,35 @@ test('EncounterEditor: a failed kill post reverts the toggle and shows the error
   await waitFor(() => assert.equal(screen.getByLabelText('gob killed').checked, false))
   await screen.findByRole('alert')
 })
+
+test('EncounterEditor: a slow first toggle never overrides a newer one', async () => {
+  let openFirst
+  const firstGate = new Promise((r) => (openFirst = r))
+  let n = 0
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url)
+    if (u.endsWith('/kills')) {
+      const body = JSON.parse(init.body)
+      if (++n === 1) {
+        await firstGate // the first (killed:true) answers last, with an error
+        return res({ error: 'boom' }, 500)
+      }
+      return res({ ...enc, kills: { 'm1:1': { killed: body.killed, at: 't', source: 'eb' } } })
+    }
+    if (u.endsWith('/encounters/e1')) return res(enc)
+    if (u.endsWith('/encounters')) return res([enc])
+    if (u.endsWith('/chapters')) return res([])
+    if (u.endsWith('/settings')) return res({ party_level: 1, party_size: 4 })
+    return res({})
+  }
+  render(<EncounterEditor campaignId="c1" encounterId="e1" onClose={() => {}} />)
+  fireEvent.click(await screen.findByRole('tab', { name: 'Encounter' }))
+  const box = await screen.findByLabelText('gob killed')
+  fireEvent.click(box) // killed
+  fireEvent.click(screen.getByLabelText('gob killed')) // alive again, answers first
+  await waitFor(() => assert.equal(n, 2))
+  openFirst()
+  await new Promise((r) => setTimeout(r, 20))
+  assert.equal(screen.getByLabelText('gob killed').checked, false)
+  assert.equal(screen.queryByRole('alert'), null)
+})
