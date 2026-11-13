@@ -140,3 +140,71 @@ test('RoomView: no navigation when there are no neighbours and no chapter', () =
   render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={null} neighbours={[]} onOpenEncounter={() => {}} onOpenChapter={() => {}} onChange={() => {}} />)
   assert.equal(screen.queryByRole('navigation', { name: 'Connected rooms' }), null)
 })
+
+test('RoomView: the area can be typed (keyboard path), seeded from the current region (qcm5)', () => {
+  const calls = []
+  render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={chapter} onChange={(p) => calls.push(p)} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Change area on chapter map' }))
+  assert.equal(screen.getByLabelText('Width').value, '400')
+  fireEvent.change(screen.getByLabelText('X'), { target: { value: '120.6' } })
+  fireEvent.change(screen.getByLabelText('Height'), { target: { value: '2' } })
+  assert.equal(screen.getByRole('button', { name: 'Save area' }).disabled, true) // under 4px
+  fireEvent.change(screen.getByLabelText('Height'), { target: { value: '' } })
+  assert.equal(screen.getByRole('button', { name: 'Save area' }).disabled, true) // blank
+  fireEvent.change(screen.getByLabelText('Height'), { target: { value: '250' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save area' }))
+  assert.deepEqual(calls, [{ map_region: { x: 121, y: 100, w: 400, h: 250 } }])
+  assert.equal(screen.queryByTestId('room-picker'), null)
+})
+
+test('RoomView: a new area is seeded from the room card on the chapter map (qcm5)', () => {
+  render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={() => {}} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Mark area on chapter map' }))
+  assert.deepEqual(['X', 'Y', 'Width', 'Height'].map((l) => screen.getByLabelText(l).value), ['100', '200', '132', '46'])
+})
+
+test('RoomView: a pointer cancel mid-drag saves nothing, even if an up lands far away (qcm5)', () => {
+  const realPoint = globalThis.DOMPoint
+  globalThis.DOMPoint = class {
+    constructor(x, y) {
+      this.x = x
+      this.y = y
+    }
+    matrixTransform() {
+      return { x: this.x, y: this.y }
+    }
+  }
+  try {
+    const calls = []
+    render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={chapter} onChange={(p) => calls.push(p)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Mark area on chapter map' }))
+    const svg = screen.getByTestId('room-picker')
+    identityScreen(svg)
+    fireEvent.pointerDown(svg, { clientX: 100, clientY: 100, pointerId: 1 })
+    fireEvent.pointerCancel(svg, { pointerId: 1 })
+    fireEvent.pointerUp(svg, { clientX: 600, clientY: 500, pointerId: 1 })
+    assert.deepEqual(calls, [])
+  } finally {
+    globalThis.DOMPoint = realPoint
+  }
+})
+
+test('RoomView: a broken room image or chapter map image says so (qcm5)', () => {
+  render(<RoomView campaignId="c" enc={{ id: 'e1', map_image: { url: '/maps/gone.png' } }} chapter={chapter} onChange={() => {}} />)
+  assert.equal(screen.queryByRole('alert'), null)
+  fireEvent.error(screen.getByRole('img', { name: 'Room map' }))
+  assert.match(screen.getByRole('alert').textContent, /Couldn't load the map image/)
+  fireEvent.load(screen.getByRole('img', { name: 'Room map' })) // recovered (e.g. a retry)
+  assert.equal(screen.queryByRole('alert'), null)
+  cleanup()
+  render(<RoomView campaignId="c" enc={{ id: 'e1', map_region: region }} chapter={chapter} onChange={() => {}} />)
+  fireEvent.error(screen.getByRole('img', { name: 'Room on the chapter map' }).querySelector('image'))
+  assert.match(screen.getByRole('alert').textContent, /Couldn't load the map image/)
+})
+
+test('RoomView: an unsorted encounter with exits shows its connected rooms but no chapter link', () => {
+  render(<RoomView campaignId="c" enc={{ id: 'e1' }} chapter={null} neighbours={[{ id: 'n1', name: 'A2', label: '' }]} onOpenEncounter={() => {}} onOpenChapter={() => {}} onChange={() => {}} />)
+  const nav = screen.getByRole('navigation', { name: 'Connected rooms' })
+  assert.ok(within(nav).getByRole('button', { name: 'A2' }))
+  assert.equal(within(nav).queryByRole('button', { name: 'Open chapter map' }), null)
+})

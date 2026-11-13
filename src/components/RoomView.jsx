@@ -12,15 +12,42 @@ const CARD = { w: 132, h: 46 }
 function MapSvg({ img, view, svgRef, children, ...rest }) {
   const t = imageTransform(img)
   const { w, h } = imageBox(img, t)
+  const [failedUrl, setFailedUrl] = useState(null)
   return (
-    <svg ref={svgRef} className="room-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} {...rest}>
-      <image href={img.url} width={w} height={h} preserveAspectRatio="none" transform={t.rotation ? `rotate(${t.rotation} ${w / 2} ${h / 2})` : undefined} />
-      {children}
-    </svg>
+    <>
+      <svg ref={svgRef} className="room-map" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} {...rest}>
+        <image href={img.url} width={w} height={h} preserveAspectRatio="none" transform={t.rotation ? `rotate(${t.rotation} ${w / 2} ${h / 2})` : undefined} onError={() => setFailedUrl(img.url)} onLoad={() => setFailedUrl(null)} />
+        {children}
+      </svg>
+      {failedUrl === img.url && <ImageError />}
+    </>
   )
 }
 
+// qcm5: a bad or expired /maps/ URL says so instead of showing a blank map.
+const ImageError = () => (
+  <p className="error" role="alert">
+    Couldn't load the map image. Try reloading, or upload it again.
+  </p>
+)
+
 const Box = ({ r, className }) => <rect className={className} x={r.x} y={r.y} width={r.w} height={r.h} vectorEffect="non-scaling-stroke" />
+
+const AREA_FIELDS = [
+  ['x', 'X'],
+  ['y', 'Y'],
+  ['w', 'Width'],
+  ['h', 'Height'],
+]
+
+// The typed box, or null unless every field is a number and it's at least 4px each
+// way (the same floor as a drag).
+function typedArea(t) {
+  const n = Object.fromEntries(AREA_FIELDS.map(([k]) => [k, t[k] === '' ? NaN : Number(t[k])]))
+  if (!AREA_FIELDS.every(([k]) => Number.isFinite(n[k]))) return null
+  if (n.w < 4 || n.h < 4) return null
+  return { x: Math.round(n.x), y: Math.round(n.y), w: Math.round(n.w), h: Math.round(n.h) }
+}
 
 // Drag a box over the whole chapter map; this room's card is outlined to find it.
 function AreaPicker({ img, region, card, onPick, onCancel }) {
@@ -32,9 +59,13 @@ function AreaPicker({ img, region, card, onPick, onCancel }) {
     return { x: p.x, y: p.y }
   }
   const drawn = start && cur ? dragRect(start, cur, 0) : null
+  // qcm5: the keyboard path (and fine-tuning): type the box in map pixels.
+  const seed = region || card || { x: 0, y: 0, w: CARD.w, h: CARD.h }
+  const [typed, setTyped] = useState({ x: String(seed.x), y: String(seed.y), w: String(seed.w), h: String(seed.h) })
+  const typedRect = typedArea(typed)
   return (
     <div className="room-picker">
-      <p>Drag a box around this room on the chapter map.</p>
+      <p>Drag a box around this room on the chapter map, or type it below.</p>
       <MapSvg
         img={img}
         view={imageBox(img, imageTransform(img)).bbox}
@@ -58,12 +89,31 @@ function AreaPicker({ img, region, card, onPick, onCancel }) {
         }}
       >
         {card && <Box r={card} className="room-card-outline" />}
-        {region && !drawn && <Box r={region} className="room-region" />}
-        {drawn && <Box r={drawn} className="room-region" />}
+        {drawn ? <Box r={drawn} className="room-region" /> : typedRect && <Box r={typedRect} className="room-region" />}
       </MapSvg>
-      <button type="button" className="link" onClick={onCancel}>
-        Cancel
-      </button>
+      <form
+        className="room-area-fields"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (typedRect) onPick(typedRect)
+        }}
+      >
+        <fieldset>
+          <legend>Area (map pixels)</legend>
+          {AREA_FIELDS.map(([k, label]) => (
+            <label key={k}>
+              {label}
+              <input type="number" step="1" value={typed[k]} onChange={(e) => setTyped((t) => ({ ...t, [k]: e.target.value }))} />
+            </label>
+          ))}
+        </fieldset>
+        <button type="submit" disabled={!typedRect}>
+          Save area
+        </button>
+        <button type="button" className="link" onClick={onCancel}>
+          Cancel
+        </button>
+      </form>
     </div>
   )
 }
@@ -87,6 +137,7 @@ function NeighbourCard({ n, at, onOpen }) {
 // the rooms it connects to and out to the chapter map.
 export default function RoomView({ campaignId, enc, chapter, released, onChange, neighbours = [], onOpenEncounter, onOpenChapter }) {
   const [picking, setPicking] = useState(false)
+  const [brokenUrl, setBrokenUrl] = useState(null)
   const chapterImg = chapter?.map_image
   const region = enc.map_region
   const pos = chapter?.map_positions?.[enc.id]
@@ -109,7 +160,10 @@ export default function RoomView({ campaignId, enc, chapter, released, onChange,
   return (
     <div className="room-view">
       {enc.map_image ? (
-        <img className="room-image" src={enc.map_image.url} alt="Room map" />
+        <>
+          <img className="room-image" src={enc.map_image.url} alt="Room map" onError={() => setBrokenUrl(enc.map_image.url)} onLoad={() => setBrokenUrl(null)} />
+          {brokenUrl === enc.map_image.url && <ImageError />}
+        </>
       ) : chapterImg && region ? (
         <MapSvg img={chapterImg} view={paddedView(region)} role="img" aria-label="Room on the chapter map">
           <Box r={region} className="room-region" />
