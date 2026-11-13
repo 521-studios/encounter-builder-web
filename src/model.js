@@ -4,7 +4,25 @@ import { partyFields } from './party.js'
 // The API validates + normalizes these, so the UI just offers the valid choices.
 export const ADJUSTMENTS = ['none', 'elite', 'weak']
 export const SALE_CLASSES = ['normal', 'pure_treasure']
-export const TREASURE_STATES = ['intact', 'consumed', 'destroyed']
+export const TREASURE_STATES = ['intact', 'consumed', 'destroyed', 'left_behind']
+// Why loot doesn't move to the party at close-out (we5k.2.5): the non-intact states.
+export const EXCLUSION_REASONS = ['consumed', 'destroyed', 'left_behind']
+export const EXCLUSION_REASON_LABELS = { consumed: 'consumed', destroyed: 'destroyed', left_behind: 'left behind' }
+
+// How many of a treasure line move to the party at release. Mirrors the API's
+// TreasureLine.Moving: qty_moving (capped at qty) when set, else all of an
+// intact line and none of a pruned one.
+export function treasureMoving(t) {
+  const qty = Number(t?.qty) || 0
+  if (t?.qty_moving != null) return Math.max(0, Math.min(Number(t.qty_moving) || 0, qty))
+  return !t?.state || t.state === 'intact' ? qty : 0
+}
+
+// A coin drop's value in copper.
+export function coinCp(coin) {
+  const n = (k) => Number(coin?.[k]) || 0
+  return n('cp') + 10 * n('sp') + 100 * n('gp') + 1000 * n('pp')
+}
 
 // Room/area type. `combat` (default) is the builder's original unit and the only
 // type with a meaningful difficulty band + treasure target; the others are
@@ -455,7 +473,11 @@ export function contentInput(enc) {
         out.push({ id: c.id, type: c.type, markdown: markdownBlockInput(c.markdown) })
         break
       case 'pool':
-        out.push({ id: c.id, type: c.type, pool: { name: (c.pool?.name || '').trim(), gate: gateInput(c.pool?.gate) } })
+        out.push({
+          id: c.id,
+          type: c.type,
+          pool: { name: (c.pool?.name || '').trim(), gate: gateInput(c.pool?.gate), ...(c.pool?.not_found ? { not_found: true } : {}) },
+        })
         break
       case 'treasure':
         out.push({ id: c.id, type: c.type, treasure: treasureLineInput(c.treasure || {}) })
@@ -489,6 +511,11 @@ function coinInput(coin) {
   for (const k of ['cp', 'sp', 'gp', 'pp']) {
     const n = Math.round(Number(coin?.[k]) || 0)
     if (n > 0) out[k] = n
+  }
+  // we5k.2.5: an excluded drop keeps its reason + note.
+  if (coin?.state && coin.state !== 'intact') {
+    out.state = coin.state
+    if (coin.state_note) out.state_note = coin.state_note
   }
   return out
 }

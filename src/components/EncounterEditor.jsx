@@ -32,6 +32,7 @@ import SkillInput from './SkillInput.jsx'
 import PartyFields from './PartyFields.jsx'
 import TreasureBudget from './TreasureBudget.jsx'
 import EncounterPrintSheet from './EncounterPrintSheet.jsx'
+import TreasurePackage from './TreasurePackage.jsx'
 import RemoveButton from './RemoveButton.jsx'
 import RoomView from './RoomView.jsx'
 
@@ -449,6 +450,16 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
             />
           </label>
         )}
+        {partyTreasure && !released && (status === 'complete' || status === 'skipped') && (
+          <TreasurePackage
+            content={content}
+            entryOf={budget.entryOf}
+            onChange={(next) => patch({ content: next })}
+            onRelease={() => release()}
+            releasing={releasing}
+            saving={saveState === 'saving'}
+          />
+        )}
         {released && partyTreasure && <ReleaseReceipt push={enc.release_push} onRetry={retryPush} retrying={retrying} />}
         {enc.combat_push && (
           <p className="muted combat-push" data-testid="combat-push">
@@ -532,11 +543,6 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               {combatPush && combat && (status === 'prepared' || status === 'executing') && (
                 <button data-testid="push-combat" onClick={pushCombat} disabled={pushing || saveState === 'saving'}>
                   {pushing ? 'Sending…' : enc.combat_push ? 'Update lets-roll' : 'Run in lets-roll'}
-                </button>
-              )}
-              {partyTreasure && (
-                <button onClick={() => release()} disabled={releasing || saveState === 'saving'}>
-                  {releasing ? 'Releasing…' : 'Release to party'}
                 </button>
               )}
             </div>

@@ -55,7 +55,9 @@ test('GM builds and releases an encounter end-to-end', async ({ page, baseURL })
   await page.getByRole('button', { name: /^show stat block for/ }).first().click()
   await expect(page.locator('.statblock')).toBeVisible()
 
-  // Release → read-only.
+  // Close out (we5k.2.5: Release lives in the treasure package) → release → read-only.
+  await page.getByTestId('encounter-status').selectOption('complete')
+  await expect(page.getByTestId('treasure-package')).toBeVisible()
   page.once('dialog', (d) => d.accept())
   await page.getByRole('button', { name: /Release/ }).click()
   await expect(page.getByText(/Released/)).toBeVisible()
