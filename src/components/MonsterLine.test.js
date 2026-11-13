@@ -131,12 +131,12 @@ test('MonsterLine shows one killed toggle per creature only when onKill is given
   const calls = []
   const kills = { 'm1:2': { killed: true } }
   rerender(<MonsterLine monster={monster} itemId="m1" kills={kills} onKill={(k, v) => calls.push([k, v])} entryOf={entryOf} onChange={noop} onRemove={noop} />)
-  const first = screen.getByLabelText('Goblin Warrior 1 killed')
+  const first = screen.getByLabelText('Goblin Warrior #1 killed')
   assert.equal(first.checked, false)
-  assert.equal(screen.getByLabelText('Goblin Warrior 2 killed').checked, true)
+  assert.equal(screen.getByLabelText('Goblin Warrior #2 killed').checked, true)
   fireEvent.click(first)
   assert.deepEqual(calls, [['m1:1', true]])
 
   rerender(<MonsterLine monster={monster} itemId="m1" kills={kills} onKill={noop} disabled entryOf={entryOf} onChange={noop} onRemove={noop} />)
-  assert.equal(screen.getByLabelText('Goblin Warrior 2 killed').disabled, true) // released: read-only
+  assert.equal(screen.getByLabelText('Goblin Warrior #2 killed').disabled, true) // released: read-only
 })

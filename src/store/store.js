@@ -183,9 +183,16 @@ export function resetFlush() {
 // replacing a read cache) each pass so overlapping edits can't reorder; persist
 // via the entity's x.persist; on failure keep dirty (retry on next edit) and
 // surface via x.onError.
-async function runFlush(key) {
+// A flush already in flight returns its promise, so flushNow() callers (markKill)
+// wait for the write that's landing, including edits it picks up on the way.
+function runFlush(key) {
   const x = metaOf(key)
-  if (x.saving || !x.dirty) return
+  if (x.saving) return x.inflight
+  if (!x.dirty) return Promise.resolve()
+  x.inflight = flushLoop(x)
+  return x.inflight
+}
+async function flushLoop(x) {
   x.saving = true
   setFlushState(x, 'saving')
   try {

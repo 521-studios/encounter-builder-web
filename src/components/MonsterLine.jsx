@@ -77,7 +77,7 @@ export default function MonsterLine({ monster, itemId, entryOf, disabled, kills,
 }
 
 function KillToggles({ name, itemId, count, kills, disabled, onKill }) {
-  const n = Math.max(1, Number(count) || 1)
+  const n = Math.min(100, Math.max(1, Math.floor(Number(count)) || 1)) // a sane cap: one toggle per creature
   return (
     <div className="monster-kills" data-testid="monster-kills">
       {Array.from({ length: n }, (_, i) => {
@@ -86,7 +86,7 @@ function KillToggles({ name, itemId, count, kills, disabled, onKill }) {
           <label key={key}>
             <input
               type="checkbox"
-              aria-label={n > 1 ? `${name} ${i + 1} killed` : `${name} killed`}
+              aria-label={n > 1 ? `${name} #${i + 1} killed` : `${name} killed`} // contains the visible text (label-in-name)
               checked={!!kills?.[key]?.killed}
               disabled={disabled}
               onChange={(e) => onKill(key, e.target.checked)}
