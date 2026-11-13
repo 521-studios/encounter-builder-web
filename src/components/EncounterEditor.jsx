@@ -278,17 +278,30 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
   // autosaved PUT (the API keeps them apart so a save never clobbers a lets-roll
   // report), so save pending edits first (a just-added monster must exist on the
   // server), then adopt only the returned kills.
+  // The toggle flips at once (optimistic) and reverts if the save or the post fails.
   async function markKill(key, killed) {
     const id = encRef.current?.id
+    const setKill = (k) => {
+      if (!encRef.current || encRef.current.id !== id) return // the GM opened another encounter meanwhile
+      const kills = { ...encRef.current.kills }
+      if (k) kills[key] = k
+      else delete kills[key]
+      encRef.current = { ...encRef.current, kills }
+      setEnc(encRef.current)
+    }
+    const before = encRef.current?.kills?.[key]
     setError(null)
+    setKill({ ...before, killed })
     try {
       await encounters.flush(campaignId, encounterId)
-      if (flushState(encKey(campaignId, encounterId)) === 'error') return // "Save failed" is already showing
+      if (flushState(encKey(campaignId, encounterId)) === 'error') {
+        setKill(before) // "Save failed" is already showing
+        return
+      }
       const result = await encounters.markKill(campaignId, encounterId, key, killed)
-      if (!encRef.current || encRef.current.id !== id) return // the GM opened another encounter meanwhile
-      encRef.current = { ...encRef.current, kills: result.kills }
-      setEnc(encRef.current)
+      setKill(result.kills?.[key])
     } catch (e) {
+      setKill(before)
       if (encRef.current?.id === id) setError(errorMessage(e))
     }
   }
