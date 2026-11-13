@@ -274,6 +274,22 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
     }
   }
 
+  // we5k.2.4: the GM marks one creature killed or alive. Kills aren't part of the
+  // autosaved PUT (the API keeps them apart so a save never clobbers a lets-roll
+  // report), so save pending edits first (a just-added monster must exist on the
+  // server), then adopt only the returned kills.
+  async function markKill(key, killed) {
+    setError(null)
+    try {
+      await encounters.flush(campaignId, encounterId)
+      const result = await encounters.markKill(campaignId, encounterId, key, killed)
+      encRef.current = { ...encRef.current, kills: result.kills }
+      setEnc(encRef.current)
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+
   // we5k.2.3: push the monsters into the campaign's lets-roll game. Save current
   // edits first (lets-roll gets what the GM sees), then push. The API moves the
   // encounter to executing; adopt its result so a later autosave doesn't send the
@@ -615,6 +631,8 @@ export default function EncounterEditor({ campaignId, encounterId, onClose, onSa
               onAdd={addContentItem}
               onRemove={removeContentItem}
               onReorder={reorderContent}
+              kills={enc.kills}
+              onKill={status === 'prepared' ? undefined : markKill}
             />
           </div>
         )}

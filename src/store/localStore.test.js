@@ -101,3 +101,13 @@ test('update moves status among prepared/executing/complete but never into or ou
   localStore.encounters.release(a.id)
   assert.equal(localStore.encounters.update(a.id, { name: 'A', status: 'prepared' }).status, 'released')
 })
+
+test('markKill stores a kill that a later full-replace update keeps (we5k.2.4)', () => {
+  const a = localStore.encounters.create({ name: 'K' })
+  const marked = localStore.encounters.markKill(a.id, 'm1:1', true)
+  assert.equal(marked.kills['m1:1'].killed, true)
+  assert.equal(marked.kills['m1:1'].source, 'eb')
+  const saved = localStore.encounters.update(a.id, { name: 'K2' })
+  assert.equal(saved.kills['m1:1'].killed, true)
+  assert.throws(() => localStore.encounters.markKill('nope', 'm1:1', true))
+})

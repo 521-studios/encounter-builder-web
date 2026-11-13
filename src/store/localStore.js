@@ -95,6 +95,7 @@ export const localStore = {
       const prev = state.encounters[id]
       const keep = prev?.status === 'released' || !input.status || input.status === 'released'
       const rec = { ...input, id, status: keep ? prev?.status || 'prepared' : input.status }
+      if (prev?.kills) rec.kills = prev.kills // like the API: only markKill changes kills (we5k.2.4)
       state.encounters[id] = rec
       persist()
       return rec
@@ -103,6 +104,15 @@ export const localStore = {
       delete state.encounters[id]
       persist()
       return null
+    },
+    // we5k.2.4: mark creature `key` ("<content item id>:<n>") killed or alive.
+    markKill: (id, key, killed) => {
+      const prev = state.encounters[id]
+      if (!prev) throw new Error(`encounter ${id} not found`)
+      const rec = { ...prev, kills: { ...prev.kills, [key]: { killed, at: new Date().toISOString(), source: 'eb' } } }
+      state.encounters[id] = rec
+      persist()
+      return rec
     },
     release: (id) => {
       const prev = state.encounters[id]

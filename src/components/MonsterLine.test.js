@@ -122,3 +122,21 @@ test('MonsterLine: the edit link reveals a name field that writes the nickname',
   fireEvent.change(screen.getByLabelText('monster name'), { target: { value: 'Boss' } })
   assert.equal(captured.nickname, 'Boss')
 })
+
+test('MonsterLine shows one killed toggle per creature only when onKill is given (we5k.2.4)', () => {
+  const monster = { ref: { game_id: 'Monsters:1' }, count: 2, nickname: '', adjustment: 'none' }
+  const { rerender } = render(<MonsterLine monster={monster} itemId="m1" entryOf={entryOf} onChange={noop} onRemove={noop} />)
+  assert.equal(screen.queryByTestId('monster-kills'), null) // prepared: no toggles
+
+  const calls = []
+  const kills = { 'm1:2': { killed: true } }
+  rerender(<MonsterLine monster={monster} itemId="m1" kills={kills} onKill={(k, v) => calls.push([k, v])} entryOf={entryOf} onChange={noop} onRemove={noop} />)
+  const first = screen.getByLabelText('Goblin Warrior 1 killed')
+  assert.equal(first.checked, false)
+  assert.equal(screen.getByLabelText('Goblin Warrior 2 killed').checked, true)
+  fireEvent.click(first)
+  assert.deepEqual(calls, [['m1:1', true]])
+
+  rerender(<MonsterLine monster={monster} itemId="m1" kills={kills} onKill={noop} disabled entryOf={entryOf} onChange={noop} onRemove={noop} />)
+  assert.equal(screen.getByLabelText('Goblin Warrior 2 killed').disabled, true) // released: read-only
+})

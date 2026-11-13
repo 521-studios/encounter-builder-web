@@ -373,6 +373,7 @@ legend { padding: 0 0.4rem; opacity: 0.8; }
 .monster-expand:hover { color: var(--accent); }
 .monster-header-level { font-weight: 700; white-space: nowrap; color: var(--gold); }
 .monster-header-source, .monster-header-init, .monster-header-loading { font-size: 0.85em; color: var(--muted); }
+.monster-kills { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; font-size: 0.9em; }
 .statblock {
   background: var(--card);
   border: 1px solid var(--border);

@@ -44,6 +44,9 @@ const apiBackend = {
     // we5k.2.3: push the encounter's monsters into the lets-roll game (an upsert,
     // so a re-push syncs). API-only; the editor hides it when not wired up.
     pushCombat: (cid, id, opts = {}) => request('POST', `${encBase(cid)}/${enc(id)}/push-combat`, opts),
+    // we5k.2.4: the GM marks one creature killed or alive (server-stamped).
+    markKill: (cid, id, key, killed, opts = {}) =>
+      request('POST', `${encBase(cid)}/${enc(id)}/kills`, { body: { eb_monster_key: key, killed }, ...opts }),
   },
   chapters: {
     list: (cid, opts = {}) => request('GET', chBase(cid), opts),
@@ -68,6 +71,7 @@ const localBackend = {
     update: (_cid, id, input) => localStore.encounters.update(id, input),
     remove: (_cid, id) => localStore.encounters.remove(id),
     release: (_cid, id) => localStore.encounters.release(id),
+    markKill: (_cid, id, key, killed) => localStore.encounters.markKill(id, key, killed),
   },
   chapters: {
     list: () => localStore.chapters.list(),
@@ -281,6 +285,11 @@ export const store = {
     },
     async retryRelease(cid, id, opts) {
       const rec = await apiBackend.encounters.retryRelease(cid, id, opts)
+      slice(cid).encounters.set(String(id), rec)
+      return rec
+    },
+    async markKill(cid, id, key, killed, opts) {
+      const rec = await backend().encounters.markKill(cid, id, key, killed, opts)
       slice(cid).encounters.set(String(id), rec)
       return rec
     },
