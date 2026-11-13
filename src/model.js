@@ -21,6 +21,33 @@ export const ROOM_TYPE_LABELS = {
 }
 // A room shows its combat difficulty band + treasure target only when it's combat
 // (empty/unset defaults to combat, matching the API).
+// Encounter lifecycle (we5k.2.1): prepared → executing → complete → released.
+// Non-combat encounters skip executing; skipped closes out one the party never
+// ran. Rows saved before the lifecycle say draft/run; read those as
+// prepared/executing.
+export const STATUSES = ['prepared', 'executing', 'complete', 'skipped', 'released']
+// Closed out: complete, skipped, or past that (released). What rollups count as done.
+export function isDone(status) {
+  const s = canonicalStatus(status)
+  return s === 'complete' || s === 'skipped' || s === 'released'
+}
+export function canonicalStatus(status) {
+  if (!status || status === 'draft') return 'prepared'
+  if (status === 'run') return 'executing'
+  return status
+}
+// A chapter's progress: [status, count] in lifecycle order, zero counts dropped.
+export function statusRollup(encounters) {
+  const counts = Object.create(null) // statuses are server strings; no prototype keys
+  for (const e of encounters) {
+    const s = canonicalStatus(e.status)
+    counts[s] = (counts[s] || 0) + 1
+  }
+  return [...STATUSES, ...Object.keys(counts).filter((s) => !STATUSES.includes(s))]
+    .filter((s) => counts[s])
+    .map((s) => [s, counts[s]])
+}
+
 export function isCombatRoom(roomType) {
   return !roomType || roomType === 'combat'
 }
@@ -493,6 +520,7 @@ export function toEncounterInput(enc) {
     chapter_id: enc.chapter_id || '',
     description: '',
     notes: enc.notes || '',
+    closeout_notes: enc.closeout_notes || '',
     // The single ordered "Encounter" content list. Supersedes text_blocks / challenges /
     // treasure / treasure_pools / xp_awards / rewards / currency — all omitted here so the
     // full-replace PUT clears them (the description→text_blocks migration pattern).

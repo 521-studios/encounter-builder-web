@@ -3,7 +3,7 @@ import { errorMessage } from '../api/errors.js'
 import { encounters as encountersApi } from '../api/encounters.js'
 import { chapters as chaptersApi } from '../api/chapters.js'
 import { groupEncountersByChapter, nextChapterOrder, ensureUnsortedGroup, UNSORTED } from '../chapters.js'
-import { toEncounterInput } from '../model.js'
+import { toEncounterInput, canonicalStatus, statusRollup, isDone } from '../model.js'
 
 // The sidebar chapter tree: chapters (in order) each expand to their encounters
 // (natural-sorted). Direct manipulation — click a chapter's NAME to open its
@@ -143,6 +143,7 @@ export default function ChapterTree({ campaignId, onEdit, onEditChapter, reloadK
                 className="chapter-caret-btn"
                 aria-expanded={isOpen}
                 aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${g.chapter ? g.chapter.name : 'Unsorted'}`}
+                aria-describedby={g.encounters.length > 0 ? `rollup-${key}` : undefined}
                 onClick={() => toggle(key)}
               >
                 <span className="chapter-caret" aria-hidden="true">{isOpen ? '▾' : '▸'}</span>
@@ -157,6 +158,15 @@ export default function ChapterTree({ campaignId, onEdit, onEditChapter, reloadK
                 </button>
               ) : (
                 <span className="chapter-name chapter-name--unsorted">Unsorted</span>
+              )}
+              {/* Progress rollup (we5k.2.1): always visible, even collapsed. */}
+              {g.encounters.length > 0 && (
+                <span className="chapter-rollup" id={`rollup-${key}`} data-testid="chapter-rollup">
+                  {[
+                    `${g.encounters.filter((e) => isDone(e.status)).length}/${g.encounters.length} done`,
+                    ...statusRollup(g.encounters).map(([s, n]) => `${n} ${s}`),
+                  ].join(' · ')}
+                </span>
               )}
             </div>
             {isOpen && (
@@ -184,7 +194,7 @@ export default function ChapterTree({ campaignId, onEdit, onEditChapter, reloadK
                         aria-pressed={e.id === selectedId}
                         onClick={() => onEdit(e)}
                       >
-                        {e.name} <span className="status">{e.status}</span>
+                        {e.name} <span className={`status status--${canonicalStatus(e.status)}`}>{canonicalStatus(e.status)}</span>
                       </button>
                     </li>
                   ))}

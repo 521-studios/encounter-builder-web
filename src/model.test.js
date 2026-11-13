@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  canonicalStatus,
+  statusRollup,
+  isDone,
   keyed,
   withKey,
   stripKey,
@@ -830,4 +833,28 @@ test('roomNeighbours: own linked exits first, then rooms that lead here; deduped
     { id: 'b', name: 'A2', label: 'back door' },
   ])
   assert.deepEqual(roomNeighbours('me', [], []), [])
+})
+
+test('canonicalStatus reads legacy draft/run (and missing) as the lifecycle names', () => {
+  assert.equal(canonicalStatus('draft'), 'prepared')
+  assert.equal(canonicalStatus(undefined), 'prepared')
+  assert.equal(canonicalStatus('run'), 'executing')
+  assert.equal(canonicalStatus('complete'), 'complete')
+  assert.equal(canonicalStatus('released'), 'released')
+})
+
+test('statusRollup counts a chapter in lifecycle order, dropping zeros', () => {
+  const encs = [{ status: 'complete' }, { status: 'draft' }, { status: 'prepared' }, { status: 'run' }, { status: 'released' }, { status: 'skipped' }]
+  assert.deepEqual(statusRollup(encs), [['prepared', 2], ['executing', 1], ['complete', 1], ['skipped', 1], ['released', 1]])
+  assert.deepEqual(statusRollup([]), [])
+})
+
+test('toEncounterInput sends closeout_notes (empty string clears)', () => {
+  assert.equal(toEncounterInput({ name: 'x', closeout_notes: 'skipped' }).closeout_notes, 'skipped')
+  assert.equal(toEncounterInput({ name: 'x' }).closeout_notes, '')
+})
+
+test('isDone: complete, skipped and released are closed out; the rest are not', () => {
+  for (const s of ['complete', 'skipped', 'released']) assert.equal(isDone(s), true, s)
+  for (const s of ['prepared', 'executing', 'draft', 'run', undefined]) assert.equal(isDone(s), false, String(s))
 })
